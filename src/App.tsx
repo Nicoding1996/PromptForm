@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import FormRenderer from './components/FormRenderer';
 import type { FormData } from './components/FormRenderer';
+import ImageUploader from './components/ImageUploader';
 
 const App: React.FC = () => {
   const [promptText, setPromptText] = useState<string>('');
   const [formJson, setFormJson] = useState<FormData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<'text' | 'image'>('text');
 
   const handleGenerate = async () => {
     setError(null);
@@ -58,6 +60,73 @@ const App: React.FC = () => {
     }
   };
 
+  // Convert selected image file to Base64 (without data: prefix) and mime type
+  const fileToBase64 = (file: File): Promise<{ base64: string; mimeType: string }> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const result = String(reader.result);
+          // e.g. data:image/png;base64,AAAA...
+          const [prefix, b64] = result.split(',');
+          const mimeType = prefix?.match(/data:(.*);base64/)?.[1] ?? file.type;
+          if (!b64) return reject(new Error('Failed to read file as Base64.'));
+          resolve({ base64: b64, mimeType });
+        } catch (e) {
+          reject(e);
+        }
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+
+  const handleGenerateImage = async (file: File) => {
+    setError(null);
+    setIsLoading(true);
+    try {
+      const { base64, mimeType } = await fileToBase64(file);
+
+      const resp = await fetch('http://localhost:3001/generate-form-from-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64, mimeType }),
+      });
+
+      let data: unknown = null;
+      try {
+        data = await resp.json();
+      } catch {
+        // ignore JSON parse errors; handled below
+      }
+
+      if (!resp.ok) {
+        console.error('Generate form from image error', {
+          status: resp.status,
+          statusText: resp.statusText,
+          details: data,
+        });
+        const message = (() => {
+          if (data && typeof data === 'object') {
+            const d = data as Record<string, unknown>;
+            if (typeof d.error === 'string') return d.error;
+            if (typeof d.message === 'string') return d.message;
+          }
+          return 'Failed to generate form from image.';
+        })();
+        setError(message);
+        setFormJson(null);
+      } else {
+        setFormJson(data as FormData);
+      }
+    } catch (err) {
+      console.error('Image handling or network error:', err);
+      setError('Error processing the image or contacting backend.');
+      setFormJson(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-100">
       <main className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-10">
@@ -66,68 +135,111 @@ const App: React.FC = () => {
             PromptForm
           </h1>
           <p className="mt-2 text-sm text-gray-600">
-            Describe the form you want to create.
+            {mode === 'text'
+              ? 'Describe the form you want to create.'
+              : 'Upload an image of a form to digitize it.'}
           </p>
-        </header>
 
-        <section className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-gray-700" htmlFor="promptText">
-              Prompt
-            </label>
-            <textarea
-              id="promptText"
-              value={promptText}
-              onChange={(e) => setPromptText(e.target.value)}
-              rows={8}
-              placeholder="Describe the form you want to generate..."
-              className="min-h-[160px] w-full rounded-lg border border-gray-300 bg-white p-4 text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-
-          {error && (
-            <p
-              role="status"
-              className="mt-4 rounded-md border-l-4 border-red-400 bg-red-50 p-3 text-sm text-red-700"
-            >
-              {error}
-            </p>
-          )}
-
-          <div className="mt-6">
+          <div className="mt-4 inline-flex items-center rounded-md bg-white p-1 ring-1 ring-gray-200">
             <button
               type="button"
-              onClick={handleGenerate}
+              className={`px-3 py-1 text-sm font-medium rounded ${
+                mode === 'text'
+                  ? 'bg-indigo-600 text-white shadow'
+                  : 'text-gray-700 hover:bg-gray-100'
+              }`}
+              onClick={() => setMode('text')}
               disabled={isLoading}
-              className="inline-flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-500  -2 -offset-2 -indigo-600 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isLoading && (
-                <svg
-                  className="h-5 w-5 animate-spin text-white"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8v4A4 4 0 008 12H4z"
-                  />
-                </svg>
-              )}
-              {isLoading ? 'Generating...' : 'Generate Form'}
+              From Text
+            </button>
+            <button
+              type="button"
+              className={`px-3 py-1 text-sm font-medium rounded ${
+                mode === 'image'
+                  ? 'bg-indigo-600 text-white shadow'
+                  : 'text-gray-700 hover:bg-gray-100'
+              }`}
+              onClick={() => setMode('image')}
+              disabled={isLoading}
+            >
+              From Image
             </button>
           </div>
-        </section>
+        </header>
+
+        {mode === 'text' ? (
+          <section className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-gray-700" htmlFor="promptText">
+                Prompt
+              </label>
+              <textarea
+                id="promptText"
+                value={promptText}
+                onChange={(e) => setPromptText(e.target.value)}
+                rows={8}
+                placeholder="Describe the form you want to generate..."
+                className="min-h-[160px] w-full rounded-lg border border-gray-300 bg-white p-4 text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+
+            {error && (
+              <p
+                role="status"
+                className="mt-4 rounded-md border-l-4 border-red-400 bg-red-50 p-3 text-sm text-red-700"
+              >
+                {error}
+              </p>
+            )}
+
+            <div className="mt-6">
+              <button
+                type="button"
+                onClick={handleGenerate}
+                disabled={isLoading}
+                className="inline-flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isLoading && (
+                  <svg
+                    className="h-5 w-5 animate-spin text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8v4A4 4 0 008 12H4z"
+                    />
+                  </svg>
+                )}
+                {isLoading ? 'Generating...' : 'Generate Form'}
+              </button>
+            </div>
+          </section>
+        ) : (
+          <section className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
+            <ImageUploader onGenerate={handleGenerateImage} isLoading={isLoading} />
+            {error && (
+              <p
+                role="status"
+                className="mt-4 rounded-md border-l-4 border-red-400 bg-red-50 p-3 text-sm text-red-700"
+              >
+                {error}
+              </p>
+            )}
+          </section>
+        )}
 
         {/* Loading placeholder / generated form */}
         {isLoading ? (
