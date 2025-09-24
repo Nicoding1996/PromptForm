@@ -14,9 +14,13 @@ export interface FormField {
     | 'time'
     | 'file'
     | 'range'
+    | 'radioGrid'
     | 'submit';
   name: string;
   options?: string[]; // required for radio | checkbox | select
+  // radioGrid-specific structure:
+  rows?: string[];    // array of row labels/questions
+  columns?: string[]; // array of column choices
 }
 
 export interface FormData {
@@ -198,6 +202,58 @@ const FormRenderer: React.FC<FormRendererProps> = ({ formData }) => {
                     </option>
                   ))}
                 </select>
+              </div>
+            );
+          }
+
+          // Radio Grid (matrix-style)
+          if (field.type === 'radioGrid') {
+            const rows = field.rows ?? [];
+            const cols = field.columns ?? [];
+            return (
+              <div className="flex flex-col gap-3" key={key}>
+                <span className={baseLabelClass}>{field.label}</span>
+                <div className="overflow-auto">
+                  <table className="min-w-full border-collapse">
+                    <thead>
+                      <tr>
+                        <th className="p-2 text-left text-xs font-semibold text-gray-600"></th>
+                        {cols.map((col, cIdx) => (
+                          <th key={`${field.name}-col-${cIdx}`} className="p-2 text-xs font-semibold text-gray-600">
+                            {col}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((row, rIdx) => {
+                        const rowName = `${field.name}[${rIdx}]`;
+                        return (
+                          <tr key={`${field.name}-row-${rIdx}`} className="border-t border-gray-200">
+                            <th scope="row" className="p-2 text-left text-sm font-medium text-gray-700">
+                              {row}
+                            </th>
+                            {cols.map((col, cIdx) => {
+                              const id = `${field.name}-${rIdx}-${cIdx}`;
+                              return (
+                                <td key={id} className="p-2 text-center">
+                                  <input
+                                    type="radio"
+                                    id={id}
+                                    name={rowName}
+                                    value={String(cIdx)}
+                                    className="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                    aria-label={`${row} - ${col}`}
+                                  />
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             );
           }
