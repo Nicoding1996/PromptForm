@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import FormRenderer from './components/FormRenderer';
 import type { FormData } from './components/FormRenderer';
-import ImageUploader from './components/ImageUploader';
+import FileUploader from './components/FileUploader';
 
 const App: React.FC = () => {
   const [promptText, setPromptText] = useState<string>('');
   const [formJson, setFormJson] = useState<FormData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [mode, setMode] = useState<'text' | 'image'>('text');
+  const [mode, setMode] = useState<'text' | 'file'>('text');
 
   const handleGenerate = async () => {
     setError(null);
@@ -80,17 +80,29 @@ const App: React.FC = () => {
       reader.readAsDataURL(file);
     });
 
-  const handleGenerateImage = async (file: File) => {
+  const handleGenerateFile = async (file: File) => {
     setError(null);
     setIsLoading(true);
     try {
-      const { base64, mimeType } = await fileToBase64(file);
+      let resp: Response | null = null;
 
-      const resp = await fetch('http://localhost:3001/generate-form-from-image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64, mimeType }),
-      });
+      if (file.type && file.type.startsWith('image/')) {
+        // Route images to the existing vision endpoint
+        const { base64, mimeType } = await fileToBase64(file);
+        resp = await fetch('http://localhost:3001/generate-form-from-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: base64, mimeType }),
+        });
+      } else {
+        // Route non-images (txt, pdf, docx) to the document endpoint as multipart/form-data
+        const form = new FormData();
+        form.append('file', file, file.name);
+        resp = await fetch('http://localhost:3001/generate-form-from-document', {
+          method: 'POST',
+          body: form, // Let the browser set the multipart boundary
+        });
+      }
 
       let data: unknown = null;
       try {
@@ -100,7 +112,7 @@ const App: React.FC = () => {
       }
 
       if (!resp.ok) {
-        console.error('Generate form from image error', {
+        console.error('Generate form from file error', {
           status: resp.status,
           statusText: resp.statusText,
           details: data,
@@ -111,7 +123,7 @@ const App: React.FC = () => {
             if (typeof d.error === 'string') return d.error;
             if (typeof d.message === 'string') return d.message;
           }
-          return 'Failed to generate form from image.';
+          return 'Failed to generate form from file.';
         })();
         setError(message);
         setFormJson(null);
@@ -119,8 +131,8 @@ const App: React.FC = () => {
         setFormJson(data as FormData);
       }
     } catch (err) {
-      console.error('Image handling or network error:', err);
-      setError('Error processing the image or contacting backend.');
+      console.error('File handling or network error:', err);
+      setError('Error processing the file or contacting backend.');
       setFormJson(null);
     } finally {
       setIsLoading(false);
@@ -137,7 +149,7 @@ const App: React.FC = () => {
           <p className="mt-2 text-sm text-gray-600">
             {mode === 'text'
               ? 'Describe the form you want to create.'
-              : 'Upload an image of a form to digitize it.'}
+              : 'Upload a file (image, TXT, PDF, DOCX) of a form to digitize it.'}
           </p>
 
           <div className="mt-4 inline-flex items-center rounded-md bg-white p-1 ring-1 ring-gray-200">
@@ -156,14 +168,14 @@ const App: React.FC = () => {
             <button
               type="button"
               className={`px-3 py-1 text-sm font-medium rounded ${
-                mode === 'image'
+                mode === 'file'
                   ? 'bg-indigo-600 text-white shadow'
                   : 'text-gray-700 hover:bg-gray-100'
               }`}
-              onClick={() => setMode('image')}
+              onClick={() => setMode('file')}
               disabled={isLoading}
             >
-              From Image
+              From File
             </button>
           </div>
         </header>
@@ -229,7 +241,7 @@ const App: React.FC = () => {
           </section>
         ) : (
           <section className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-            <ImageUploader onGenerate={handleGenerateImage} isLoading={isLoading} />
+            <FileUploader onGenerate={handleGenerateFile} isLoading={isLoading} />
             {error && (
               <p
                 role="status"
