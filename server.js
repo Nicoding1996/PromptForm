@@ -8,7 +8,7 @@ import pdfParse from 'pdf-parse/lib/pdf-parse.js';
 import mammoth from 'mammoth';
 
  // Load environment variables from .env file (point to the frontend .env location)
-dotenv.config({ path: './PromptForm/.env' });
+dotenv.config();
 
 const app = express();
 const port = 3001;
