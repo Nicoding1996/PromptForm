@@ -13,6 +13,25 @@ dotenv.config();
 const app = express();
 const port = 3001;
 
+// Limit for including extracted document text in prompts (characters)
+const DOC_TEXT_CHAR_LIMIT = parseInt(process.env.DOC_TEXT_CHAR_LIMIT || '15000', 10);
+
+// Preferred Gemini model (override via .env GEMINI_MODEL). Using "-latest" avoids 404 on retired versions.
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-flash-latest';
+
+/**
+ * Condense large text to fit within model prompt limits while keeping context.
+ * Keeps the beginning and the end where most form headers and signature sections live.
+ */
+function condenseText(input, limit = DOC_TEXT_CHAR_LIMIT) {
+  if (!input || input.length <= limit) return input || '';
+  const head = Math.floor(limit * 0.75);
+  const tail = limit - head - 64; // reserve for ellipsis marker
+  const start = input.slice(0, head);
+  const end = input.slice(-Math.max(tail, 0));
+  return `${start}\n\n...[omitted ${input.length - (head + Math.max(tail, 0))} chars]...\n\n${end}`;
+}
+
 app.use(cors());
 // Increase JSON body limit to handle base64 images safely (adjust as needed)
 app.use(express.json({ limit: '10mb' }));
@@ -39,7 +58,7 @@ app.post('/generate-form', async (req, res) => {
 
   try {
     const model = genAI.getGenerativeModel({
-      model: 'gemini-1.5-flash',
+      model: GEMINI_MODEL,
       generationConfig: { responseMimeType: 'application/json' }
     });
 
@@ -162,7 +181,7 @@ app.post('/generate-form-from-image', async (req, res) => {
 
     // Use a current vision-capable model (supports image inputs via inlineData)
     const model = genAI.getGenerativeModel({
-      model: 'gemini-1.5-flash',
+      model: GEMINI_MODEL,
       generationConfig: { responseMimeType: 'application/json' },
     });
 
@@ -310,9 +329,16 @@ app.post('/generate-form-from-document', async (req, res) => {
       });
     }
 
+    // Condense overly long text to avoid upstream provider errors (e.g., input too long)
+    const beforeLen = extractedText.length;
+    if (beforeLen > DOC_TEXT_CHAR_LIMIT) {
+      console.warn(`[DOC] Extracted text length ${beforeLen} exceeds limit ${DOC_TEXT_CHAR_LIMIT}. Condensing for prompt.`);
+      extractedText = condenseText(extractedText, DOC_TEXT_CHAR_LIMIT);
+    }
+
     // Use the same structure and rules as the text endpoint (with radioGrid support)
     const model = genAI.getGenerativeModel({
-      model: 'gemini-1.5-flash',
+      model: GEMINI_MODEL,
       generationConfig: { responseMimeType: 'application/json' },
     });
 
