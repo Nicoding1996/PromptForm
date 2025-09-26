@@ -78,6 +78,14 @@ const App: React.FC = () => {
     });
   };
 
+  // ===== Form-level editors =====
+  const handleUpdateFormTitle = (newTitle: string) => {
+    setFormJson((prev) => (prev ? { ...prev, title: newTitle } : prev));
+  };
+  const handleUpdateFormDescription = (newDescription: string) => {
+    setFormJson((prev) => (prev ? { ...prev, description: newDescription } : prev));
+  };
+ 
   // ===== Advanced editor handlers =====
   const handleUpdateFieldOption = (fieldIndex: number, optionIndex: number, newText: string) => {
     setFormJson((prev) => {
@@ -438,6 +446,8 @@ const App: React.FC = () => {
               onDeleteField={handleDeleteField}
               onReorderFields={handleReorderFields}
               onAddField={handleAddField}
+              onUpdateFormTitle={handleUpdateFormTitle}
+              onUpdateFormDescription={handleUpdateFormDescription}
               // Advanced editor props
               focusedFieldIndex={focusedFieldIndex}
               setFocusedFieldIndex={setFocusedFieldIndex}

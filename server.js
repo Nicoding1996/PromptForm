@@ -80,6 +80,7 @@ app.post('/generate-form', async (req, res) => {
       The JSON structure must be:
       {
         "title": "A String for the Form Title",
+        "description": "An optional string for the form's introduction.",
         "fields": [
           {
             "label": "Field Label",
@@ -112,6 +113,7 @@ app.post('/generate-form', async (req, res) => {
         - "columns": an array of strings for each column choice (e.g., "Very Satisfied", "Satisfied", ...).
         - "label": the main title of the grid.
       - 'submit': Ensure there is exactly one field with type "submit".
+      - If the user's request implies a longer introduction or context, include a helpful summary in the "description" field.
       
       User's request: "${req.body.prompt}"
     `;
@@ -212,6 +214,7 @@ Additional user instructions (context): "${context.trim()}". Use these instructi
       The JSON structure must be:
       {
         "title": "A String for the Form Title",
+        "description": "An optional string for the form's introduction.",
         "fields": [
           {
             "label": "Field Label",
@@ -244,6 +247,7 @@ Additional user instructions (context): "${context.trim()}". Use these instructi
         - "columns": an array of strings for each column choice (e.g., "Very Satisfied", "Satisfied", ...).
         - "label": the main title of the grid.
       - 'submit': Ensure there is exactly one field with type "submit".
+      - If the user's request implies a longer introduction or context, include a helpful summary in the "description" field.
       ${extraVisionContext}
     `;
 
@@ -416,6 +420,7 @@ Additional user instructions (context): "${userContext}"
       The JSON structure must be:
       {
         "title": "A String for the Form Title",
+        "description": "An optional string for the form's introduction.",
         "fields": [
           {
             "label": "Field Label",
@@ -448,6 +453,7 @@ Additional user instructions (context): "${userContext}"
         - "columns": an array of strings for each column choice (e.g., "Very Satisfied", "Satisfied", ...).
         - "label": the main title of the grid.
       - 'submit': Ensure there is exactly one field with type "submit".
+      - If the user's request implies a longer introduction or context, include a helpful summary in the "description" field.
       
       ${contextBlock}
       Document content to analyze and transform:

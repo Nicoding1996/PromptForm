@@ -29,6 +29,7 @@ export interface FormField {
 
 export interface FormData {
   title: string;
+  description?: string;
   fields: FormField[];
 }
 
@@ -38,6 +39,10 @@ interface FormRendererProps {
   onDeleteField: (index: number) => void;
   onReorderFields: (oldIndex: number, newIndex: number) => void;
   onAddField: () => void;
+
+  // Form-level edits
+  onUpdateFormTitle: (newTitle: string) => void;
+  onUpdateFormDescription: (newDescription: string) => void;
 
   // Implicit edit mode focus
   focusedFieldIndex: number | null;
@@ -422,6 +427,8 @@ const FormRenderer: React.FC<FormRendererProps> = ({
   onDeleteField,
   onReorderFields,
   onAddField,
+  onUpdateFormTitle,
+  onUpdateFormDescription,
   focusedFieldIndex,
   setFocusedFieldIndex,
   onUpdateFieldOption,
@@ -459,7 +466,22 @@ const FormRenderer: React.FC<FormRendererProps> = ({
 
   return (
     <section className="mt-8 rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-      <h2 className="mb-6 text-xl font-semibold text-gray-900">{formData.title}</h2>
+      <div className="mb-6">
+        <EditableLabel
+          label={formData.title}
+          htmlFor="form-title"
+          className="block text-xl font-semibold text-gray-900 cursor-text"
+          onCommit={(t) => onUpdateFormTitle(t)}
+        />
+        {formData.description && (
+          <EditableLabel
+            label={formData.description}
+            htmlFor="form-description"
+            className="block mt-1 text-sm text-gray-600 cursor-text"
+            onCommit={(d) => onUpdateFormDescription(d)}
+          />
+        )}
+      </div>
 
       <DndContext onDragEnd={handleDragEnd}>
         <div className="space-y-4">
