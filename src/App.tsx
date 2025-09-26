@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import FormRenderer from './components/FormRenderer';
-import type { FormData } from './components/FormRenderer';
+import type { FormData, FormField } from './components/FormRenderer';
 import CommandBar from './components/CommandBar';
 
 const App: React.FC = () => {
@@ -9,7 +9,156 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  // Focused question index for "Implicit Edit Mode"
+  const [focusedFieldIndex, setFocusedFieldIndex] = useState<number | null>(null);
+ 
+  // ===== In-place editor handlers (single source of truth: formJson) =====
+  const handleUpdateFieldLabel = (fieldIndex: number, newLabel: string) => {
+    setFormJson((prev) => {
+      if (!prev) return prev;
+      const fields = [...prev.fields];
+      if (!fields[fieldIndex]) return prev;
+      fields[fieldIndex] = { ...fields[fieldIndex], label: newLabel };
+      return { ...prev, fields };
+    });
+  };
 
+  const handleDeleteField = (fieldIndex: number) => {
+    setFormJson((prev) => {
+      if (!prev) return prev;
+      if (fieldIndex < 0 || fieldIndex >= prev.fields.length) return prev;
+      const fields = prev.fields.slice(0, fieldIndex).concat(prev.fields.slice(fieldIndex + 1));
+      return { ...prev, fields };
+    });
+  };
+
+  const handleReorderFields = (oldIndex: number, newIndex: number) => {
+    setFormJson((prev) => {
+      if (!prev) return prev;
+      const fields = [...prev.fields];
+      if (
+        oldIndex < 0 ||
+        newIndex < 0 ||
+        oldIndex >= fields.length ||
+        newIndex >= fields.length
+      ) {
+        return prev;
+      }
+      const [moved] = fields.splice(oldIndex, 1);
+      fields.splice(newIndex, 0, moved);
+      return { ...prev, fields };
+    });
+  };
+
+  const handleAddField = () => {
+    setFormJson((prev) => {
+      if (!prev) return prev;
+      const base = 'new_question';
+      const used = new Set(prev.fields.map((f) => f.name));
+      let name = base;
+      let i = 1;
+      while (used.has(name)) {
+        name = `${base}_${i++}`;
+      }
+      const newField: FormField = { label: 'New Question', type: 'text', name };
+      return { ...prev, fields: [...prev.fields, newField] };
+    });
+  };
+
+  // ===== Advanced editor handlers =====
+  const handleUpdateFieldOption = (fieldIndex: number, optionIndex: number, newText: string) => {
+    setFormJson((prev) => {
+      if (!prev) return prev;
+      const fields = [...prev.fields];
+      const f = fields[fieldIndex];
+      if (!f) return prev;
+      const needsOptions = f.type === 'radio' || f.type === 'checkbox' || f.type === 'select';
+      if (!needsOptions) return prev;
+      const opts = (f.options ? [...f.options] : []);
+      if (optionIndex < 0) return prev;
+      // Expand array if needed
+      while (opts.length <= optionIndex) opts.push(`Option ${opts.length + 1}`);
+      opts[optionIndex] = newText.trim();
+      fields[fieldIndex] = { ...f, options: opts };
+      return { ...prev, fields };
+    });
+  };
+
+  const handleAddFieldOption = (fieldIndex: number) => {
+    setFormJson((prev) => {
+      if (!prev) return prev;
+      const fields = [...prev.fields];
+      const f = fields[fieldIndex];
+      if (!f) return prev;
+      const needsOptions = f.type === 'radio' || f.type === 'checkbox' || f.type === 'select';
+      if (!needsOptions) return prev;
+      const opts = (f.options ? [...f.options] : []);
+      const label = `Option ${opts.length + 1}`;
+      opts.push(label);
+      fields[fieldIndex] = { ...f, options: opts };
+      return { ...prev, fields };
+    });
+  };
+
+  const handleChangeFieldType = (fieldIndex: number, newType: FormField['type']) => {
+    setFormJson((prev) => {
+      if (!prev) return prev;
+      const fields = [...prev.fields];
+      const f = fields[fieldIndex];
+      if (!f) return prev;
+
+      const next: FormField = { ...f, type: newType };
+
+      // Ensure options exist for types that require them
+      if (newType === 'radio' || newType === 'checkbox' || newType === 'select') {
+        next.options = (f.options && f.options.length ? [...f.options] : ['Option 1', 'Option 2']);
+      } else {
+        // Remove options for other types
+        delete next.options;
+      }
+
+      // Clean radioGrid-only keys if switching away (kept simple)
+      if (newType !== 'radioGrid') {
+        delete next.rows;
+        delete next.columns;
+      }
+
+      fields[fieldIndex] = next;
+      return { ...prev, fields };
+    });
+  };
+
+  const handleDuplicateField = (fieldIndex: number) => {
+    setFormJson((prev) => {
+      if (!prev) return prev;
+      const fields = [...prev.fields];
+      const f = fields[fieldIndex];
+      if (!f) return prev;
+
+      const used = new Set(fields.map((x) => x.name));
+      const base = `${f.name}_copy`;
+      let name = base;
+      let i = 1;
+      while (used.has(name)) name = `${base}_${i++}`;
+
+      const clone: FormField = { ...f, name };
+      fields.splice(fieldIndex + 1, 0, clone);
+      return { ...prev, fields };
+    });
+  };
+
+  const handleToggleRequiredField = (fieldIndex: number) => {
+    setFormJson((prev) => {
+      if (!prev) return prev;
+      const fields = [...prev.fields];
+      const f = fields[fieldIndex];
+      if (!f) return prev;
+      const required = !(f as any).required;
+      fields[fieldIndex] = { ...f, required } as FormField & { required?: boolean };
+      return { ...prev, fields };
+    });
+  };
+ 
   const handleGenerate = async () => {
     setError(null);
     if (!promptText.trim() && !selectedFile) {
@@ -153,7 +302,23 @@ const App: React.FC = () => {
             </div>
           </section>
         ) : (
-          formJson && <FormRenderer formData={formJson} />
+          formJson && (
+            <FormRenderer
+              formData={formJson}
+              onUpdateFieldLabel={handleUpdateFieldLabel}
+              onDeleteField={handleDeleteField}
+              onReorderFields={handleReorderFields}
+              onAddField={handleAddField}
+              // Advanced editor props
+              focusedFieldIndex={focusedFieldIndex}
+              setFocusedFieldIndex={setFocusedFieldIndex}
+              onUpdateFieldOption={handleUpdateFieldOption}
+              onAddFieldOption={handleAddFieldOption}
+              onChangeFieldType={handleChangeFieldType}
+              onDuplicateField={handleDuplicateField}
+              onToggleRequiredField={handleToggleRequiredField}
+            />
+          )
         )}
       </main>
     </div>
