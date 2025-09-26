@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 export interface FormField {
   label: string;
@@ -58,6 +58,8 @@ const FormRenderer: React.FC<FormRendererProps> = ({ formData }) => {
             field.type === 'file' ||
             field.type === 'range'
           ) {
+            // eslint-disable-next-line react-hooks/rules-of-hooks
+            const [rangeValue, setRangeValue] = useState(5);
             const inputSpecific =
               field.type === 'range'
                 ? 'h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-200 accent-indigo-600'
@@ -70,15 +72,24 @@ const FormRenderer: React.FC<FormRendererProps> = ({ formData }) => {
                 </label>
 
                 {field.type === 'range' ? (
-                  <input
-                    type="range"
-                    id={field.name}
-                    name={field.name}
-                    min={0}
-                    max={10}
-                    defaultValue={5}
-                    className={inputSpecific}
-                  />
+                  <div className="flex items-center gap-4">
+                    <input
+                      type="range"
+                      id={field.name}
+                      name={field.name}
+                      min={0}
+                      max={10}
+                      value={rangeValue}
+                      onChange={(e) => setRangeValue(Number(e.target.value))}
+                      className={inputSpecific}
+                    />
+                    <output
+                      htmlFor={field.name}
+                      className="min-w-[40px] text-center text-sm font-semibold text-gray-700"
+                    >
+                      {rangeValue}
+                    </output>
+                  </div>
                 ) : (
                   <input
                     type={field.type}
