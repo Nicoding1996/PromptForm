@@ -50,11 +50,18 @@ interface FormRendererProps {
   onDuplicateField: (fieldIndex: number) => void;
   onToggleRequiredField: (fieldIndex: number) => void;
 
+  // NEW remove handlers
+  onRemoveFieldOption: (fieldIndex: number, optionIndex: number) => void;
+
   // Grid editing
   onUpdateGridRow: (fieldIndex: number, rowIndex: number, newText: string) => void;
   onUpdateGridColumn: (fieldIndex: number, colIndex: number, newText: string) => void;
   onAddGridRow: (fieldIndex: number) => void;
   onAddGridColumn: (fieldIndex: number) => void;
+
+  // NEW grid remove handlers
+  onRemoveGridRow: (fieldIndex: number, rowIndex: number) => void;
+  onRemoveGridColumn: (fieldIndex: number, colIndex: number) => void;
 
   // Range editing
   onUpdateRangeBounds: (fieldIndex: number, min: number, max: number) => void;
@@ -152,19 +159,24 @@ const EditableLabel: React.FC<{
 const AdvancedEditor: React.FC<{
   field: FormField;
   index: number;
- 
+
   onUpdateFieldLabel: (index: number, newLabel: string) => void;
   onUpdateFieldOption: (fieldIndex: number, optionIndex: number, newText: string) => void;
   onAddFieldOption: (fieldIndex: number) => void;
   onChangeFieldType: (fieldIndex: number, newType: FormField['type']) => void;
   onDuplicateField: (fieldIndex: number) => void;
   onToggleRequiredField: (fieldIndex: number) => void;
- 
+
+  // Remove handlers
+  onRemoveFieldOption: (fieldIndex: number, optionIndex: number) => void;
+
   // Grid + range
   onUpdateGridRow: (fieldIndex: number, rowIndex: number, newText: string) => void;
   onUpdateGridColumn: (fieldIndex: number, colIndex: number, newText: string) => void;
   onAddGridRow: (fieldIndex: number) => void;
   onAddGridColumn: (fieldIndex: number) => void;
+  onRemoveGridRow: (fieldIndex: number, rowIndex: number) => void;
+  onRemoveGridColumn: (fieldIndex: number, colIndex: number) => void;
   onUpdateRangeBounds: (fieldIndex: number, min: number, max: number) => void;
 }> = ({
   field,
@@ -175,10 +187,13 @@ const AdvancedEditor: React.FC<{
   onChangeFieldType,
   onDuplicateField,
   onToggleRequiredField,
+  onRemoveFieldOption,
   onUpdateGridRow,
   onUpdateGridColumn,
   onAddGridRow,
   onAddGridColumn,
+  onRemoveGridRow,
+  onRemoveGridColumn,
   onUpdateRangeBounds,
 }) => {
   const optionTypes: FormField['type'][] = [
@@ -243,6 +258,15 @@ const AdvancedEditor: React.FC<{
                 value={opt}
                 onChange={(e) => onUpdateFieldOption(index, optIdx, e.target.value)}
               />
+              <button
+                type="button"
+                aria-label="Remove option"
+                title="Remove option"
+                onClick={() => onRemoveFieldOption(index, optIdx)}
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md text-red-600 hover:bg-red-50 ring-1 ring-red-200"
+              >
+                <FiTrash2 />
+              </button>
             </div>
           ))}
           <button
@@ -262,12 +286,22 @@ const AdvancedEditor: React.FC<{
             <div className="mb-1 text-xs font-medium text-gray-600">Columns</div>
             <div className="flex flex-wrap gap-2">
               {(field.columns ?? []).map((col, cIdx) => (
-                <input
-                  key={`${field.name}-col-edit-${cIdx}`}
-                  className="w-40 rounded-md border border-gray-300 px-2 py-1 text-sm"
-                  value={col}
-                  onChange={(e) => onUpdateGridColumn(index, cIdx, e.target.value)}
-                />
+                <div key={`${field.name}-col-edit-${cIdx}`} className="flex items-center gap-2">
+                  <input
+                    className="w-40 rounded-md border border-gray-300 px-2 py-1 text-sm"
+                    value={col}
+                    onChange={(e) => onUpdateGridColumn(index, cIdx, e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    aria-label="Remove column"
+                    title="Remove column"
+                    onClick={() => onRemoveGridColumn(index, cIdx)}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-md text-red-600 hover:bg-red-50 ring-1 ring-red-200"
+                  >
+                    <FiTrash2 />
+                  </button>
+                </div>
               ))}
             </div>
             <button
@@ -283,12 +317,22 @@ const AdvancedEditor: React.FC<{
             <div className="mb-1 text-xs font-medium text-gray-600">Rows</div>
             <div className="flex flex-col gap-2">
               {(field.rows ?? []).map((row, rIdx) => (
-                <input
-                  key={`${field.name}-row-edit-${rIdx}`}
-                  className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm"
-                  value={row}
-                  onChange={(e) => onUpdateGridRow(index, rIdx, e.target.value)}
-                />
+                <div key={`${field.name}-row-edit-${rIdx}`} className="flex items-center gap-2">
+                  <input
+                    className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm"
+                    value={row}
+                    onChange={(e) => onUpdateGridRow(index, rIdx, e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    aria-label="Remove row"
+                    title="Remove row"
+                    onClick={() => onRemoveGridRow(index, rIdx)}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-md text-red-600 hover:bg-red-50 ring-1 ring-red-200"
+                  >
+                    <FiTrash2 />
+                  </button>
+                </div>
               ))}
             </div>
             <button
@@ -382,6 +426,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
   setFocusedFieldIndex,
   onUpdateFieldOption,
   onAddFieldOption,
+  onRemoveFieldOption,
   onChangeFieldType,
   onDuplicateField,
   onToggleRequiredField,
@@ -389,6 +434,8 @@ const FormRenderer: React.FC<FormRendererProps> = ({
   onUpdateGridColumn,
   onAddGridRow,
   onAddGridColumn,
+  onRemoveGridRow,
+  onRemoveGridColumn,
   onUpdateRangeBounds,
 }) => {
   const fields = formData?.fields ?? [];
@@ -644,6 +691,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                 onUpdateFieldLabel={onUpdateFieldLabel}
                 onUpdateFieldOption={onUpdateFieldOption}
                 onAddFieldOption={onAddFieldOption}
+                onRemoveFieldOption={onRemoveFieldOption}
                 onChangeFieldType={onChangeFieldType}
                 onDuplicateField={onDuplicateField}
                 onToggleRequiredField={onToggleRequiredField}
@@ -651,6 +699,8 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                 onUpdateGridColumn={onUpdateGridColumn}
                 onAddGridRow={onAddGridRow}
                 onAddGridColumn={onAddGridColumn}
+                onRemoveGridRow={onRemoveGridRow}
+                onRemoveGridColumn={onRemoveGridColumn}
                 onUpdateRangeBounds={onUpdateRangeBounds}
               />
             ) : (

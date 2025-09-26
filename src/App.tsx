@@ -113,6 +113,53 @@ const App: React.FC = () => {
     });
   };
 
+  // Remove a single option for radio/checkbox/select fields
+  const handleRemoveFieldOption = (fieldIndex: number, optionIndex: number) => {
+    setFormJson((prev) => {
+      if (!prev) return prev;
+      const fields = [...prev.fields];
+      const f = fields[fieldIndex];
+      if (!f) return prev;
+      const needsOptions = f.type === 'radio' || f.type === 'checkbox' || f.type === 'select';
+      if (!needsOptions || !f.options) return prev;
+      if (optionIndex < 0 || optionIndex >= f.options.length) return prev;
+      const opts = f.options.slice();
+      opts.splice(optionIndex, 1);
+      fields[fieldIndex] = { ...f, options: opts };
+      return { ...prev, fields };
+    });
+  };
+
+  // Remove a row from a radioGrid field
+  const handleRemoveGridRow = (fieldIndex: number, rowIndex: number) => {
+    setFormJson((prev) => {
+      if (!prev) return prev;
+      const fields = [...prev.fields];
+      const f = fields[fieldIndex];
+      if (!f || f.type !== 'radioGrid' || !f.rows) return prev;
+      if (rowIndex < 0 || rowIndex >= f.rows.length) return prev;
+      const rows = f.rows.slice();
+      rows.splice(rowIndex, 1);
+      fields[fieldIndex] = { ...f, rows };
+      return { ...prev, fields };
+    });
+  };
+
+  // Remove a column from a radioGrid field
+  const handleRemoveGridColumn = (fieldIndex: number, columnIndex: number) => {
+    setFormJson((prev) => {
+      if (!prev) return prev;
+      const fields = [...prev.fields];
+      const f = fields[fieldIndex];
+      if (!f || f.type !== 'radioGrid' || !f.columns) return prev;
+      if (columnIndex < 0 || columnIndex >= f.columns.length) return prev;
+      const columns = f.columns.slice();
+      columns.splice(columnIndex, 1);
+      fields[fieldIndex] = { ...f, columns };
+      return { ...prev, fields };
+    });
+  };
+
   const handleChangeFieldType = (fieldIndex: number, newType: FormField['type']) => {
     setFormJson((prev) => {
       if (!prev) return prev;
@@ -396,6 +443,7 @@ const App: React.FC = () => {
               setFocusedFieldIndex={setFocusedFieldIndex}
               onUpdateFieldOption={handleUpdateFieldOption}
               onAddFieldOption={handleAddFieldOption}
+              onRemoveFieldOption={handleRemoveFieldOption}
               onChangeFieldType={handleChangeFieldType}
               onDuplicateField={handleDuplicateField}
               onToggleRequiredField={handleToggleRequiredField}
@@ -404,6 +452,8 @@ const App: React.FC = () => {
               onUpdateGridColumn={handleUpdateGridColumn}
               onAddGridRow={handleAddGridRow}
               onAddGridColumn={handleAddGridColumn}
+              onRemoveGridRow={handleRemoveGridRow}
+              onRemoveGridColumn={handleRemoveGridColumn}
               onUpdateRangeBounds={handleUpdateRangeBounds}
             />
           )
