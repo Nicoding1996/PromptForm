@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 
 interface FileUploaderProps {
-  onGenerate: (file: File) => void | Promise<void>;
+  value: File | null;
+  onChange: (file: File | null) => void;
   isLoading?: boolean;
 }
 
-const FileUploader: React.FC<FileUploaderProps> = ({ onGenerate, isLoading = false }) => {
-  const [file, setFile] = useState<File | null>(null);
+const FileUploader: React.FC<FileUploaderProps> = ({ value, onChange, isLoading = false }) => {
+  const file = value;
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const isImage = useMemo(() => file?.type?.startsWith('image/'), [file]);
@@ -22,26 +23,23 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onGenerate, isLoading = fal
   }, [file, isImage]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isLoading) return;
     const f = e.target.files?.[0] ?? null;
-    setFile(f);
+    onChange(f);
   };
 
   const handleDrop = (e: React.DragEvent<HTMLLabelElement>) => {
     e.preventDefault();
+    if (isLoading) return;
     const f = e.dataTransfer.files?.[0] ?? null;
-    if (f) {
-      setFile(f);
-    }
+    onChange(f);
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLLabelElement>) => {
     e.preventDefault();
+    if (isLoading) return;
   };
 
-  const handleGenerateClick = () => {
-    if (!file || isLoading) return;
-    onGenerate(file);
-  };
 
   return (
     <div className="space-y-4">
@@ -49,7 +47,8 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onGenerate, isLoading = fal
         htmlFor="file-input"
         onDrop={handleDrop}
         onDragOver={handleDragOver}
-        className="flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-gray-300 bg-white p-6 text-center transition hover:border-indigo-400 hover:bg-indigo-50"
+        aria-disabled={isLoading}
+        className={`flex flex-col items-center justify-center rounded-lg border border-dashed border-gray-300 bg-white p-6 text-center transition ${isLoading ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-indigo-400 hover:bg-indigo-50'}`}
       >
         <svg
           className="mb-3 h-10 w-10 text-gray-400"
@@ -70,6 +69,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onGenerate, isLoading = fal
           type="file"
           accept="image/*, .txt, .pdf, .docx"
           onChange={handleFileChange}
+          disabled={isLoading}
           className="sr-only"
         />
       </label>
@@ -103,39 +103,6 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onGenerate, isLoading = fal
         </div>
       )}
 
-      <div>
-        <button
-          type="button"
-          onClick={handleGenerateClick}
-          disabled={!file || isLoading}
-          className="inline-flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-500 focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isLoading && (
-            <svg
-              className="h-5 w-5 animate-spin text-white"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8v4A4 4 0 008 12H4z"
-              />
-            </svg>
-          )}
-          Generate Form
-        </button>
-      </div>
     </div>
   );
 };

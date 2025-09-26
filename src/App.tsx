@@ -1,29 +1,57 @@
 import React, { useState } from 'react';
 import FormRenderer from './components/FormRenderer';
 import type { FormData } from './components/FormRenderer';
-import FileUploader from './components/FileUploader';
+import CommandBar from './components/CommandBar';
 
 const App: React.FC = () => {
   const [promptText, setPromptText] = useState<string>('');
   const [formJson, setFormJson] = useState<FormData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [mode, setMode] = useState<'text' | 'file'>('text');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const handleGenerate = async () => {
     setError(null);
-    if (!promptText.trim()) {
-      setError('Please enter a prompt.');
+    if (!promptText.trim() && !selectedFile) {
+      setError('Please enter a prompt or attach a file.');
       return;
     }
 
     setIsLoading(true);
     try {
-      const resp = await fetch('http://localhost:3001/generate-form', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: promptText }),
-      });
+      let resp: Response | null = null;
+
+      if (selectedFile) {
+        if (selectedFile.type && selectedFile.type.startsWith('image/')) {
+          // Image flow with context
+          const { base64, mimeType } = await fileToBase64(selectedFile);
+          resp = await fetch('http://localhost:3001/generate-form-from-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              image: base64,
+              mimeType,
+              context: promptText.trim() || undefined,
+            }),
+          });
+        } else {
+          // Document flow with context in multipart/form-data
+          const form = new FormData();
+          form.append('file', selectedFile, selectedFile.name);
+          if (promptText.trim()) form.append('prompt', promptText.trim());
+          resp = await fetch('http://localhost:3001/generate-form-from-document', {
+            method: 'POST',
+            body: form,
+          });
+        }
+      } else {
+        // Text-only flow
+        resp = await fetch('http://localhost:3001/generate-form', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: promptText }),
+        });
+      }
 
       let data: unknown = null;
       try {
@@ -80,64 +108,6 @@ const App: React.FC = () => {
       reader.readAsDataURL(file);
     });
 
-  const handleGenerateFile = async (file: File) => {
-    setError(null);
-    setIsLoading(true);
-    try {
-      let resp: Response | null = null;
-
-      if (file.type && file.type.startsWith('image/')) {
-        // Route images to the existing vision endpoint
-        const { base64, mimeType } = await fileToBase64(file);
-        resp = await fetch('http://localhost:3001/generate-form-from-image', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image: base64, mimeType }),
-        });
-      } else {
-        // Route non-images (txt, pdf, docx) to the document endpoint as multipart/form-data
-        const form = new FormData();
-        form.append('file', file, file.name);
-        resp = await fetch('http://localhost:3001/generate-form-from-document', {
-          method: 'POST',
-          body: form, // Let the browser set the multipart boundary
-        });
-      }
-
-      let data: unknown = null;
-      try {
-        data = await resp.json();
-      } catch {
-        // ignore JSON parse errors; handled below
-      }
-
-      if (!resp.ok) {
-        console.error('Generate form from file error', {
-          status: resp.status,
-          statusText: resp.statusText,
-          details: data,
-        });
-        const message = (() => {
-          if (data && typeof data === 'object') {
-            const d = data as Record<string, unknown>;
-            if (typeof d.error === 'string') return d.error;
-            if (typeof d.message === 'string') return d.message;
-          }
-          return 'Failed to generate form from file.';
-        })();
-        setError(message);
-        setFormJson(null);
-      } else {
-        setFormJson(data as FormData);
-      }
-    } catch (err) {
-      console.error('File handling or network error:', err);
-      setError('Error processing the file or contacting backend.');
-      setFormJson(null);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -147,110 +117,26 @@ const App: React.FC = () => {
             PromptForm
           </h1>
           <p className="mt-2 text-sm text-gray-600">
-            {mode === 'text'
-              ? 'Describe the form you want to create.'
-              : 'Upload a file (image, TXT, PDF, DOCX) of a form to digitize it.'}
+            Describe the form you want to create. Attach a file if you want your text to transform it.
           </p>
-
-          <div className="mt-4 inline-flex items-center rounded-md bg-white p-1 ring-1 ring-gray-200">
-            <button
-              type="button"
-              className={`px-3 py-1 text-sm font-medium rounded ${
-                mode === 'text'
-                  ? 'bg-indigo-600 text-white shadow'
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
-              onClick={() => setMode('text')}
-              disabled={isLoading}
-            >
-              From Text
-            </button>
-            <button
-              type="button"
-              className={`px-3 py-1 text-sm font-medium rounded ${
-                mode === 'file'
-                  ? 'bg-indigo-600 text-white shadow'
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
-              onClick={() => setMode('file')}
-              disabled={isLoading}
-            >
-              From File
-            </button>
-          </div>
         </header>
 
-        {mode === 'text' ? (
-          <section className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-gray-700" htmlFor="promptText">
-                Prompt
-              </label>
-              <textarea
-                id="promptText"
-                value={promptText}
-                onChange={(e) => setPromptText(e.target.value)}
-                rows={8}
-                placeholder="Describe the form you want to generate..."
-                className="min-h-[160px] w-full rounded-lg border border-gray-300 bg-white p-4 text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
+        <CommandBar
+          prompt={promptText}
+          onPromptChange={setPromptText}
+          file={selectedFile}
+          onFileChange={setSelectedFile}
+          isLoading={isLoading}
+          onSend={handleGenerate}
+        />
 
-            {error && (
-              <p
-                role="status"
-                className="mt-4 rounded-md border-l-4 border-red-400 bg-red-50 p-3 text-sm text-red-700"
-              >
-                {error}
-              </p>
-            )}
-
-            <div className="mt-6">
-              <button
-                type="button"
-                onClick={handleGenerate}
-                disabled={isLoading}
-                className="inline-flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isLoading && (
-                  <svg
-                    className="h-5 w-5 animate-spin text-white"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8v4A4 4 0 008 12H4z"
-                    />
-                  </svg>
-                )}
-                {isLoading ? 'Generating...' : 'Generate Form'}
-              </button>
-            </div>
-          </section>
-        ) : (
-          <section className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-            <FileUploader onGenerate={handleGenerateFile} isLoading={isLoading} />
-            {error && (
-              <p
-                role="status"
-                className="mt-4 rounded-md border-l-4 border-red-400 bg-red-50 p-3 text-sm text-red-700"
-              >
-                {error}
-              </p>
-            )}
-          </section>
+        {error && (
+          <p
+            role="status"
+            className="rounded-md border-l-4 border-red-400 bg-red-50 p-3 text-sm text-red-700"
+          >
+            {error}
+          </p>
         )}
 
         {/* Loading placeholder / generated form */}

@@ -37,6 +37,38 @@ const baseInputClass =
 
 const baseLabelClass = 'text-sm font-medium text-gray-700';
 
+/**
+ * Range field with visible numeric output.
+ * Isolated component so hooks usage is valid (not inside a loop).
+ */
+const RangeField: React.FC<{
+  id: string;
+  name: string;
+  min?: number;
+  max?: number;
+  defaultValue?: number;
+  className?: string;
+}> = ({ id, name, min = 0, max = 10, defaultValue = 5, className }) => {
+  const [value, setValue] = useState<number>(defaultValue);
+  return (
+    <div className="flex items-center gap-4">
+      <input
+        type="range"
+        id={id}
+        name={name}
+        min={min}
+        max={max}
+        value={value}
+        onChange={(e) => setValue(Number(e.target.value))}
+        className={className}
+      />
+      <output htmlFor={id} className="min-w-[40px] text-center text-sm font-semibold text-gray-700">
+        {value}
+      </output>
+    </div>
+  );
+};
+
 const FormRenderer: React.FC<FormRendererProps> = ({ formData }) => {
   if (!formData) return null;
 
@@ -58,8 +90,6 @@ const FormRenderer: React.FC<FormRendererProps> = ({ formData }) => {
             field.type === 'file' ||
             field.type === 'range'
           ) {
-            // eslint-disable-next-line react-hooks/rules-of-hooks
-            const [rangeValue, setRangeValue] = useState(5);
             const inputSpecific =
               field.type === 'range'
                 ? 'h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-200 accent-indigo-600'
@@ -72,24 +102,14 @@ const FormRenderer: React.FC<FormRendererProps> = ({ formData }) => {
                 </label>
 
                 {field.type === 'range' ? (
-                  <div className="flex items-center gap-4">
-                    <input
-                      type="range"
-                      id={field.name}
-                      name={field.name}
-                      min={0}
-                      max={10}
-                      value={rangeValue}
-                      onChange={(e) => setRangeValue(Number(e.target.value))}
-                      className={inputSpecific}
-                    />
-                    <output
-                      htmlFor={field.name}
-                      className="min-w-[40px] text-center text-sm font-semibold text-gray-700"
-                    >
-                      {rangeValue}
-                    </output>
-                  </div>
+                  <RangeField
+                    id={field.name}
+                    name={field.name}
+                    min={0}
+                    max={10}
+                    defaultValue={5}
+                    className={inputSpecific}
+                  />
                 ) : (
                   <input
                     type={field.type}

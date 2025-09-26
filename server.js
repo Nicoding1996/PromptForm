@@ -175,7 +175,7 @@ app.post('/generate-form', async (req, res) => {
  *  - mimeType: e.g., "image/png", "image/jpeg"
  */
 app.post('/generate-form-from-image', async (req, res) => {
-  const { image, mimeType } = req.body ?? {};
+  const { image, mimeType, context } = req.body ?? {};
   console.log(`[POST] /generate-form-from-image (mimeType=${mimeType || 'n/a'})`);
 
   try {
@@ -196,12 +196,18 @@ app.post('/generate-form-from-image', async (req, res) => {
       generationConfig: { responseMimeType: 'application/json' },
     });
 
+    const extraVisionContext =
+      typeof context === 'string' && context.trim().length
+        ? `
+Additional user instructions (context): "${context.trim()}". Use these instructions to transform the extracted form as requested.`
+        : '';
+
     const visionPrompt = `
       You are an expert web form generator. Analyze the provided image of a form
       and return a valid JSON object that represents that form. Do not include any
       conversational text, explanations, or markdown formatting like \`\`\`json.
       Only return the raw JSON object.
-
+ 
       The JSON structure must be:
       {
         "title": "A String for the Form Title",
@@ -216,7 +222,7 @@ app.post('/generate-form-from-image', async (req, res) => {
           }
         ]
       }
-
+ 
       Follow these critical rules:
       - 'type': Use the most appropriate type based on what is present in the image.
         - For short text: "text"
@@ -236,6 +242,7 @@ app.post('/generate-form-from-image', async (req, res) => {
         - "columns": an array of strings for each column choice (e.g., "Very Satisfied", "Satisfied", ...).
         - "label": the main title of the grid.
       - 'submit': Ensure there is exactly one field with type "submit".
+      ${extraVisionContext}
     `;
 
     // Send text instructions + inline image
@@ -332,6 +339,7 @@ app.post('/generate-form-from-document', async (req, res) => {
 
     let extractedText = '';
     const lowerName = name.toLowerCase();
+    const userContext = String(req.body?.prompt ?? req.body?.context ?? '').trim();
 
     if (mime.startsWith('text/') || lowerName.endsWith('.txt')) {
       extractedText = buf.toString('utf-8');
@@ -392,10 +400,17 @@ app.post('/generate-form-from-document', async (req, res) => {
       generationConfig: { responseMimeType: 'application/json' },
     });
 
-    const masterPrompt = `
-      You are an expert web form generator. Your sole purpose is to take a user's request and return a valid JSON object that represents a web form.
-      Do not include any conversational text, explanations, or markdown formatting like \`\`\`json. Only return the raw JSON object.
+    const contextBlock =
+      userContext
+        ? `
+Additional user instructions (context): "${userContext}"
+`
+        : '';
 
+    const masterPrompt = `
+      You are an expert web form generator. Your sole purpose is to analyze the provided document content and return a valid JSON object that represents a web form. Use any additional context, if provided, to transform the document accordingly.
+      Do not include any conversational text, explanations, or markdown formatting like \`\`\`json. Only return the raw JSON object.
+ 
       The JSON structure must be:
       {
         "title": "A String for the Form Title",
@@ -431,7 +446,9 @@ app.post('/generate-form-from-document', async (req, res) => {
         - "label": the main title of the grid.
       - 'submit': Ensure there is exactly one field with type "submit".
       
-      User's request: "${extractedText}"
+      ${contextBlock}
+      Document content to analyze and transform:
+      """${extractedText}"""
     `;
 
     const result = await model.generateContent(masterPrompt);
