@@ -6,6 +6,7 @@ import fileUpload from 'express-fileupload';
 // NOTE: Import the library implementation directly to avoid index.js debug path in ESM which tries to read a test PDF.
 import pdfParse from 'pdf-parse/lib/pdf-parse.js';
 import mammoth from 'mammoth';
+import fs from 'fs';
 
  // Load environment variables from .env file (point to the frontend .env location)
 dotenv.config();
@@ -18,6 +19,14 @@ const DOC_TEXT_CHAR_LIMIT = parseInt(process.env.DOC_TEXT_CHAR_LIMIT || '15000',
 
 // Preferred Gemini model (override via .env GEMINI_MODEL). Using "-latest" avoids 404 on retired versions.
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-flash-latest';
+
+// Temp directory for buffering uploads (prevents memory spikes on large DOCX)
+const TEMP_DIR = './.tmp';
+try {
+  if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR, { recursive: true });
+} catch (e) {
+  console.warn('[warn] Could not ensure temp dir exists:', e);
+}
 
 /**
  * Condense large text to fit within model prompt limits while keeping context.
@@ -38,8 +47,10 @@ app.use(express.json({ limit: '10mb' }));
 // Enable multipart handling for file uploads (TXT, PDF, DOCX)
 app.use(
   fileUpload({
-    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
-    abortOnLimit: true,
+    limits: { fileSize: 25 * 1024 * 1024 }, // 25MB
+    abortOnLimit: false, // don't hard-abort; allow a proper 413 or downstream handling
+    useTempFiles: true,
+    tempFileDir: TEMP_DIR,
     createParentPath: false,
   })
 );
@@ -298,7 +309,26 @@ app.post('/generate-form-from-document', async (req, res) => {
     const uploaded = Array.isArray(file) ? file[0] : file;
     const mime = uploaded.mimetype || '';
     const name = uploaded.name || '';
-    const buf = uploaded.data;
+    // Read buffer from memory or temp file (when useTempFiles is enabled)
+    let buf = uploaded.data;
+    // When useTempFiles=true, "data" may be an empty Buffer. Fallback to reading the temp file.
+    if (!buf || buf.length === 0) {
+      if (uploaded.tempFilePath) {
+        try {
+          buf = await fs.promises.readFile(uploaded.tempFilePath);
+        } catch (e) {
+          console.warn('[DOCX] Failed reading temp file:', uploaded.tempFilePath, e);
+          buf = Buffer.alloc(0);
+        }
+      }
+    }
+    if (!buf || buf.length === 0) {
+      return res.status(400).json({
+        error: 'Uploaded file content is empty.',
+        message: 'The server received a zero-length file buffer. Please re-upload the file or re-save it as DOCX and try again.',
+        received: { name, mime, size: uploaded.size }
+      });
+    }
 
     let extractedText = '';
     const lowerName = name.toLowerCase();
@@ -312,8 +342,28 @@ app.post('/generate-form-from-document', async (req, res) => {
       mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
       lowerName.endsWith('.docx')
     ) {
-      const result = await mammoth.extractRawText({ buffer: buf });
-      extractedText = result.value || '';
+      try {
+        // Prefer reading directly from the temp file path to avoid zero-length buffers
+        if (uploaded.tempFilePath && uploaded.tempFilePath.length > 0) {
+          const result = await mammoth.extractRawText({ path: uploaded.tempFilePath });
+          extractedText = result.value || '';
+        } else {
+          const result = await mammoth.extractRawText({ buffer: buf });
+          extractedText = result.value || '';
+        }
+      } catch (e) {
+        console.error('[DOCX PARSE ERROR]', e);
+        return res.status(400).json({
+          error: 'Failed to read DOCX file.',
+          message: 'The DOCX appears corrupted or unreadable. Please re-save it as .docx in Word/Google Docs and try again.',
+          details: String(e?.message || e),
+        });
+      } finally {
+        if (uploaded.tempFilePath) {
+          // Best-effort cleanup to avoid temp file buildup
+          fs.promises.unlink(uploaded.tempFilePath).catch(() => {});
+        }
+      }
     } else {
       return res.status(400).json({
         error: 'Unsupported file type. Please upload a TXT, PDF, or DOCX file.',
