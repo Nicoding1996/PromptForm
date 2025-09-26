@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import FormRenderer from './components/FormRenderer';
 import type { FormData, FormField } from './components/FormRenderer';
 import CommandBar from './components/CommandBar';
@@ -11,7 +11,20 @@ const App: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   // Focused question index for "Implicit Edit Mode"
   const [focusedFieldIndex, setFocusedFieldIndex] = useState<number | null>(null);
- 
+
+  // Click-outside to exit focus mode
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      if (focusedFieldIndex === null) return;
+      const node = e.target as HTMLElement | null;
+      if (!node) return;
+      const inside = node.closest?.('[data-adv-editor="true"]');
+      if (!inside) setFocusedFieldIndex(null);
+    };
+    document.addEventListener('mousedown', onDown, true);
+    return () => document.removeEventListener('mousedown', onDown, true);
+  }, [focusedFieldIndex]);
+
   // ===== In-place editor handlers (single source of truth: formJson) =====
   const handleUpdateFieldLabel = (fieldIndex: number, newLabel: string) => {
     setFormJson((prev) => {
@@ -158,7 +171,76 @@ const App: React.FC = () => {
       return { ...prev, fields };
     });
   };
- 
+
+  // ===== Grid (radioGrid) editors =====
+  const handleUpdateGridRow = (fieldIndex: number, rowIndex: number, newText: string) => {
+    setFormJson((prev) => {
+      if (!prev) return prev;
+      const fields = [...prev.fields];
+      const f = fields[fieldIndex];
+      if (!f || f.type !== 'radioGrid') return prev;
+      const rows = f.rows ? [...f.rows] : [];
+      while (rows.length <= rowIndex) rows.push(`Row ${rows.length + 1}`);
+      rows[rowIndex] = newText.trim();
+      fields[fieldIndex] = { ...f, rows };
+      return { ...prev, fields };
+    });
+  };
+
+  const handleUpdateGridColumn = (fieldIndex: number, colIndex: number, newText: string) => {
+    setFormJson((prev) => {
+      if (!prev) return prev;
+      const fields = [...prev.fields];
+      const f = fields[fieldIndex];
+      if (!f || f.type !== 'radioGrid') return prev;
+      const columns = f.columns ? [...f.columns] : [];
+      while (columns.length <= colIndex) columns.push(`Column ${columns.length + 1}`);
+      columns[colIndex] = newText.trim();
+      fields[fieldIndex] = { ...f, columns };
+      return { ...prev, fields };
+    });
+  };
+
+  const handleAddGridRow = (fieldIndex: number) => {
+    setFormJson((prev) => {
+      if (!prev) return prev;
+      const fields = [...prev.fields];
+      const f = fields[fieldIndex];
+      if (!f || f.type !== 'radioGrid') return prev;
+      const rows = f.rows ? [...f.rows] : [];
+      rows.push(`Row ${rows.length + 1}`);
+      fields[fieldIndex] = { ...f, rows };
+      return { ...prev, fields };
+    });
+  };
+
+  const handleAddGridColumn = (fieldIndex: number) => {
+    setFormJson((prev) => {
+      if (!prev) return prev;
+      const fields = [...prev.fields];
+      const f = fields[fieldIndex];
+      if (!f || f.type !== 'radioGrid') return prev;
+      const columns = f.columns ? [...f.columns] : [];
+      columns.push(`Column ${columns.length + 1}`);
+      fields[fieldIndex] = { ...f, columns };
+      return { ...prev, fields };
+    });
+  };
+
+  // ===== Range (slider) bounds =====
+  const handleUpdateRangeBounds = (fieldIndex: number, min: number, max: number) => {
+    setFormJson((prev) => {
+      if (!prev) return prev;
+      const fields = [...prev.fields];
+      const f = fields[fieldIndex];
+      if (!f || f.type !== 'range') return prev;
+      const nextMin = Number.isFinite(min) ? min : 0;
+      const nextMax = Number.isFinite(max) ? max : 10;
+      fields[fieldIndex] = { ...f, min: nextMin, max: nextMax } as FormField & { min?: number; max?: number };
+      return { ...prev, fields };
+    });
+  };
+
   const handleGenerate = async () => {
     setError(null);
     if (!promptText.trim() && !selectedFile) {
@@ -317,6 +399,12 @@ const App: React.FC = () => {
               onChangeFieldType={handleChangeFieldType}
               onDuplicateField={handleDuplicateField}
               onToggleRequiredField={handleToggleRequiredField}
+              // Grid + range
+              onUpdateGridRow={handleUpdateGridRow}
+              onUpdateGridColumn={handleUpdateGridColumn}
+              onAddGridRow={handleAddGridRow}
+              onAddGridColumn={handleAddGridColumn}
+              onUpdateRangeBounds={handleUpdateRangeBounds}
             />
           )
         )}

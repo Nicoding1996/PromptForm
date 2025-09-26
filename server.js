@@ -105,6 +105,7 @@ app.post('/generate-form', async (req, res) => {
         - For file uploads: "file"
         - For linear scales or ratings: "range"
         - For questions presented in a grid/matrix where multiple rows share the same set of column choices: "radioGrid"
+      - If the user asks for an "Age Range", you MUST use the "text" field type (not "range" or any other).
       - 'options': This key MUST be included for types "radio", "checkbox", and "select". It MUST be omitted for all other types (including "radioGrid").
       - 'radioGrid' structure: Use when the question is a matrix/grid. Include:
         - "rows": an array of strings for each row's question/label.
@@ -236,6 +237,7 @@ Additional user instructions (context): "${context.trim()}". Use these instructi
         - For file uploads: "file"
         - For linear scales or ratings: "range"
         - For questions presented in a grid/matrix where multiple rows share the same set of column choices: "radioGrid"
+      - If the user asks for an "Age Range", you MUST use the "text" field type (not "range" or any other).
       - 'options': This key MUST be included for types "radio", "checkbox", and "select". It MUST be omitted for all other types (including "radioGrid").
       - 'radioGrid' structure: Use when the question is a matrix/grid. Include:
         - "rows": an array of strings for each row's question/label.
@@ -439,6 +441,7 @@ Additional user instructions (context): "${userContext}"
         - For file uploads: "file"
         - For linear scales or ratings: "range"
         - For questions presented in a grid/matrix where multiple rows share the same set of column choices: "radioGrid"
+      - If the user asks for an "Age Range", you MUST use the "text" field type (not "range" or any other).
       - 'options': This key MUST be included for types "radio", "checkbox", and "select". It MUST be omitted for all other types (including "radioGrid").
       - 'radioGrid' structure: Use when the question is a matrix/grid. Include:
         - "rows": an array of strings for each row's question/label.

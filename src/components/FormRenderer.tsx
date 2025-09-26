@@ -49,6 +49,15 @@ interface FormRendererProps {
   onChangeFieldType: (fieldIndex: number, newType: FormField['type']) => void;
   onDuplicateField: (fieldIndex: number) => void;
   onToggleRequiredField: (fieldIndex: number) => void;
+
+  // Grid editing
+  onUpdateGridRow: (fieldIndex: number, rowIndex: number, newText: string) => void;
+  onUpdateGridColumn: (fieldIndex: number, colIndex: number, newText: string) => void;
+  onAddGridRow: (fieldIndex: number) => void;
+  onAddGridColumn: (fieldIndex: number) => void;
+
+  // Range editing
+  onUpdateRangeBounds: (fieldIndex: number, min: number, max: number) => void;
 }
 
 const baseInputClass =
@@ -143,24 +152,34 @@ const EditableLabel: React.FC<{
 const AdvancedEditor: React.FC<{
   field: FormField;
   index: number;
-  simple: React.ReactNode;
-
+ 
   onUpdateFieldLabel: (index: number, newLabel: string) => void;
   onUpdateFieldOption: (fieldIndex: number, optionIndex: number, newText: string) => void;
   onAddFieldOption: (fieldIndex: number) => void;
   onChangeFieldType: (fieldIndex: number, newType: FormField['type']) => void;
   onDuplicateField: (fieldIndex: number) => void;
   onToggleRequiredField: (fieldIndex: number) => void;
+ 
+  // Grid + range
+  onUpdateGridRow: (fieldIndex: number, rowIndex: number, newText: string) => void;
+  onUpdateGridColumn: (fieldIndex: number, colIndex: number, newText: string) => void;
+  onAddGridRow: (fieldIndex: number) => void;
+  onAddGridColumn: (fieldIndex: number) => void;
+  onUpdateRangeBounds: (fieldIndex: number, min: number, max: number) => void;
 }> = ({
   field,
   index,
-  simple,
   onUpdateFieldLabel,
   onUpdateFieldOption,
   onAddFieldOption,
   onChangeFieldType,
   onDuplicateField,
   onToggleRequiredField,
+  onUpdateGridRow,
+  onUpdateGridColumn,
+  onAddGridRow,
+  onAddGridColumn,
+  onUpdateRangeBounds,
 }) => {
   const optionTypes: FormField['type'][] = [
     'text','email','password','textarea','radio','checkbox','select','date','time','file','range','radioGrid','submit'
@@ -168,16 +187,19 @@ const AdvancedEditor: React.FC<{
   const needsOptions = field.type === 'radio' || field.type === 'checkbox' || field.type === 'select';
   const options = field.options ?? [];
 
+  const rmin = (field as any).min ?? 0;
+  const rmax = (field as any).max ?? 10;
+
   return (
-    <div className="flex flex-col gap-4 rounded-md bg-indigo-50/20 p-3 ring-1 ring-indigo-100">
-      {/* Label editor */}
+    <div className="flex flex-col gap-4 rounded-md bg-indigo-50/20 p-3 ring-1 ring-indigo-100" data-adv-editor="true">
+      {/* Label editor (WYSIWYG-like) */}
       <EditableLabel
         label={field.label}
         htmlFor={field.name}
         onCommit={(txt) => onUpdateFieldLabel(index, txt)}
       />
 
-      {/* Row: type switcher + duplicate + required */}
+      {/* Type switcher + duplicate + required */}
       <div className="flex flex-wrap items-center gap-3">
         <label className="text-xs font-medium text-gray-600">Type</label>
         <select
@@ -211,7 +233,7 @@ const AdvancedEditor: React.FC<{
         </label>
       </div>
 
-      {/* Options editor */}
+      {/* Options editor for radio/checkbox/select */}
       {needsOptions && (
         <div className="space-y-2">
           {options.map((opt, optIdx) => (
@@ -233,8 +255,78 @@ const AdvancedEditor: React.FC<{
         </div>
       )}
 
-      {/* Live preview (simple view) */}
-      <div className="rounded-md bg-white p-3 ring-1 ring-gray-200">{simple}</div>
+      {/* RadioGrid editor: editable rows/columns */}
+      {field.type === 'radioGrid' && (
+        <div className="space-y-3">
+          <div>
+            <div className="mb-1 text-xs font-medium text-gray-600">Columns</div>
+            <div className="flex flex-wrap gap-2">
+              {(field.columns ?? []).map((col, cIdx) => (
+                <input
+                  key={`${field.name}-col-edit-${cIdx}`}
+                  className="w-40 rounded-md border border-gray-300 px-2 py-1 text-sm"
+                  value={col}
+                  onChange={(e) => onUpdateGridColumn(index, cIdx, e.target.value)}
+                />
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => onAddGridColumn(index)}
+              className="mt-2 text-sm font-medium text-indigo-700 hover:underline"
+            >
+              + Add column
+            </button>
+          </div>
+
+          <div>
+            <div className="mb-1 text-xs font-medium text-gray-600">Rows</div>
+            <div className="flex flex-col gap-2">
+              {(field.rows ?? []).map((row, rIdx) => (
+                <input
+                  key={`${field.name}-row-edit-${rIdx}`}
+                  className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm"
+                  value={row}
+                  onChange={(e) => onUpdateGridRow(index, rIdx, e.target.value)}
+                />
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => onAddGridRow(index)}
+              className="mt-2 text-sm font-medium text-indigo-700 hover:underline"
+            >
+              + Add row
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Range bounds editor */}
+      {field.type === 'range' && (
+        <div className="flex items-center gap-3">
+          <label className="text-xs font-medium text-gray-600">Min</label>
+          <input
+            type="number"
+            defaultValue={rmin}
+            className="w-20 rounded-md border border-gray-300 px-2 py-1 text-sm"
+            onBlur={(e) => {
+              const minV = Number(e.target.value);
+              onUpdateRangeBounds(index, Number.isFinite(minV) ? minV : rmin, rmax);
+            }}
+          />
+          <label className="text-xs font-medium text-gray-600">Max</label>
+          <input
+            type="number"
+            defaultValue={rmax}
+            className="w-20 rounded-md border border-gray-300 px-2 py-1 text-sm"
+            onBlur={(e) => {
+              const maxV = Number(e.target.value);
+              onUpdateRangeBounds(index, rmin, Number.isFinite(maxV) ? maxV : rmax);
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 };
@@ -293,6 +385,11 @@ const FormRenderer: React.FC<FormRendererProps> = ({
   onChangeFieldType,
   onDuplicateField,
   onToggleRequiredField,
+  onUpdateGridRow,
+  onUpdateGridColumn,
+  onAddGridRow,
+  onAddGridColumn,
+  onUpdateRangeBounds,
 }) => {
   const fields = formData?.fields ?? [];
 
@@ -354,7 +451,14 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                   <div className="flex flex-col gap-2">
                     {labelNode}
                     {field.type === 'range' ? (
-                      <RangeField id={field.name} name={field.name} min={0} max={10} defaultValue={5} className={inputSpecific} />
+                      <RangeField
+                        id={field.name}
+                        name={field.name}
+                        min={(field as any).min ?? 0}
+                        max={(field as any).max ?? 10}
+                        defaultValue={Math.floor((((field as any).min ?? 0) + ((field as any).max ?? 10)) / 2)}
+                        className={inputSpecific}
+                      />
                     ) : (
                       <input type={field.type} id={field.name} name={field.name} className={inputSpecific} />
                     )}
@@ -531,19 +635,23 @@ const FormRenderer: React.FC<FormRendererProps> = ({
               return null;
             })();
 
-            // Wrap with AdvancedEditor if focused
+            // Advanced editor when focused; otherwise simple renderer
             const isFocused = focusedFieldIndex === idx;
             const rendered = isFocused ? (
               <AdvancedEditor
                 field={field}
                 index={idx}
-                simple={content}
                 onUpdateFieldLabel={onUpdateFieldLabel}
                 onUpdateFieldOption={onUpdateFieldOption}
                 onAddFieldOption={onAddFieldOption}
                 onChangeFieldType={onChangeFieldType}
                 onDuplicateField={onDuplicateField}
                 onToggleRequiredField={onToggleRequiredField}
+                onUpdateGridRow={onUpdateGridRow}
+                onUpdateGridColumn={onUpdateGridColumn}
+                onAddGridRow={onAddGridRow}
+                onAddGridColumn={onAddGridColumn}
+                onUpdateRangeBounds={onUpdateRangeBounds}
               />
             ) : (
               content
