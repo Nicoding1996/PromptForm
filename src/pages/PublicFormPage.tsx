@@ -76,7 +76,7 @@ const PublicFormPage: React.FC = () => {
             <p className="text-sm text-red-700">Error: {error}</p>
           </section>
         ) : (
-          <PublicFormRenderer formData={formJson} />
+          <PublicFormRenderer formData={formJson} formId={formId!} />
         )}
       </main>
     </div>

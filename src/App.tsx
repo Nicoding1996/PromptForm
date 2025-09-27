@@ -69,6 +69,14 @@ const App: React.FC = () => {
       }
       const [moved] = fields.splice(oldIndex, 1);
       fields.splice(newIndex, 0, moved);
+
+      // Ensure any submit field always stays at the end
+      const submitIdx = fields.findIndex((f) => f.type === 'submit');
+      if (submitIdx >= 0 && submitIdx !== fields.length - 1) {
+        const [submitField] = fields.splice(submitIdx, 1);
+        fields.push(submitField);
+      }
+
       return { ...prev, fields };
     });
   };
@@ -84,7 +92,17 @@ const App: React.FC = () => {
         name = `${base}_${i++}`;
       }
       const newField: FormField = { label: 'New Question', type: 'text', name };
-      return { ...prev, fields: [...prev.fields, newField] };
+      const fields = [...prev.fields];
+
+      // Insert the new field before any submit field so submit remains last
+      const submitIdx = fields.findIndex((f) => f.type === 'submit');
+      if (submitIdx >= 0) {
+        fields.splice(submitIdx, 0, newField);
+      } else {
+        fields.push(newField);
+      }
+
+      return { ...prev, fields };
     });
   };
 

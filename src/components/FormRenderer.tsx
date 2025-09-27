@@ -445,7 +445,11 @@ const FormRenderer: React.FC<FormRendererProps> = ({
   onRemoveGridColumn,
   onUpdateRangeBounds,
 }) => {
-  const fields = formData?.fields ?? [];
+  // Ensure the submit field (if any) always renders last
+  const rawFields = formData?.fields ?? [];
+  const submitFields = rawFields.filter((f) => f.type === 'submit');
+  const nonSubmitFields = rawFields.filter((f) => f.type !== 'submit');
+  const fields = [...nonSubmitFields, ...submitFields];
 
   const idForIndex = (i: number) => `field-${i}`;
   const indexFromId = (id: string) => {

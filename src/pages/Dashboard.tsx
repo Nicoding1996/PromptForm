@@ -1,14 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { listFormsForUser, type StoredForm } from '../services/forms';
+import { listFormsForUser, type StoredForm, deleteForm } from '../services/forms';
 import LoginButton from '../components/LoginButton';
+import { FiTrash2 } from 'react-icons/fi';
 
 const Dashboard: React.FC = () => {
   const { user, initializing } = useAuth();
   const [forms, setForms] = useState<StoredForm[]>([]);
   const [loading, setLoading] = useState(false);
   const [shareOpenId, setShareOpenId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const baseUrl = useMemo(() => {
     // Assumes app runs on same origin for public links
@@ -123,6 +125,15 @@ const Dashboard: React.FC = () => {
                         >
                           View
                         </Link>
+
+                        <Link
+                          to={`/dashboard/${f.id}/responses`}
+                          className="rounded-md bg-white px-2.5 py-1.5 text-sm font-medium text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50"
+                          title="View responses"
+                        >
+                          Responses
+                        </Link>
+
                         <button
                           type="button"
                           onClick={() => setShareOpenId((s) => (s === f.id ? null : f.id))}
@@ -130,6 +141,27 @@ const Dashboard: React.FC = () => {
                           title="Share"
                         >
                           Share
+                        </button>
+
+                        <button
+                          type="button"
+                          title="Delete form"
+                          onClick={async () => {
+                            const ok = window.confirm('Are you sure you want to delete this form?');
+                            if (!ok) return;
+                            try {
+                              setDeletingId(f.id);
+                              await deleteForm(f.id);
+                              setForms((rows) => rows.filter((x) => x.id !== f.id));
+                              if (shareOpenId === f.id) setShareOpenId(null);
+                            } finally {
+                              setDeletingId(null);
+                            }
+                          }}
+                          disabled={deletingId === f.id}
+                          className="inline-flex items-center gap-1 rounded-md bg-white px-2.5 py-1.5 text-sm font-medium text-red-600 ring-1 ring-red-200 hover:bg-red-50 disabled:opacity-60"
+                        >
+                          <FiTrash2 /> Delete
                         </button>
                       </div>
                     </div>

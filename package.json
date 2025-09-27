@@ -22,6 +22,7 @@
     "express": "^5.1.0",
     "express-fileupload": "^1.5.2",
     "firebase": "^12.3.0",
+    "firebase-admin": "^13.5.0",
     "mammoth": "^1.11.0",
     "pdf-parse": "^1.1.1",
     "react": "^19.1.1",

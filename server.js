@@ -8,7 +8,18 @@ import pdfParse from 'pdf-parse/lib/pdf-parse.js';
 import mammoth from 'mammoth';
 import fs from 'fs';
 
- // Load environment variables from .env file (point to the frontend .env location)
+// Firebase Client SDK (web) used on the server per simplified architecture
+import { initializeApp } from 'firebase/app';
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  serverTimestamp,
+  doc,
+  deleteDoc,
+} from 'firebase/firestore';
+
+// Load environment variables from .env file
 dotenv.config();
 
 const app = express();
@@ -57,11 +68,24 @@ app.use(
 
 // Check for API Key
 if (!process.env.GEMINI_API_KEY) {
-  throw new Error("GEMINI_API_KEY is not defined. Please check your .env file.");
+  throw new Error('GEMINI_API_KEY is not defined. Please check your .env file.');
 }
 
 // Initialize the Google AI client
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+// Initialize Firebase Client SDK on server using Vite-style keys from .env
+const firebaseConfig = {
+  apiKey: process.env.VITE_FIREBASE_API_KEY,
+  authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.VITE_FIREBASE_APP_ID,
+  measurementId: process.env.VITE_FIREBASE_MEASUREMENT_ID,
+};
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp);
 
 // The API endpoint
 app.post('/generate-form', async (req, res) => {
@@ -70,7 +94,7 @@ app.post('/generate-form', async (req, res) => {
   try {
     const model = genAI.getGenerativeModel({
       model: GEMINI_MODEL,
-      generationConfig: { responseMimeType: 'application/json' }
+      generationConfig: { responseMimeType: 'application/json' },
     });
 
     const masterPrompt = `
@@ -163,7 +187,6 @@ app.post('/generate-form', async (req, res) => {
     // Send the valid JSON back to the client
     console.log('[SUCCESS]: Sending valid JSON to client.');
     res.json(jsonResponse);
-
   } catch (error) {
     console.error('[CRITICAL SERVER ERROR]: An error occurred while processing the AI request.');
     console.error(error); // Log the full error object
@@ -339,7 +362,7 @@ app.post('/generate-form-from-document', async (req, res) => {
       return res.status(400).json({
         error: 'Uploaded file content is empty.',
         message: 'The server received a zero-length file buffer. Please re-upload the file or re-save it as DOCX and try again.',
-        received: { name, mime, size: uploaded.size }
+        received: { name, mime, size: uploaded.size },
       });
     }
 
@@ -406,12 +429,11 @@ app.post('/generate-form-from-document', async (req, res) => {
       generationConfig: { responseMimeType: 'application/json' },
     });
 
-    const contextBlock =
-      userContext
-        ? `
+    const contextBlock = userContext
+      ? `
 Additional user instructions (context): "${userContext}"
 `
-        : '';
+      : '';
 
     const masterPrompt = `
       You are an expert web form generator. Your sole purpose is to analyze the provided document content and return a valid JSON object that represents a web form. Use any additional context, if provided, to transform the document accordingly.
@@ -503,6 +525,62 @@ Additional user instructions (context): "${userContext}"
   } catch (error) {
     console.error('[CRITICAL SERVER ERROR - DOCUMENT]:', error);
     res.status(500).json({ error: 'Internal server error.', details: error.message });
+  }
+});
+
+/**
+ * Public responses endpoint using Firebase Client SDK:
+ *   Stores submissions under forms/{formId}/responses/{autoId}
+ */
+app.post('/submit-response/:formId', async (req, res) => {
+  const { formId } = req.params;
+  if (!formId || typeof formId !== 'string') {
+    return res.status(400).json({ error: 'Invalid formId' });
+  }
+
+  try {
+    const payload = req.body ?? {};
+    const ip =
+      (req.headers['x-forwarded-for']?.toString().split(',')[0] || '').trim() ||
+      req.socket?.remoteAddress ||
+      null;
+
+    const ref = await addDoc(collection(db, 'forms', formId, 'responses'), {
+      payload,
+      createdAt: serverTimestamp(),
+      userAgent: req.get('user-agent') || null,
+      ip,
+    });
+
+    return res.status(201).json({ ok: true, id: ref.id });
+  } catch (e) {
+    console.error('[submit-response] Failed to save response:', e);
+    return res.status(500).json({
+      error: 'Failed to save response',
+      message: e?.message || 'Unknown error',
+    });
+  }
+});
+
+/**
+ * Delete a form document using Firebase Client SDK:
+ *   DELETE /forms/:formId
+ */
+app.delete('/forms/:formId', async (req, res) => {
+  const { formId } = req.params;
+  if (!formId || typeof formId !== 'string') {
+    return res.status(400).json({ error: 'Invalid formId' });
+  }
+
+  try {
+    await deleteDoc(doc(db, 'forms', formId));
+    return res.status(200).json({ ok: true });
+  } catch (e) {
+    console.error('[delete-form] Failed to delete form:', e);
+    return res.status(500).json({
+      error: 'Failed to delete form',
+      message: e?.message || 'Unknown error',
+    });
   }
 });
 

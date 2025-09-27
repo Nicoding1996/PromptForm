@@ -11,6 +11,7 @@ import {
   updateDoc,
   where,
   Timestamp,
+  deleteDoc,
 } from 'firebase/firestore';
 import type { FormData } from '../components/FormRenderer';
 
@@ -73,4 +74,25 @@ export async function getFormById(id: string): Promise<StoredForm | null> {
   if (!snap.exists()) return null;
   const data = snap.data() as Omit<StoredForm, 'id'>;
   return { id: snap.id, ...data };
+}
+
+export type StoredResponse = {
+  id: string;
+  payload: Record<string, any>;
+  createdAt?: Timestamp;
+};
+
+export async function listResponsesForForm(formId: string): Promise<StoredResponse[]> {
+  const q = query(collection(db, FORMS_COL, formId, 'responses'), orderBy('createdAt', 'desc'));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => {
+    const data = d.data() as Omit<StoredResponse, 'id'>;
+    return { id: d.id, ...data };
+  });
+}
+
+export async function deleteForm(id: string): Promise<void> {
+  // Perform delete on the client with the current authenticated user so Firestore rules apply:
+  // allow delete: if request.auth != null && get(...forms/$(formId)).data.userId == request.auth.uid;
+  await deleteDoc(doc(db, FORMS_COL, id));
 }

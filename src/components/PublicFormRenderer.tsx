@@ -1,17 +1,78 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import type { FormData, FormField } from './FormRenderer';
 
 const baseInputClass =
   'block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500';
 const baseLabelClass = 'text-sm font-medium text-gray-700';
 
-const PublicFormRenderer: React.FC<{ formData: FormData | null }> = ({ formData }) => {
+type Props = {
+  formData: FormData | null;
+  formId: string;
+};
+
+const PublicFormRenderer: React.FC<Props> = ({ formData, formId }) => {
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const actionBase = useMemo(() => {
+    return (import.meta as any)?.env?.VITE_API_BASE || 'http://localhost:3001';
+  }, []);
+
   if (!formData) return null;
 
-  const fields = formData.fields ?? [];
+  const rawFields = formData.fields ?? [];
+  const submitFields = rawFields.filter((f) => f.type === 'submit');
+  const nonSubmitFields = rawFields.filter((f) => f.type !== 'submit');
+  const fields = [...nonSubmitFields, ...submitFields];
+
+  const onSubmit: React.FormEventHandler<HTMLFormElement> = async (e) => {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      const formEl = e.currentTarget;
+      const fd = new FormData(formEl);
+
+      // Convert FormData to JSON payload; combine duplicate keys into arrays
+      const payload: Record<string, any> = {};
+      for (const [key, value] of fd.entries()) {
+        if (key in payload) {
+          const prev = payload[key];
+          if (Array.isArray(prev)) payload[key] = [...prev, value];
+          else payload[key] = [prev, value];
+        } else {
+          payload[key] = value;
+        }
+      }
+
+      const resp = await fetch(`${actionBase}/submit-response/${formId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!resp.ok) {
+        const detail = await resp.json().catch(() => ({}));
+        throw new Error(detail?.message || `Submit failed (${resp.status})`);
+      }
+      setSubmitted(true);
+      // Optionally clear inputs
+      // formEl.reset();
+    } catch (err: any) {
+      setError(err?.message || 'Failed to submit response.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const renderField = (field: FormField, idx: number) => {
-    const labelNode = <label className={baseLabelClass} htmlFor={field.name}>{field.label}</label>;
+    const required = (field as any).required === true;
+    const labelNode = (
+      <label className={baseLabelClass} htmlFor={field.name}>
+        {field.label}
+        {required ? <span className="ml-1 text-red-600">*</span> : null}
+      </label>
+    );
 
     // Simple inputs
     if (
@@ -25,7 +86,13 @@ const PublicFormRenderer: React.FC<{ formData: FormData | null }> = ({ formData 
       return (
         <div className="flex flex-col gap-2" key={`${field.name}-${idx}`}>
           {labelNode}
-          <input type={field.type} id={field.name} name={field.name} className={baseInputClass} readOnly />
+          <input
+            type={field.type}
+            id={field.name}
+            name={field.name}
+            className={baseInputClass}
+            required={required}
+          />
         </div>
       );
     }
@@ -45,8 +112,7 @@ const PublicFormRenderer: React.FC<{ formData: FormData | null }> = ({ formData 
               min={min}
               max={max}
               defaultValue={mid}
-              readOnly
-              className="h-2 w-full cursor-not-allowed appearance-none rounded-lg bg-gray-200 accent-indigo-600"
+              className="h-2 w-full appearance-none rounded-lg bg-gray-200 accent-indigo-600"
             />
             <output className="min-w-[40px] text-center text-sm font-semibold text-gray-700">{mid}</output>
           </div>
@@ -59,7 +125,13 @@ const PublicFormRenderer: React.FC<{ formData: FormData | null }> = ({ formData 
       return (
         <div className="flex flex-col gap-2" key={`${field.name}-${idx}`}>
           {labelNode}
-          <textarea id={field.name} name={field.name} rows={4} className={baseInputClass} readOnly />
+          <textarea
+            id={field.name}
+            name={field.name}
+            rows={4}
+            className={baseInputClass}
+            required={required}
+          />
         </div>
       );
     }
@@ -69,7 +141,10 @@ const PublicFormRenderer: React.FC<{ formData: FormData | null }> = ({ formData 
       const options = field.options ?? [];
       return (
         <div className="flex flex-col gap-2" key={`${field.name}-${idx}`}>
-          <span className={baseLabelClass}>{field.label}</span>
+          <span className={baseLabelClass}>
+            {field.label}
+            {required ? <span className="ml-1 text-red-600">*</span> : null}
+          </span>
           <div className="flex flex-col gap-2">
             {options.map((opt, optIdx) => {
               const optId = `${field.name}-radio-${optIdx}`;
@@ -81,7 +156,7 @@ const PublicFormRenderer: React.FC<{ formData: FormData | null }> = ({ formData 
                     name={field.name}
                     value={opt}
                     className="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                    disabled
+                    required={required && optIdx === 0}
                   />
                   <label className="text-sm text-gray-700" htmlFor={optId}>
                     {opt}
@@ -100,7 +175,10 @@ const PublicFormRenderer: React.FC<{ formData: FormData | null }> = ({ formData 
       if (options.length > 0) {
         return (
           <div className="flex flex-col gap-2" key={`${field.name}-${idx}`}>
-            <span className={baseLabelClass}>{field.label}</span>
+            <span className={baseLabelClass}>
+              {field.label}
+              {required ? <span className="ml-1 text-red-600">*</span> : null}
+            </span>
             <div className="flex flex-col gap-2">
               {options.map((opt, optIdx) => {
                 const optId = `${field.name}-check-${optIdx}`;
@@ -112,7 +190,6 @@ const PublicFormRenderer: React.FC<{ formData: FormData | null }> = ({ formData 
                       name={field.name}
                       value={opt}
                       className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                      disabled
                     />
                     <span>{opt}</span>
                   </label>
@@ -122,6 +199,7 @@ const PublicFormRenderer: React.FC<{ formData: FormData | null }> = ({ formData 
           </div>
         );
       }
+      // Single checkbox fallback
       return (
         <label className="flex items-center gap-2 text-sm text-gray-700" key={`${field.name}-${idx}`}>
           <input
@@ -129,7 +207,6 @@ const PublicFormRenderer: React.FC<{ formData: FormData | null }> = ({ formData 
             id={field.name}
             name={field.name}
             className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-            disabled
           />
           <span>{field.label}</span>
         </label>
@@ -142,7 +219,13 @@ const PublicFormRenderer: React.FC<{ formData: FormData | null }> = ({ formData 
       return (
         <div className="flex flex-col gap-2" key={`${field.name}-${idx}`}>
           {labelNode}
-          <select id={field.name} name={field.name} className={baseInputClass} defaultValue="" disabled>
+          <select
+            id={field.name}
+            name={field.name}
+            className={baseInputClass}
+            defaultValue=""
+            required={required}
+          >
             <option value="" disabled>
               Select an option
             </option>
@@ -162,7 +245,10 @@ const PublicFormRenderer: React.FC<{ formData: FormData | null }> = ({ formData 
       const cols = field.columns ?? [];
       return (
         <div className="flex flex-col gap-3" key={`${field.name}-${idx}`}>
-          <span className={baseLabelClass}>{field.label}</span>
+          <span className={baseLabelClass}>
+            {field.label}
+            {required ? <span className="ml-1 text-red-600">*</span> : null}
+          </span>
           <div className="overflow-auto">
             <table className="min-w-full border-collapse">
               <thead>
@@ -193,8 +279,8 @@ const PublicFormRenderer: React.FC<{ formData: FormData | null }> = ({ formData 
                               name={rowName}
                               value={String(cIdx)}
                               className="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                              disabled
                               aria-label={`${row} - ${col}`}
+                              required={required && cIdx === 0}
                             />
                           </td>
                         );
@@ -209,16 +295,16 @@ const PublicFormRenderer: React.FC<{ formData: FormData | null }> = ({ formData 
       );
     }
 
-    // Submit
+    // Submit (render the actual submit button)
     if (field.type === 'submit') {
       return (
         <div className="pt-2" key={`${field.name}-${idx}`}>
           <button
-            type="button"
-            disabled
-            className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white opacity-60"
+            type="submit"
+            disabled={submitting || submitted}
+            className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-500 focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {field.label}
+            {submitted ? 'Submitted' : submitting ? 'Submitting...' : field.label}
           </button>
         </div>
       );
@@ -226,6 +312,17 @@ const PublicFormRenderer: React.FC<{ formData: FormData | null }> = ({ formData 
 
     return null;
   };
+
+  if (submitted) {
+    return (
+      <section className="mt-8 rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
+        <div className="text-center">
+          <h2 className="text-lg font-semibold text-gray-900">Thank you for your response!</h2>
+          <p className="mt-1 text-sm text-gray-600">Your submission has been recorded.</p>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="mt-8 rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
@@ -235,9 +332,16 @@ const PublicFormRenderer: React.FC<{ formData: FormData | null }> = ({ formData 
           <p className="mt-1 text-sm text-gray-600">{formData.description}</p>
         )}
       </div>
-      <div className="space-y-4">
+
+      {error && (
+        <div className="mb-4 rounded-md border-l-4 border-red-400 bg-red-50 p-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      <form onSubmit={onSubmit} className="space-y-4">
         {fields.map((f, idx) => renderField(f, idx))}
-      </div>
+      </form>
     </section>
   );
 };
