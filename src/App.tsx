@@ -374,6 +374,7 @@ const App: React.FC = () => {
         setFormJson(null);
       } else {
         setFormJson(data as FormData);
+        setLastSavedId(null);
       }
     } catch (err) {
       console.error('Network or parsing error:', err);
@@ -403,7 +404,21 @@ const App: React.FC = () => {
       reader.onerror = () => reject(reader.error);
       reader.readAsDataURL(file);
     });
-
+ 
+  // Handle save form without navigation; show "✓ Saved!"
+  const handleSaveForm = async () => {
+    if (!user || !formJson) return;
+    setSaveError(null);
+    setSaving(true);
+    try {
+      const id = await saveFormForUser(user.uid, formJson as FormData);
+      setLastSavedId(id);
+    } catch (e: any) {
+      setSaveError(e?.message || 'Failed to save form.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -422,35 +437,25 @@ const App: React.FC = () => {
             {user && formJson && (
               <button
                 type="button"
-                onClick={async () => {
-                  if (!user || !formJson) return;
-                  setSaveError(null);
-                  setSaving(true);
-                  try {
-                    const id = await saveFormForUser(user.uid, formJson as FormData);
-                    setLastSavedId(id);
-                  } catch (e: any) {
-                    setSaveError(e?.message || 'Failed to save form.');
-                  } finally {
-                    setSaving(false);
-                  }
-                }}
-                disabled={saving}
+                onClick={handleSaveForm}
+                disabled={saving || !!lastSavedId}
                 className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
                 title="Save this form to your account"
               >
-                {saving ? 'Saving...' : 'Save Form'}
+                {lastSavedId ? '✓ Saved!' : (saving ? 'Saving...' : 'Save Form')}
               </button>
             )}
 
             {lastSavedId && (
-              <Link
-                to={`/form/${lastSavedId}`}
+              <a
+                href={`/form/${lastSavedId}`}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50"
                 title="Open the public link for this form"
               >
                 View link
-              </Link>
+              </a>
             )}
 
             <Link
