@@ -21,15 +21,18 @@
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
     "express-fileupload": "^1.5.2",
+    "firebase": "^12.3.0",
     "mammoth": "^1.11.0",
     "pdf-parse": "^1.1.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "react-icons": "^5.5.0"
+    "react-icons": "^5.5.0",
+    "react-router-dom": "^7.9.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.13",
     "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
     "@vitejs/plugin-react": "^5.0.3",
     "autoprefixer": "^10.4.21",
     "postcss": "^8.5.6",

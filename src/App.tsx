@@ -2,6 +2,10 @@ import React, { useEffect, useState } from 'react';
 import FormRenderer from './components/FormRenderer';
 import type { FormData, FormField } from './components/FormRenderer';
 import CommandBar from './components/CommandBar';
+import { useAuth } from './context/AuthContext';
+import LoginButton from './components/LoginButton';
+import { Link } from 'react-router-dom';
+import { saveFormForUser } from './services/forms';
 
 const App: React.FC = () => {
   const [promptText, setPromptText] = useState<string>('');
@@ -11,6 +15,12 @@ const App: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   // Focused question index for "Implicit Edit Mode"
   const [focusedFieldIndex, setFocusedFieldIndex] = useState<number | null>(null);
+
+  // Auth + Save state
+  const { user } = useAuth();
+  const [saving, setSaving] = useState<boolean>(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [lastSavedId, setLastSavedId] = useState<string | null>(null);
 
   // Click-outside to exit focus mode
   useEffect(() => {
@@ -398,13 +408,65 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-100">
       <main className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-10">
-        <header className="text-center">
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
-            PromptForm
-          </h1>
-          <p className="mt-2 text-sm text-gray-600">
-            Describe the form you want to create. Attach a file if you want your text to transform it.
-          </p>
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="text-center sm:text-left">
+            <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+              PromptForm
+            </h1>
+            <p className="mt-2 text-sm text-gray-600">
+              Describe the form you want to create. Attach a file if you want your text to transform it.
+            </p>
+          </div>
+
+          <div className="flex items-center justify-center gap-2">
+            {user && formJson && (
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!user || !formJson) return;
+                  setSaveError(null);
+                  setSaving(true);
+                  try {
+                    const id = await saveFormForUser(user.uid, formJson as FormData);
+                    setLastSavedId(id);
+                  } catch (e: any) {
+                    setSaveError(e?.message || 'Failed to save form.');
+                  } finally {
+                    setSaving(false);
+                  }
+                }}
+                disabled={saving}
+                className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+                title="Save this form to your account"
+              >
+                {saving ? 'Saving...' : 'Save Form'}
+              </button>
+            )}
+
+            {lastSavedId && (
+              <Link
+                to={`/form/${lastSavedId}`}
+                className="rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50"
+                title="Open the public link for this form"
+              >
+                View link
+              </Link>
+            )}
+
+            <Link
+              to="/dashboard"
+              className="rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50"
+              title="Go to My Forms"
+            >
+              Dashboard
+            </Link>
+
+            <LoginButton />
+          </div>
+
+          {saveError && (
+            <div className="sm:text-right text-center text-xs text-red-600">{saveError}</div>
+          )}
         </header>
 
         <CommandBar
