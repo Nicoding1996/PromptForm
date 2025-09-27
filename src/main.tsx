@@ -6,7 +6,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import App from './App.tsx'
 import Dashboard from './pages/Dashboard.tsx'
 import PublicFormPage from './pages/PublicFormPage.tsx'
-import ResponsesPage from './pages/ResponsesPage.tsx'
+import FormEditorPage from './pages/FormEditorPage.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -16,7 +16,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="/" element={<App />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/form/:formId" element={<PublicFormPage />} />
-          <Route path="/dashboard/:formId/responses" element={<ResponsesPage />} />
+          <Route path="/form/:formId/edit" element={<FormEditorPage />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

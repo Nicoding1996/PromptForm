@@ -9,6 +9,8 @@ const ResponsesPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<FormData | null>(null);
   const [responses, setResponses] = useState<StoredResponse[]>([]);
+  // Which submission is currently selected in the new sidebar
+  const [selectedResponseIndex, setSelectedResponseIndex] = useState(0);
 
   // Columns are derived from form fields (excluding submit)
   const columns = useMemo(() => {
@@ -48,13 +50,6 @@ const ResponsesPage: React.FC = () => {
     };
   }, [formId]);
 
-  const renderCell = (resp: StoredResponse, col: { key: string; label: string; field: FormField }) => {
-    const v = resp.payload?.[col.key];
-    // For checkbox groups or duplicated keys we combined into arrays at submit time
-    if (Array.isArray(v)) return v.join(', ');
-    if (typeof v === 'object' && v !== null) return JSON.stringify(v);
-    return String(v ?? '');
-  };
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -100,35 +95,81 @@ const ResponsesPage: React.FC = () => {
             <p className="text-sm text-gray-700">No responses yet.</p>
           </section>
         ) : (
-          <section className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-200 overflow-auto">
-            <table className="min-w-full border-collapse">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="p-2 text-left text-xs font-semibold text-gray-600">#</th>
-                  <th className="p-2 text-left text-xs font-semibold text-gray-600">Submitted</th>
-                  {columns.map((c) => (
-                    <th key={c.key} className="p-2 text-left text-xs font-semibold text-gray-600">
-                      {c.label}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {responses.map((r, idx) => (
-                  <tr key={r.id} className="border-b border-gray-100">
-                    <td className="p-2 text-sm text-gray-700">{idx + 1}</td>
-                    <td className="p-2 text-xs text-gray-500">
-                      {r.createdAt?.toDate ? r.createdAt.toDate().toLocaleString() : ''}
-                    </td>
-                    {columns.map((c) => (
-                      <td key={`${r.id}-${c.key}`} className="p-2 text-sm text-gray-800">
-                        {renderCell(r, c)}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <section className="rounded-xl bg-white p-0 shadow-sm ring-1 ring-gray-200 overflow-hidden">
+            <div className="flex h-[70vh]">
+              {/* Left Sidebar: Submission list */}
+              <aside className="w-64 border-r border-gray-200 overflow-y-auto">
+                <ul className="divide-y divide-gray-100">
+                  {responses.map((r, idx) => {
+                    const active = idx === selectedResponseIndex;
+                    const ts = r.createdAt?.toDate
+                      ? r.createdAt.toDate().toLocaleString()
+                      : 'Unknown date';
+                    return (
+                      <li key={r.id}>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedResponseIndex(idx)}
+                          className={
+                            'w-full text-left px-3 py-3 transition ' +
+                            (active ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-gray-50')
+                          }
+                          title={`Open submission #${idx + 1}`}
+                        >
+                          <div className="text-sm font-medium">{`Submission #${idx + 1}`}</div>
+                          <div className="text-xs text-gray-500">{ts}</div>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </aside>
+
+              {/* Main Content: Selected response details */}
+              <main className="flex-1 overflow-y-auto p-6">
+                {(() => {
+                  const r = responses[selectedResponseIndex];
+                  if (!r) {
+                    return <p className="text-sm text-gray-500">Select a submission to view details.</p>;
+                  }
+
+                  // Prefer ordered form fields; if missing, fall back to raw payload entries
+                  const pairs =
+                    columns.length > 0
+                      ? columns.map((c) => ({
+                          label: c.label,
+                          value: r.payload?.[c.key],
+                        }))
+                      : Object.entries(r.payload || {}).map(([k, v]) => ({ label: k, value: v }));
+
+                  const format = (v: any) =>
+                    Array.isArray(v)
+                      ? v.join(', ')
+                      : typeof v === 'object' && v !== null
+                      ? JSON.stringify(v)
+                      : String(v ?? '');
+
+                  return (
+                    <div className="space-y-4">
+                      <div className="mb-2">
+                        <div className="text-sm text-gray-500">
+                          {r.createdAt?.toDate ? r.createdAt.toDate().toLocaleString() : ''}
+                        </div>
+                      </div>
+
+                      {pairs.map((p, i) => (
+                        <div key={i} className="pb-4 border-b border-gray-100">
+                          <strong className="block text-sm text-gray-700">{p.label}</strong>
+                          <p className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">
+                            {format(p.value)}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </main>
+            </div>
           </section>
         )}
       </main>

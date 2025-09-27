@@ -119,19 +119,11 @@ const Dashboard: React.FC = () => {
                       </div>
                       <div className="flex items-center gap-2">
                         <Link
-                          to={`/form/${f.id}`}
+                          to={`/form/${f.id}/edit`}
                           className="rounded-md bg-white px-2.5 py-1.5 text-sm font-medium text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50"
-                          title="Open public link"
+                          title="Edit form"
                         >
-                          View
-                        </Link>
-
-                        <Link
-                          to={`/dashboard/${f.id}/responses`}
-                          className="rounded-md bg-white px-2.5 py-1.5 text-sm font-medium text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50"
-                          title="View responses"
-                        >
-                          Responses
+                          Edit Form
                         </Link>
 
                         <button
