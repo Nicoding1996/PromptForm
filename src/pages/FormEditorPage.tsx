@@ -91,6 +91,9 @@ const FormEditorPage: React.FC = () => {
     return fields.map((f) => ({ key: f.name, label: f.label, field: f }));
   }, [formJson]);
 
+  // Quiz mode derived from formJson
+  const quizMode = formJson?.isQuiz === true;
+
   // ===== In-place editor handlers (single source of truth: formJson) =====
   const handleUpdateFieldLabel = (fieldIndex: number, newLabel: string) => {
     setFormJson((prev) => {
@@ -199,7 +202,18 @@ const FormEditorPage: React.FC = () => {
       const opts = (f.options ? [...f.options] : []);
       const label = `Option ${opts.length + 1}`;
       opts.push(label);
-      fields[fieldIndex] = { ...f, options: opts };
+
+      const next: any = { ...f, options: opts };
+      // If quiz mode is on and there is no correct answer yet, default to the first option
+      if (quizMode && !next.correctAnswer && opts.length > 0) {
+        next.correctAnswer = opts[0];
+      }
+      // Ensure points exists in quiz mode
+      if (quizMode && (next.points == null || !Number.isFinite(next.points))) {
+        next.points = 1;
+      }
+
+      fields[fieldIndex] = next as FormField;
       return { ...prev, fields };
     });
   };
@@ -226,21 +240,30 @@ const FormEditorPage: React.FC = () => {
       const fields = [...prev.fields];
       const f = fields[fieldIndex];
       if (!f) return prev;
-
-      const next: FormField = { ...f, type: newType };
-
+  
+      const next: any = { ...f, type: newType };
+  
       if (newType === 'radio' || newType === 'checkbox' || newType === 'select') {
         next.options = (f.options && f.options.length ? [...f.options] : ['Option 1', 'Option 2']);
+        // Quiz-mode defaults for option-based questions
+        if (quizMode) {
+          if (next.correctAnswer == null && next.options && next.options.length > 0) {
+            next.correctAnswer = next.options[0];
+          }
+          if (next.points == null || !Number.isFinite(next.points)) {
+            next.points = 1;
+          }
+        }
       } else {
         delete next.options;
       }
-
+  
       if (newType !== 'radioGrid') {
-        delete (next as any).rows;
-        delete (next as any).columns;
+        delete next.rows;
+        delete next.columns;
       }
-
-      fields[fieldIndex] = next;
+  
+      fields[fieldIndex] = next as FormField;
       return { ...prev, fields };
     });
   };
@@ -372,6 +395,41 @@ const FormEditorPage: React.FC = () => {
         max?: number;
       };
       return { ...prev, fields };
+    });
+  };
+
+  // ===== Quiz mode + handlers =====
+  const handleUpdateFieldCorrectAnswer = (fieldIndex: number, value: string) => {
+    setFormJson((prev) => {
+      if (!prev) return prev;
+      const fields = [...prev.fields];
+      const f = fields[fieldIndex];
+      if (!f) return prev;
+      if (f.type !== 'radio' && f.type !== 'checkbox' && f.type !== 'select') return prev;
+      const next: any = { ...f };
+      if (value && value.length) next.correctAnswer = value;
+      else delete next.correctAnswer;
+      fields[fieldIndex] = next as FormField;
+      return { ...prev, fields };
+    });
+  };
+
+  const handleUpdateFieldPoints = (fieldIndex: number, points: number) => {
+    setFormJson((prev) => {
+      if (!prev) return prev;
+      const fields = [...prev.fields];
+      const f = fields[fieldIndex];
+      if (!f) return prev;
+      const next: any = { ...f, points: Math.max(0, Math.floor(Number(points) || 0)) || 1 };
+      fields[fieldIndex] = next as FormField;
+      return { ...prev, fields };
+    });
+  };
+
+  const handleSetQuizMode = (enabled: boolean) => {
+    setFormJson((prev) => {
+      if (!prev) return prev;
+      return { ...prev, isQuiz: !!enabled };
     });
   };
 
@@ -590,6 +648,20 @@ const FormEditorPage: React.FC = () => {
                 </p>
               )}
 
+              {/* Quiz toggle */}
+              <div className="flex items-center justify-between rounded-md bg-indigo-50/40 p-3 ring-1 ring-indigo-100">
+                <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={quizMode}
+                    onChange={(e) => handleSetQuizMode(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  Make this a quiz
+                </label>
+                {quizMode && <span className="text-xs text-gray-500">Mark correct answers and assign points in each choice question.</span>}
+              </div>
+
               {/* Loading placeholder / generated form */}
               {isLoading ? (
                 <section
@@ -622,6 +694,10 @@ const FormEditorPage: React.FC = () => {
                     onChangeFieldType={handleChangeFieldType}
                     onDuplicateField={handleDuplicateField}
                     onToggleRequiredField={handleToggleRequiredField}
+                    // Quiz
+                    quizMode={quizMode}
+                    onUpdateFieldCorrectAnswer={handleUpdateFieldCorrectAnswer}
+                    onUpdateFieldPoints={handleUpdateFieldPoints}
                     // Grid + range
                     onUpdateGridRow={handleUpdateGridRow}
                     onUpdateGridColumn={handleUpdateGridColumn}

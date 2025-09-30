@@ -107,6 +107,7 @@ app.post('/generate-form', async (req, res) => {
       {
         "title": "A String for the Form Title",
         "description": "An optional string for the form's introduction.",
+        "isQuiz": false, // when applicable, set to true (see rules below)
         "fields": [
           {
             "label": "Field Label",
@@ -114,7 +115,9 @@ app.post('/generate-form', async (req, res) => {
             "name": "lowercase_field_label_with_underscores",
             "options": ["Option 1", "Option 2"],
             "rows": ["Row 1", "Row 2"],       // only for radioGrid
-            "columns": ["Col A", "Col B"]     // only for radioGrid
+            "columns": ["Col A", "Col B"],    // only for radioGrid
+            "correctAnswer": "Option 1",      // when isQuiz is true and applicable (radio/checkbox/select)
+            "points": 1                       // when isQuiz is true; default to 1 if not specified
           }
         ]
       }
@@ -140,6 +143,13 @@ app.post('/generate-form', async (req, res) => {
         - "label": the main title of the grid.
       - 'submit': Ensure there is exactly one field with type "submit".
       - If the user's request implies a longer introduction or context, include a helpful summary in the "description" field.
+
+      QUIZ/ASSESSMENT RULES:
+      - If the user's prompt contains keywords that imply an assessment—such as "quiz", "test", "exam", "assessment", "true or false", "knowledge check", or "evaluation"—you MUST add a new top-level property "isQuiz": true on the main JSON object.
+      - When "isQuiz" is true, you MUST do your best to analyze the prompt/context to identify the correct answer for option-based questions (types "radio", "checkbox", or "select"):
+        - If you can identify the correct answer, set "correctAnswer" on that field to the matching option value.
+        - Always add a "points" key with value 1 on that field.
+      - Only set "correctAnswer" on fields that actually have options (radio/checkbox/select). Do NOT add it for text-like or radioGrid fields.
       
       User's request: "${req.body.prompt}"
     `;
@@ -240,6 +250,7 @@ Additional user instructions (context): "${context.trim()}". Use these instructi
       {
         "title": "A String for the Form Title",
         "description": "An optional string for the form's introduction.",
+        "isQuiz": false,
         "fields": [
           {
             "label": "Field Label",
@@ -247,7 +258,9 @@ Additional user instructions (context): "${context.trim()}". Use these instructi
             "name": "lowercase_field_label_with_underscores",
             "options": ["Option 1", "Option 2"],
             "rows": ["Row 1", "Row 2"],       // only for radioGrid
-            "columns": ["Col A", "Col B"]     // only for radioGrid
+            "columns": ["Col A", "Col B"],    // only for radioGrid
+            "correctAnswer": "Option 1",      // when isQuiz is true and applicable
+            "points": 1
           }
         ]
       }
@@ -273,6 +286,14 @@ Additional user instructions (context): "${context.trim()}". Use these instructi
         - "label": the main title of the grid.
       - 'submit': Ensure there is exactly one field with type "submit".
       - If the user's request implies a longer introduction or context, include a helpful summary in the "description" field.
+
+      QUIZ/ASSESSMENT RULES:
+      - If the user's prompt or the image/context contains keywords that imply an assessment—such as "quiz", "test", "exam", "assessment", "true or false", "knowledge check", or "evaluation"—you MUST add a new top-level property "isQuiz": true on the main JSON object.
+      - When "isQuiz" is true, you MUST do your best to analyze the image/context to identify the correct answer for option-based questions (types "radio", "checkbox", or "select"):
+        - If you can identify the correct answer, set "correctAnswer" on that field to the matching option value.
+        - Always add a "points" key with value 1 on that field.
+      - Only set "correctAnswer" on fields that actually have options (radio/checkbox/select). Do NOT add it for text-like or radioGrid fields.
+
       ${extraVisionContext}
     `;
 
@@ -445,6 +466,7 @@ Additional user instructions (context): "${userContext}"
       {
         "title": "A String for the Form Title",
         "description": "An optional string for the form's introduction.",
+        "isQuiz": false,
         "fields": [
           {
             "label": "Field Label",
@@ -452,7 +474,9 @@ Additional user instructions (context): "${userContext}"
             "name": "lowercase_field_label_with_underscores",
             "options": ["Option 1", "Option 2"],
             "rows": ["Row 1", "Row 2"],       // only for radioGrid
-            "columns": ["Col A", "Col B"]     // only for radioGrid
+            "columns": ["Col A", "Col B"],    // only for radioGrid
+            "correctAnswer": "Option 1",      // when isQuiz is true and applicable
+            "points": 1
           }
         ]
       }
@@ -478,6 +502,13 @@ Additional user instructions (context): "${userContext}"
         - "label": the main title of the grid.
       - 'submit': Ensure there is exactly one field with type "submit".
       - If the user's request implies a longer introduction or context, include a helpful summary in the "description" field.
+
+      QUIZ/ASSESSMENT RULES:
+      - If the user's prompt or the document content contains keywords that imply an assessment—such as "quiz", "test", "exam", "assessment", "true or false", "knowledge check", or "evaluation"—you MUST add a new top-level property "isQuiz": true on the main JSON object.
+      - When "isQuiz" is true, you MUST do your best to analyze the prompt/document to identify the correct answer for option-based questions (types "radio", "checkbox", or "select"):
+        - If you can identify the correct answer, set "correctAnswer" on that field to the matching option value.
+        - Always add a "points" key with value 1 on that field.
+      - Only set "correctAnswer" on fields that actually have options (radio/checkbox/select). Do NOT add it for text-like or radioGrid fields.
       
       ${contextBlock}
       Document content to analyze and transform:
@@ -541,7 +572,11 @@ app.post('/submit-response/:formId', async (req, res) => {
   }
 
   try {
-    const payload = req.body ?? {};
+    const body = req.body ?? {};
+    // Backward compatible: if caller sends raw answers directly, treat it as payload.
+    const payload = body.payload ?? body;
+    const { score = null, maxScore = null } = body;
+
     const ip =
       (req.headers['x-forwarded-for']?.toString().split(',')[0] || '').trim() ||
       req.socket?.remoteAddress ||
@@ -549,6 +584,8 @@ app.post('/submit-response/:formId', async (req, res) => {
 
     const ref = await addDoc(collection(db, 'forms', formId, 'responses'), {
       payload,
+      score,
+      maxScore,
       createdAt: serverTimestamp(),
       userAgent: req.get('user-agent') || null,
       ip,

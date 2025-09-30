@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { DndContext, useDraggable, useDroppable, type DragEndEvent } from '@dnd-kit/core';
-import { FiTrash2, FiCopy } from 'react-icons/fi';
+import { FiTrash2, FiCopy, FiCheckCircle } from 'react-icons/fi';
 import { RxDragHandleDots2 } from 'react-icons/rx';
 
 export interface FormField {
@@ -22,6 +22,10 @@ export interface FormField {
   name: string;
   options?: string[]; // required for radio | checkbox | select
 
+  // Quiz-related (used when form is in quiz mode for option-based questions)
+  correctAnswer?: string;
+  points?: number;
+
   // radioGrid-specific structure:
   rows?: string[]; // array of row labels/questions
   columns?: string[]; // array of column choices
@@ -30,6 +34,7 @@ export interface FormField {
 export interface FormData {
   title: string;
   description?: string;
+  isQuiz?: boolean;
   fields: FormField[];
 }
 
@@ -54,6 +59,11 @@ interface FormRendererProps {
   onChangeFieldType: (fieldIndex: number, newType: FormField['type']) => void;
   onDuplicateField: (fieldIndex: number) => void;
   onToggleRequiredField: (fieldIndex: number) => void;
+
+  // Quiz mode and related handlers
+  quizMode?: boolean;
+  onUpdateFieldCorrectAnswer?: (fieldIndex: number, value: string) => void;
+  onUpdateFieldPoints?: (fieldIndex: number, points: number) => void;
 
   // NEW remove handlers
   onRemoveFieldOption: (fieldIndex: number, optionIndex: number) => void;
@@ -172,6 +182,11 @@ const AdvancedEditor: React.FC<{
   onDuplicateField: (fieldIndex: number) => void;
   onToggleRequiredField: (fieldIndex: number) => void;
 
+  // Quiz
+  quizMode?: boolean;
+  onUpdateFieldCorrectAnswer?: (fieldIndex: number, value: string) => void;
+  onUpdateFieldPoints?: (fieldIndex: number, points: number) => void;
+
   // Remove handlers
   onRemoveFieldOption: (fieldIndex: number, optionIndex: number) => void;
 
@@ -192,6 +207,9 @@ const AdvancedEditor: React.FC<{
   onChangeFieldType,
   onDuplicateField,
   onToggleRequiredField,
+  quizMode,
+  onUpdateFieldCorrectAnswer,
+  onUpdateFieldPoints,
   onRemoveFieldOption,
   onUpdateGridRow,
   onUpdateGridColumn,
@@ -256,24 +274,49 @@ const AdvancedEditor: React.FC<{
       {/* Options editor for radio/checkbox/select */}
       {needsOptions && (
         <div className="space-y-2">
-          {options.map((opt, optIdx) => (
-            <div key={`${field.name}-opt-edit-${optIdx}`} className="flex items-center gap-2">
-              <input
-                className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm"
-                value={opt}
-                onChange={(e) => onUpdateFieldOption(index, optIdx, e.target.value)}
-              />
-              <button
-                type="button"
-                aria-label="Remove option"
-                title="Remove option"
-                onClick={() => onRemoveFieldOption(index, optIdx)}
-                className="inline-flex h-7 w-7 items-center justify-center rounded-md text-red-600 hover:bg-red-50 ring-1 ring-red-200"
+          {options.map((opt, optIdx) => {
+            const isCorrect = quizMode && (field as any).correctAnswer === opt;
+            return (
+              <div
+                key={`${field.name}-opt-edit-${optIdx}`}
+                className={
+                  'flex items-center gap-2 ' +
+                  (isCorrect ? 'rounded bg-green-50 px-2 ring-1 ring-green-200' : '')
+                }
               >
-                <FiTrash2 />
-              </button>
-            </div>
-          ))}
+                <input
+                  className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm"
+                  value={opt}
+                  onChange={(e) => onUpdateFieldOption(index, optIdx, e.target.value)}
+                />
+                {quizMode && (
+                  <button
+                    type="button"
+                    aria-label="Mark as correct"
+                    title={isCorrect ? 'Correct answer' : 'Mark as correct'}
+                    onClick={() => onUpdateFieldCorrectAnswer?.(index, opt)}
+                    className={
+                      'inline-flex h-7 w-7 items-center justify-center rounded-md ring-1 ' +
+                      (isCorrect
+                        ? 'text-green-700 ring-green-300 bg-green-100'
+                        : 'text-gray-500 ring-gray-200 hover:bg-gray-50')
+                    }
+                  >
+                    <FiCheckCircle />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  aria-label="Remove option"
+                  title="Remove option"
+                  onClick={() => onRemoveFieldOption(index, optIdx)}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-red-600 hover:bg-red-50 ring-1 ring-red-200"
+                >
+                  <FiTrash2 />
+                </button>
+              </div>
+            );
+          })}
           <button
             type="button"
             onClick={() => onAddFieldOption(index)}
@@ -281,6 +324,37 @@ const AdvancedEditor: React.FC<{
           >
             + Add option
           </button>
+
+          {/* Quiz controls */}
+          {quizMode && (
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <label className="text-xs font-medium text-gray-600">Correct answer</label>
+              <select
+                className="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm"
+                value={(field as any).correctAnswer ?? ''}
+                onChange={(e) => onUpdateFieldCorrectAnswer?.(index, e.target.value)}
+              >
+                <option value="">-- none --</option>
+                {options.map((opt, i) => (
+                  <option key={`${field.name}-correct-${i}`} value={opt}>
+                    {opt}
+                  </option>
+                ))}
+              </select>
+
+              <label className="ml-2 text-xs font-medium text-gray-600">Points</label>
+              <input
+                type="number"
+                min={0}
+                defaultValue={(field as any).points ?? 1}
+                className="w-20 rounded-md border border-gray-300 px-2 py-1 text-sm"
+                onBlur={(e) => {
+                  const n = Number(e.target.value);
+                  onUpdateFieldPoints?.(index, Number.isFinite(n) ? n : ((field as any).points ?? 1));
+                }}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -437,6 +511,11 @@ const FormRenderer: React.FC<FormRendererProps> = ({
   onChangeFieldType,
   onDuplicateField,
   onToggleRequiredField,
+  // Quiz
+  quizMode,
+  onUpdateFieldCorrectAnswer,
+  onUpdateFieldPoints,
+  // Grid/range
   onUpdateGridRow,
   onUpdateGridColumn,
   onAddGridRow,
@@ -721,6 +800,11 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                 onChangeFieldType={onChangeFieldType}
                 onDuplicateField={onDuplicateField}
                 onToggleRequiredField={onToggleRequiredField}
+                // Quiz
+                quizMode={quizMode}
+                onUpdateFieldCorrectAnswer={onUpdateFieldCorrectAnswer}
+                onUpdateFieldPoints={onUpdateFieldPoints}
+                // Grid + range
                 onUpdateGridRow={onUpdateGridRow}
                 onUpdateGridColumn={onUpdateGridColumn}
                 onAddGridRow={onAddGridRow}

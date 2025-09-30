@@ -14,6 +14,8 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId }) => {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastScore, setLastScore] = useState<number | null>(null);
+  const [lastMaxScore, setLastMaxScore] = useState<number | null>(null);
 
   const actionBase = useMemo(() => {
     return (import.meta as any)?.env?.VITE_API_BASE || 'http://localhost:3001';
@@ -33,7 +35,7 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId }) => {
     try {
       const formEl = e.currentTarget;
       const fd = new FormData(formEl);
-
+  
       // Convert FormData to JSON payload; combine duplicate keys into arrays
       const payload: Record<string, any> = {};
       for (const [key, value] of fd.entries()) {
@@ -45,11 +47,46 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId }) => {
           payload[key] = value;
         }
       }
-
+  
+      // Quiz scoring (local) if enabled
+      let scoreToSend: number | null = null;
+      let maxToSend: number | null = null;
+      if ((formData as any)?.isQuiz === true) {
+        let score = 0;
+        let max = 0;
+        const eligible = new Set<FormField['type']>(['radio', 'checkbox', 'select']);
+        for (const f of formData.fields ?? []) {
+          if (!eligible.has(f.type)) continue;
+          const correct = (f as any).correctAnswer as string | undefined;
+          if (!correct || !correct.length) continue;
+          const points = Number((f as any).points ?? 1);
+          const userVal = payload[f.name];
+          let ok = false;
+          if (Array.isArray(userVal)) {
+            ok = (userVal as any[]).map(String).includes(String(correct));
+          } else {
+            ok = String(userVal ?? '') === String(correct);
+          }
+          max += Number.isFinite(points) ? points : 1;
+          if (ok) score += Number.isFinite(points) ? points : 1;
+        }
+        scoreToSend = score;
+        maxToSend = max;
+        setLastScore(score);
+        setLastMaxScore(max);
+      } else {
+        setLastScore(null);
+        setLastMaxScore(null);
+      }
+  
       const resp = await fetch(`${actionBase}/submit-response/${formId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          payload,
+          score: scoreToSend,
+          maxScore: maxToSend,
+        }),
       });
       if (!resp.ok) {
         const detail = await resp.json().catch(() => ({}));
@@ -318,7 +355,13 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId }) => {
       <section className="mt-8 rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
         <div className="text-center">
           <h2 className="text-lg font-semibold text-gray-900">Thank you for your response!</h2>
-          <p className="mt-1 text-sm text-gray-600">Your submission has been recorded.</p>
+          {(formData as any)?.isQuiz === true && lastScore != null && lastMaxScore != null ? (
+            <p className="mt-2 text-base font-semibold text-indigo-700">
+              You scored {lastScore} out of {lastMaxScore}!
+            </p>
+          ) : (
+            <p className="mt-1 text-sm text-gray-600">Your submission has been recorded.</p>
+          )}
         </div>
       </section>
     );
