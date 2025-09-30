@@ -30,6 +30,8 @@ const DOC_TEXT_CHAR_LIMIT = parseInt(process.env.DOC_TEXT_CHAR_LIMIT || '15000',
 
 // Preferred Gemini model (override via .env GEMINI_MODEL). Using "-latest" avoids 404 on retired versions.
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-flash-latest';
+// Max characters allowed when embedding JSON form/responses into the analysis prompt (override via env)
+const ANALYZE_JSON_CHAR_LIMIT = parseInt(process.env.ANALYZE_JSON_CHAR_LIMIT || '20000', 10);
 
 // Temp directory for buffering uploads (prevents memory spikes on large DOCX)
 const TEMP_DIR = './.tmp';
@@ -584,6 +586,94 @@ app.delete('/forms/:formId', async (req, res) => {
   }
 });
 
+/**
+* AI analysis endpoint
+* POST /analyze-responses
+* Body:
+*  - form: JSON object for form structure (title, description, fields)
+*  - responses: Array of StoredResponse-like objects or raw payloads
+* Returns: Markdown text report (Content-Type: text/markdown)
+*/
+app.post('/analyze-responses', async (req, res) => {
+ try {
+   const { form, responses } = req.body ?? {};
+
+   if (!form || typeof form !== 'object') {
+     return res.status(400).json({ error: 'Invalid "form" object in request body.' });
+   }
+   if (!Array.isArray(responses)) {
+     return res.status(400).json({ error: '"responses" must be an array.' });
+   }
+
+   // Prepare compacted JSON strings for prompt (guard against very large payloads)
+   const formJson = JSON.stringify(form, null, 2);
+   const responsesJson = JSON.stringify(responses, null, 2);
+   const formBlock =
+     formJson.length > ANALYZE_JSON_CHAR_LIMIT ? condenseText(formJson, ANALYZE_JSON_CHAR_LIMIT) : formJson;
+   const responsesBlock =
+     responsesJson.length > ANALYZE_JSON_CHAR_LIMIT ? condenseText(responsesJson, ANALYZE_JSON_CHAR_LIMIT) : responsesJson;
+
+   const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
+
+   const masterPrompt = `
+You are an expert data analyst. Analyze survey/form responses and produce a concise, professional summary report.
+Your output must be VALID Markdown only. Do not include code fences. Do not include backticks. Do not include any JSON.
+
+Goals for the report:
+- Provide a brief Overview of key findings (2–4 sentences).
+- Identify strong positive and negative trends (bullet points).
+- Provide exactly three Actionable Recommendations (numbered list, 1–3).
+- If applicable, include a short Data Quality Notes section (e.g., low sample size, missing values).
+- Keep the entire report between 250–500 words. Be precise and avoid fluff. Do not hallucinate any data.
+
+Context:
+- Form definition (questions, types, choices):
+"""${formBlock}"""
+
+- Collected responses (array where each item is a single submission payload):
+"""${responsesBlock}"""
+
+Important instructions:
+- Use the question labels when referring to questions.
+- For single/multi choice fields (radio/select/checkbox/radioGrid), derive counts or clear trends from the data.
+- For text answers, extract common themes; quote sparingly.
+- For range questions, mention averages or distribution patterns when meaningful.
+- If data is insufficient to draw conclusions, clearly state that limitation.
+- Output must be Markdown with clear section headings:
+ "# AI-Powered Summary Report", "## Overview", "## Trends", "## Actionable Recommendations", "## Data Quality Notes" (if needed).
+`;
+
+   const result = await model.generateContent(masterPrompt);
+   const response = await result.response;
+
+   // Safety handling
+   const promptFeedback = response?.promptFeedback;
+   if (promptFeedback?.blockReason) {
+     console.warn('[SAFETY] Analysis prompt blocked:', promptFeedback.blockReason, promptFeedback);
+     return res.status(400).json({
+       error: 'Analysis rejected for safety reasons.',
+       message: 'Your request was blocked by the safety system. Please adjust inputs and try again.',
+       reason: promptFeedback.blockReason,
+     });
+   }
+
+   const text = (response?.text?.() ?? '').trim();
+   if (!text) {
+     console.error('[MODEL ERROR] Empty analysis response from model.');
+     return res.status(502).json({
+       error: 'Upstream model returned an empty analysis.',
+       message: 'The AI did not return any content. Please try again.',
+     });
+   }
+
+   // Return raw Markdown
+   res.type('text/markdown').send(text);
+ } catch (error) {
+   console.error('[CRITICAL SERVER ERROR - ANALYZE]:', error);
+   res.status(500).json({ error: 'Internal server error.', details: error.message });
+ }
+});
+
 app.listen(port, () => {
-  console.log(`[startup] Server listening on port ${port}`);
+ console.log(`[startup] Server listening on port ${port}`);
 });

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { FormData, FormField } from '../FormRenderer';
 import type { StoredResponse } from '../../services/forms';
 import {
@@ -14,7 +14,7 @@ import {
   YAxis,
   CartesianGrid,
 } from 'recharts';
-
+import ReportModal from '../common/ReportModal';
 type Props = {
   form: FormData | null;
   responses: StoredResponse[];
@@ -122,8 +122,66 @@ function calcAverage(nums: number[]) {
 const SummaryView: React.FC<Props> = ({ form, responses, height = '70vh' }) => {
   const fields = useMemo(() => (form?.fields ?? []).filter((f) => f.type !== 'submit'), [form]);
 
+  // AI Report state
+  const [isReportLoading, setIsReportLoading] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [reportText, setReportText] = useState('');
+  const [showReport, setShowReport] = useState(false);
+
+  // Call backend to generate AI analysis (Markdown)
+  const handleGenerateReport = async () => {
+    if (!form) {
+      setReportError('No form to analyze.');
+      return;
+    }
+    setReportError(null);
+    setIsReportLoading(true);
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE || 'http://localhost:3001';
+      const resp = await fetch(`${apiBase}/analyze-responses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          form,
+          // Server expects an array of submission objects; send payloads only
+          responses: (responses || []).map((r) => r.payload),
+        }),
+      });
+
+      const text = await resp.text();
+      if (!resp.ok) {
+        throw new Error(text || 'Failed to generate report.');
+      }
+
+      setReportText(text);
+      setShowReport(true);
+    } catch (e: any) {
+      setReportError(e?.message || 'Failed to generate report.');
+    } finally {
+      setIsReportLoading(false);
+    }
+  };
+
   return (
     <section className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-200 overflow-auto" style={{ maxHeight: height }}>
+      <div className="mb-4 flex items-center justify-end">
+        <button
+          type="button"
+          onClick={handleGenerateReport}
+          disabled={isReportLoading || !form || responses.length === 0}
+          className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+          title="Analyze responses and generate a professional Markdown report"
+        >
+          {isReportLoading ? 'Generating…' : 'Generate AI Report'}
+        </button>
+      </div>
+
+      {reportError && (
+        <div className="mb-3 rounded-md border-l-4 border-red-400 bg-red-50 p-3 text-sm text-red-700">
+          {reportError}
+        </div>
+      )}
+
       {fields.length === 0 ? (
         <div className="rounded-lg border border-dashed border-gray-300 p-6 text-sm text-gray-700">
           <h3 className="text-base font-semibold text-gray-900">No questions to summarize</h3>
@@ -293,6 +351,10 @@ const SummaryView: React.FC<Props> = ({ form, responses, height = '70vh' }) => {
             );
           })}
         </div>
+      )}
+
+      {showReport && (
+        <ReportModal text={reportText} onClose={() => setShowReport(false)} />
       )}
     </section>
   );
