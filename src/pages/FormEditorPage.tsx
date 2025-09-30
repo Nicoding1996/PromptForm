@@ -399,16 +399,49 @@ const FormEditorPage: React.FC = () => {
   };
 
   // ===== Quiz mode + handlers =====
-  const handleUpdateFieldCorrectAnswer = (fieldIndex: number, value: string) => {
+  const handleUpdateFieldCorrectAnswer = (
+    fieldIndex: number,
+    value: string | string[],
+    opts?: { toggle?: boolean }
+  ) => {
     setFormJson((prev) => {
       if (!prev) return prev;
       const fields = [...prev.fields];
       const f = fields[fieldIndex];
       if (!f) return prev;
       if (f.type !== 'radio' && f.type !== 'checkbox' && f.type !== 'select') return prev;
+
       const next: any = { ...f };
-      if (value && value.length) next.correctAnswer = value;
-      else delete next.correctAnswer;
+
+      if (f.type === 'checkbox') {
+        // Support multiple correct answers for checkbox by toggling membership
+        const toggle = opts?.toggle === true;
+        const curr = Array.isArray(next.correctAnswer)
+          ? new Set<string>(next.correctAnswer as string[])
+          : typeof next.correctAnswer === 'string' && next.correctAnswer
+          ? new Set<string>([next.correctAnswer as string])
+          : new Set<string>();
+
+        if (toggle && typeof value === 'string') {
+          if (curr.has(value)) curr.delete(value);
+          else curr.add(value);
+          next.correctAnswer = Array.from(curr);
+        } else if (Array.isArray(value)) {
+          next.correctAnswer = value;
+        } else if (typeof value === 'string') {
+          next.correctAnswer = [value];
+        }
+
+        // Normalize to undefined if empty
+        if (Array.isArray(next.correctAnswer) && next.correctAnswer.length === 0) {
+          delete next.correctAnswer;
+        }
+      } else {
+        // radio/select: single string
+        if (typeof value === 'string' && value.length) next.correctAnswer = value;
+        else delete next.correctAnswer;
+      }
+
       fields[fieldIndex] = next as FormField;
       return { ...prev, fields };
     });

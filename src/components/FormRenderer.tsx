@@ -22,8 +22,8 @@ export interface FormField {
   name: string;
   options?: string[]; // required for radio | checkbox | select
 
-  // Quiz-related (used when form is in quiz mode for option-based questions)
-  correctAnswer?: string;
+  // Quiz-related (supports single or multiple correct answers for checkbox)
+  correctAnswer?: string | string[];
   points?: number;
 
   // radioGrid-specific structure:
@@ -65,7 +65,7 @@ interface FormRendererProps {
   onUpdateFieldCorrectAnswer?: (fieldIndex: number, value: string) => void;
   onUpdateFieldPoints?: (fieldIndex: number, points: number) => void;
 
-  // NEW remove handlers
+  // Remove handlers
   onRemoveFieldOption: (fieldIndex: number, optionIndex: number) => void;
 
   // Grid editing
@@ -73,8 +73,6 @@ interface FormRendererProps {
   onUpdateGridColumn: (fieldIndex: number, colIndex: number, newText: string) => void;
   onAddGridRow: (fieldIndex: number) => void;
   onAddGridColumn: (fieldIndex: number) => void;
-
-  // NEW grid remove handlers
   onRemoveGridRow: (fieldIndex: number, rowIndex: number) => void;
   onRemoveGridColumn: (fieldIndex: number, colIndex: number) => void;
 
@@ -86,6 +84,45 @@ const baseInputClass =
   'block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500';
 
 const baseLabelClass = 'text-sm font-medium text-gray-700';
+
+// Normalization helper (case/whitespace tolerant)
+const normalize = (v: any) => String(v ?? '').trim().toLowerCase();
+
+// Build tolerant set of correct answers for highlighting and default selection
+function resolveCorrectSet(field: any, options: string[]): Set<string> {
+  const set = new Set<string>();
+  const pushIfMatch = (token: any) => {
+    const t = normalize(token);
+    if (!t) return;
+    // Index tokens
+    const idx = Number(t);
+    if (Number.isInteger(idx) && idx >= 0 && idx < options.length) {
+      set.add(normalize(options[idx]));
+      return;
+    }
+    // Exact match to an option
+    const direct = options.find((o) => normalize(o) === t);
+    if (direct) {
+      set.add(normalize(direct));
+      return;
+    }
+    // Partial containment fallback
+    const partial = options.find((o) => normalize(o).includes(t) || t.includes(normalize(o)));
+    if (partial) {
+      set.add(normalize(partial));
+    }
+  };
+
+  const raw = field?.correctAnswer;
+  if (Array.isArray(raw)) {
+    raw.forEach(pushIfMatch);
+  } else if (typeof raw === 'string') {
+    raw.split(',').forEach(pushIfMatch);
+  } else if (raw != null) {
+    pushIfMatch(raw);
+  }
+  return set;
+}
 
 /**
  * Range field with visible numeric output.
@@ -157,17 +194,12 @@ const EditableLabel: React.FC<{
   }
 
   return (
-    <label
-      className={`${className} cursor-text`}
-      htmlFor={htmlFor}
-      title="Click to edit label"
-      onClick={() => setEditing(true)}
-    >
+    <label className={`${className} cursor-text`} htmlFor={htmlFor} title="Click to edit label" onClick={() => setEditing(true)}>
       {label}
     </label>
   );
 };
- 
+
 /**
  * Advanced editor view for a focused field.
  */
@@ -220,7 +252,19 @@ const AdvancedEditor: React.FC<{
   onUpdateRangeBounds,
 }) => {
   const optionTypes: FormField['type'][] = [
-    'text','email','password','textarea','radio','checkbox','select','date','time','file','range','radioGrid','submit'
+    'text',
+    'email',
+    'password',
+    'textarea',
+    'radio',
+    'checkbox',
+    'select',
+    'date',
+    'time',
+    'file',
+    'range',
+    'radioGrid',
+    'submit',
   ];
   const needsOptions = field.type === 'radio' || field.type === 'checkbox' || field.type === 'select';
   const options = field.options ?? [];
@@ -228,14 +272,12 @@ const AdvancedEditor: React.FC<{
   const rmin = (field as any).min ?? 0;
   const rmax = (field as any).max ?? 10;
 
+  const correctSet = quizMode ? resolveCorrectSet(field, options) : new Set<string>();
+
   return (
     <div className="flex flex-col gap-4 rounded-md bg-indigo-50/20 p-3 ring-1 ring-indigo-100" data-adv-editor="true">
       {/* Label editor (WYSIWYG-like) */}
-      <EditableLabel
-        label={field.label}
-        htmlFor={field.name}
-        onCommit={(txt) => onUpdateFieldLabel(index, txt)}
-      />
+      <EditableLabel label={field.label} htmlFor={field.name} onCommit={(txt) => onUpdateFieldLabel(index, txt)} />
 
       {/* Type switcher + duplicate + required */}
       <div className="flex flex-wrap items-center gap-3">
@@ -246,7 +288,9 @@ const AdvancedEditor: React.FC<{
           onChange={(e) => onChangeFieldType(index, e.target.value as FormField['type'])}
         >
           {optionTypes.map((t) => (
-            <option key={t} value={t}>{t}</option>
+            <option key={t} value={t}>
+              {t}
+            </option>
           ))}
         </select>
 
@@ -275,14 +319,11 @@ const AdvancedEditor: React.FC<{
       {needsOptions && (
         <div className="space-y-2">
           {options.map((opt, optIdx) => {
-            const isCorrect = quizMode && (field as any).correctAnswer === opt;
+            const isCorrect = correctSet.has(normalize(opt));
             return (
               <div
                 key={`${field.name}-opt-edit-${optIdx}`}
-                className={
-                  'flex items-center gap-2 ' +
-                  (isCorrect ? 'rounded bg-green-50 px-2 ring-1 ring-green-200' : '')
-                }
+                className={'flex items-center gap-2 ' + (isCorrect ? 'rounded bg-green-50 px-2 ring-1 ring-green-200' : '')}
               >
                 <input
                   className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm"
@@ -297,9 +338,7 @@ const AdvancedEditor: React.FC<{
                     onClick={() => onUpdateFieldCorrectAnswer?.(index, opt)}
                     className={
                       'inline-flex h-7 w-7 items-center justify-center rounded-md ring-1 ' +
-                      (isCorrect
-                        ? 'text-green-700 ring-green-300 bg-green-100'
-                        : 'text-gray-500 ring-gray-200 hover:bg-gray-50')
+                      (isCorrect ? 'text-green-700 ring-green-300 bg-green-100' : 'text-gray-500 ring-gray-200 hover:bg-gray-50')
                     }
                   >
                     <FiCheckCircle />
@@ -317,6 +356,7 @@ const AdvancedEditor: React.FC<{
               </div>
             );
           })}
+
           <button
             type="button"
             onClick={() => onAddFieldOption(index)}
@@ -328,19 +368,35 @@ const AdvancedEditor: React.FC<{
           {/* Quiz controls */}
           {quizMode && (
             <div className="mt-3 flex flex-wrap items-center gap-3">
-              <label className="text-xs font-medium text-gray-600">Correct answer</label>
-              <select
-                className="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm"
-                value={(field as any).correctAnswer ?? ''}
-                onChange={(e) => onUpdateFieldCorrectAnswer?.(index, e.target.value)}
-              >
-                <option value="">-- none --</option>
-                {options.map((opt, i) => (
-                  <option key={`${field.name}-correct-${i}`} value={opt}>
-                    {opt}
-                  </option>
-                ))}
-              </select>
+              {field.type === 'checkbox' ? (
+                <div className="text-xs text-gray-600">
+                  Correct answers:{' '}
+                  <span className="font-medium">
+                    {Array.isArray(field.correctAnswer)
+                      ? (field.correctAnswer as string[]).join(', ') || '—'
+                      : typeof field.correctAnswer === 'string' && field.correctAnswer.length
+                      ? field.correctAnswer
+                      : '—'}
+                  </span>
+                  <span className="ml-2 italic text-gray-500">(Use the green check buttons to toggle)</span>
+                </div>
+              ) : (
+                <>
+                  <label className="text-xs font-medium text-gray-600">Correct answer</label>
+                  <select
+                    className="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm"
+                    value={options.find((o) => normalize(o) === normalize(field.correctAnswer)) || ''}
+                    onChange={(e) => onUpdateFieldCorrectAnswer?.(index, e.target.value)}
+                  >
+                    <option value="">-- none --</option>
+                    {options.map((opt, i) => (
+                      <option key={`${field.name}-correct-${i}`} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              )}
 
               <label className="ml-2 text-xs font-medium text-gray-600">Points</label>
               <input
@@ -350,7 +406,7 @@ const AdvancedEditor: React.FC<{
                 className="w-20 rounded-md border border-gray-300 px-2 py-1 text-sm"
                 onBlur={(e) => {
                   const n = Number(e.target.value);
-                  onUpdateFieldPoints?.(index, Number.isFinite(n) ? n : ((field as any).points ?? 1));
+                  onUpdateFieldPoints?.(index, Number.isFinite(n) ? n : (field as any).points ?? 1);
                 }}
               />
             </div>
@@ -414,11 +470,7 @@ const AdvancedEditor: React.FC<{
                 </div>
               ))}
             </div>
-            <button
-              type="button"
-              onClick={() => onAddGridRow(index)}
-              className="mt-2 text-sm font-medium text-indigo-700 hover:underline"
-            >
+            <button type="button" onClick={() => onAddGridRow(index)} className="mt-2 text-sm font-medium text-indigo-700 hover:underline">
               + Add row
             </button>
           </div>
@@ -453,7 +505,7 @@ const AdvancedEditor: React.FC<{
     </div>
   );
 };
- 
+
 /**
  * Draggable + droppable wrapper for a single field row.
  * Provides drag handle props to be applied to a handle button.
@@ -467,9 +519,7 @@ const FieldRow: React.FC<{
   const { attributes, listeners, setNodeRef: setDragRef, transform } = useDraggable({ id });
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id });
 
-  const style: React.CSSProperties = transform
-    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
-    : {};
+  const style: React.CSSProperties = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : {};
 
   return (
     <div
@@ -479,9 +529,7 @@ const FieldRow: React.FC<{
       }}
       style={style}
       onClick={onClick}
-      className={`group relative rounded-lg border border-gray-200 bg-white p-3 transition-shadow ${
-        isOver ? 'ring-2 ring-indigo-400' : ''
-      }`}
+      className={`group relative rounded-lg border border-gray-200 bg-white p-3 transition-shadow ${isOver ? 'ring-2 ring-indigo-400' : ''}`}
     >
       {/* Drag handle slot (appears on hover) */}
       <div className="absolute -left-3 top-3 hidden rounded-md text-gray-500 group-hover:block">
@@ -582,11 +630,9 @@ const FormRenderer: React.FC<FormRendererProps> = ({
               />
             );
 
-            // Per-type renderer (unchanged controls)
+            // Per-type renderer
             const inputSpecific =
-              field.type === 'range'
-                ? 'h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-200 accent-indigo-600'
-                : baseInputClass;
+              field.type === 'range' ? 'h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-200 accent-indigo-600' : baseInputClass;
 
             let content = (() => {
               // Text-like inputs
@@ -631,14 +677,19 @@ const FormRenderer: React.FC<FormRendererProps> = ({
               // Radio group
               if (field.type === 'radio') {
                 const options = field.options ?? [];
+                const correctSet = quizMode ? resolveCorrectSet(field, options) : new Set<string>();
                 return (
                   <div className="flex flex-col gap-2">
                     <span className={baseLabelClass}>{labelNode}</span>
                     <div className="flex flex-col gap-2">
                       {options.map((opt, optIdx) => {
                         const optId = `${field.name}-radio-${optIdx}`;
+                        const isCorrect = correctSet.has(normalize(opt));
                         return (
-                          <div className="flex items-center gap-2" key={optId}>
+                          <div
+                            className={'flex items-center gap-2 ' + (isCorrect ? 'rounded bg-green-50 px-2 ring-1 ring-green-200' : '')}
+                            key={optId}
+                          >
                             <input
                               type="radio"
                               id={optId}
@@ -660,6 +711,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
               // Checkbox group (multiple-choice)
               if (field.type === 'checkbox') {
                 const options = field.options ?? [];
+                const correctSet = quizMode ? resolveCorrectSet(field, options) : new Set<string>();
                 if (options.length > 0) {
                   return (
                     <div className="flex flex-col gap-2">
@@ -667,8 +719,12 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                       <div className="flex flex-col gap-2">
                         {options.map((opt, optIdx) => {
                           const optId = `${field.name}-check-${optIdx}`;
+                          const isCorrect = correctSet.has(normalize(opt));
                           return (
-                            <label className="flex items-center gap-2 text-sm text-gray-700" key={optId}>
+                            <label
+                              className={'flex items-center gap-2 text-sm text-gray-700 ' + (isCorrect ? 'rounded bg-green-50 px-2 ring-1 ring-green-200' : '')}
+                              key={optId}
+                            >
                               <input
                                 type="checkbox"
                                 id={optId}
@@ -701,10 +757,12 @@ const FormRenderer: React.FC<FormRendererProps> = ({
               // Select dropdown
               if (field.type === 'select') {
                 const options = field.options ?? [];
+                const correctSet = quizMode ? resolveCorrectSet(field, options) : new Set<string>();
+                const matched = options.find((o) => correctSet.has(normalize(o))) || '';
                 return (
                   <div className="flex flex-col gap-2">
                     {labelNode}
-                    <select id={field.name} name={field.name} className={baseInputClass} defaultValue="">
+                    <select id={field.name} name={field.name} className={baseInputClass} defaultValue={matched || ''}>
                       <option value="" disabled>
                         Select an option
                       </option>
@@ -816,7 +874,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
             ) : (
               content
             );
- 
+
             return (
               <FieldRow
                 id={id}
@@ -844,7 +902,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                 >
                   <FiTrash2 />
                 </button>
- 
+
                 {rendered}
               </FieldRow>
             );

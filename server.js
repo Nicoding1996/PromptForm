@@ -145,9 +145,10 @@ app.post('/generate-form', async (req, res) => {
       - If the user's request implies a longer introduction or context, include a helpful summary in the "description" field.
 
       QUIZ/ASSESSMENT RULES:
-      - If the user's prompt contains keywords that imply an assessment—such as "quiz", "test", "exam", "assessment", "true or false", "knowledge check", or "evaluation"—you MUST add a new top-level property "isQuiz": true on the main JSON object.
+      - If the user's prompt contains keywords that imply a knowledge test—such as "quiz", "test", "exam", "true or false", or "knowledge check"—you MUST add a new top-level property "isQuiz": true on the main JSON object. Do NOT trigger quiz mode for generic workplace/self "assessment" or "evaluation" forms.
       - When "isQuiz" is true, you MUST do your best to analyze the prompt/context to identify the correct answer for option-based questions (types "radio", "checkbox", or "select"):
-        - If you can identify the correct answer, set "correctAnswer" on that field to the matching option value.
+        - For "radio" or "select", set "correctAnswer" to the single correct option value if it can be identified.
+        - For "checkbox", if multiple options are correct, set "correctAnswer" to an array of all correct option values (e.g., ["A","C"]). If only one is correct, you may still use a single string.
         - Always add a "points" key with value 1 on that field.
       - Only set "correctAnswer" on fields that actually have options (radio/checkbox/select). Do NOT add it for text-like or radioGrid fields.
       
@@ -288,9 +289,10 @@ Additional user instructions (context): "${context.trim()}". Use these instructi
       - If the user's request implies a longer introduction or context, include a helpful summary in the "description" field.
 
       QUIZ/ASSESSMENT RULES:
-      - If the user's prompt or the image/context contains keywords that imply an assessment—such as "quiz", "test", "exam", "assessment", "true or false", "knowledge check", or "evaluation"—you MUST add a new top-level property "isQuiz": true on the main JSON object.
+      - If the user's prompt or the image/context contains keywords that imply a knowledge test—such as "quiz", "test", "exam", "true or false", or "knowledge check"—you MUST add a new top-level property "isQuiz": true on the main JSON object. Do NOT trigger quiz mode for generic workplace/self "assessment" or "evaluation" forms.
       - When "isQuiz" is true, you MUST do your best to analyze the image/context to identify the correct answer for option-based questions (types "radio", "checkbox", or "select"):
-        - If you can identify the correct answer, set "correctAnswer" on that field to the matching option value.
+        - For "radio" or "select", set "correctAnswer" to the single correct option value if it can be identified.
+        - For "checkbox", if multiple options are correct, set "correctAnswer" to an array of all correct option values (e.g., ["A","C"]). If only one is correct, you may still use a single string.
         - Always add a "points" key with value 1 on that field.
       - Only set "correctAnswer" on fields that actually have options (radio/checkbox/select). Do NOT add it for text-like or radioGrid fields.
 
@@ -504,9 +506,10 @@ Additional user instructions (context): "${userContext}"
       - If the user's request implies a longer introduction or context, include a helpful summary in the "description" field.
 
       QUIZ/ASSESSMENT RULES:
-      - If the user's prompt or the document content contains keywords that imply an assessment—such as "quiz", "test", "exam", "assessment", "true or false", "knowledge check", or "evaluation"—you MUST add a new top-level property "isQuiz": true on the main JSON object.
+      - If the user's prompt or the document content contains keywords that imply a knowledge test—such as "quiz", "test", "exam", "true or false", or "knowledge check"—you MUST add a new top-level property "isQuiz": true on the main JSON object. Do NOT trigger quiz mode for generic workplace/self "assessment" or "evaluation" forms.
       - When "isQuiz" is true, you MUST do your best to analyze the prompt/document to identify the correct answer for option-based questions (types "radio", "checkbox", or "select"):
-        - If you can identify the correct answer, set "correctAnswer" on that field to the matching option value.
+        - For "radio" or "select", set "correctAnswer" to the single correct option value if it can be identified.
+        - For "checkbox", if multiple options are correct, set "correctAnswer" to an array of all correct option values (e.g., ["A","C"]). If only one is correct, you may still use a single string.
         - Always add a "points" key with value 1 on that field.
       - Only set "correctAnswer" on fields that actually have options (radio/checkbox/select). Do NOT add it for text-like or radioGrid fields.
       
