@@ -4,6 +4,11 @@ import type { FormData, FormField } from './FormRenderer';
 const baseInputClass =
   'block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500';
 const baseLabelClass = 'text-sm font-medium text-gray-700';
+// Helpers for deterministic grading of text and choice answers
+const normalize = (v: any) => String(v ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+const toArray = (v: any): string[] => (Array.isArray(v) ? v.map(String) : v != null ? [String(v)] : []);
+const setFrom = (arr: string[]) => new Set(arr.map(normalize));
+const setsEqual = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].every((x) => b.has(x));
 
 type Props = {
   formData: FormData | null;
@@ -54,22 +59,52 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId }) => {
       if ((formData as any)?.isQuiz === true) {
         let score = 0;
         let max = 0;
-        const eligible = new Set<FormField['type']>(['radio', 'checkbox', 'select']);
+        const norm = (v: any) => String(v ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+  
         for (const f of formData.fields ?? []) {
-          if (!eligible.has(f.type)) continue;
-          const correct = (f as any).correctAnswer as string | undefined;
-          if (!correct || !correct.length) continue;
-          const points = Number((f as any).points ?? 1);
+          const pointsRaw = Number((f as any).points ?? 1);
+          const points = Number.isFinite(pointsRaw) ? pointsRaw : 1;
           const userVal = payload[f.name];
-          let ok = false;
-          if (Array.isArray(userVal)) {
-            ok = (userVal as any[]).map(String).includes(String(correct));
-          } else {
-            ok = String(userVal ?? '') === String(correct);
+  
+          // Optional regex support for deterministic grading
+          const patternStr = (f as any).answerPattern as string | undefined;
+          let regex: RegExp | null = null;
+          if (typeof patternStr === 'string' && patternStr.length > 0) {
+            try { regex = new RegExp(patternStr, 'i'); } catch { regex = null; }
           }
-          max += Number.isFinite(points) ? points : 1;
-          if (ok) score += Number.isFinite(points) ? points : 1;
+  
+          let ok: boolean | null = null; // null = not gradable, don't add to max
+  
+          if (f.type === 'radio' || f.type === 'select') {
+            const correct = (f as any).correctAnswer as string | undefined;
+            if (regex) ok = regex.test(String(userVal ?? ''));
+            else if (typeof correct === 'string' && correct.length > 0) {
+              ok = norm(userVal) === norm(correct);
+            }
+          } else if (f.type === 'checkbox') {
+            const correctRaw = (f as any).correctAnswer;
+            if (Array.isArray(correctRaw)) {
+              const userSet = setFrom(toArray(userVal));
+              const correctSet = setFrom(correctRaw);
+              ok = setsEqual(userSet, correctSet);
+            } else if (typeof correctRaw === 'string' && correctRaw.length > 0) {
+              const userSet = setFrom(toArray(userVal));
+              ok = userSet.has(norm(correctRaw));
+            }
+          } else if (f.type === 'text' || f.type === 'textarea') {
+            const correct = (f as any).correctAnswer as string | undefined;
+            if (regex) ok = regex.test(String(userVal ?? ''));
+            else if (typeof correct === 'string' && correct.length > 0) {
+              ok = norm(userVal) === norm(correct);
+            }
+          }
+  
+          if (ok !== null) {
+            max += points;
+            if (ok) score += points;
+          }
         }
+  
         scoreToSend = score;
         maxToSend = max;
         setLastScore(score);
