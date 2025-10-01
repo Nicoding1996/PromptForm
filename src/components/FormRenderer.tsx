@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { DndContext, useDraggable, useDroppable, type DragEndEvent } from '@dnd-kit/core';
-import { FiTrash2, FiCopy, FiCheckCircle } from 'react-icons/fi';
+import { FiTrash2, FiCopy, FiCheckCircle, FiZap } from 'react-icons/fi';
 import { RxDragHandleDots2 } from 'react-icons/rx';
 
 export interface FormField {
@@ -54,6 +54,7 @@ interface FormRendererProps {
   onReorderFields: (oldIndex: number, newIndex: number) => void;
   onAddField: () => void;
   onAddSection?: () => void;
+  onAiAssistQuestion?: (index: number) => void;
 
   // Form-level edits
   onUpdateFormTitle: (newTitle: string) => void;
@@ -218,6 +219,8 @@ const AdvancedEditor: React.FC<{
   field: FormField;
   index: number;
 
+  onAiAssistQuestion?: (index: number) => void;
+
   onUpdateFieldLabel: (index: number, newLabel: string) => void;
   onUpdateFieldOption: (fieldIndex: number, optionIndex: number, newText: string) => void;
   onAddFieldOption: (fieldIndex: number) => void;
@@ -245,6 +248,7 @@ const AdvancedEditor: React.FC<{
 }> = ({
   field,
   index,
+  onAiAssistQuestion,
   onUpdateFieldLabel,
   onUpdateFieldOption,
   onAddFieldOption,
@@ -290,8 +294,23 @@ const AdvancedEditor: React.FC<{
 
   return (
     <div className="flex flex-col gap-4 rounded-md bg-indigo-50/20 p-3 ring-1 ring-indigo-100" data-adv-editor="true">
-      {/* Label editor (WYSIWYG-like) */}
-      <EditableLabel label={field.label} htmlFor={field.name} onCommit={(txt) => onUpdateFieldLabel(index, txt)} />
+      {/* Label editor (WYSIWYG-like) + AI Assist */}
+      <div className="flex items-center gap-2">
+        <EditableLabel
+          label={field.label}
+          htmlFor={field.name}
+          onCommit={(txt) => onUpdateFieldLabel(index, txt)}
+        />
+        <button
+          type="button"
+          title="AI Assist"
+          aria-label="AI Assist for this question"
+          onClick={() => onAiAssistQuestion?.(index)}
+          className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-white text-indigo-700 ring-1 ring-indigo-200 hover:bg-indigo-50"
+        >
+          <FiZap />
+        </button>
+      </div>
 
       {/* Type switcher + duplicate + required */}
       <div className="flex flex-wrap items-center gap-3">
@@ -585,6 +604,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
   onReorderFields,
   onAddField,
   onAddSection,
+  onAiAssistQuestion,
   onUpdateFormTitle,
   onUpdateFormDescription,
   focusedFieldIndex,
@@ -914,6 +934,8 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                 onChangeFieldType={onChangeFieldType}
                 onDuplicateField={onDuplicateField}
                 onToggleRequiredField={onToggleRequiredField}
+                // AI assist
+                onAiAssistQuestion={onAiAssistQuestion}
                 // Quiz
                 quizMode={quizMode}
                 onUpdateFieldCorrectAnswer={onUpdateFieldCorrectAnswer}

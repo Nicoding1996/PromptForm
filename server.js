@@ -235,6 +235,78 @@ app.post('/generate-form', async (req, res) => {
     res.status(500).json({ error: 'Internal server error.', details: error.message });
   }
 });
+// AI Assist: expand a partial question prompt into a single completed field JSON
+app.post('/assist-question', async (req, res) => {
+  try {
+    const prompt = String(req.body?.prompt ?? '').trim();
+    if (!prompt) {
+      return res.status(400).json({ error: 'Missing "prompt" in body.' });
+    }
+
+    const model = genAI.getGenerativeModel({
+      model: GEMINI_MODEL,
+      generationConfig: { responseMimeType: 'application/json' },
+    });
+
+    const masterPrompt = `
+You are a form question expert. Take the user's partial prompt and expand it into a single, complete form field JSON object. Intelligently choose the best "type" and pre-populate "options" if applicable. Return ONLY a JSON object for one field, no prose.
+
+Allowed keys and rules:
+- Required: "label", "type", "name".
+- "type" must be one of: "text", "email", "password", "textarea", "radio", "checkbox", "select", "date", "time", "file", "range", "radioGrid".
+- Do NOT return "section" or "submit".
+- For "radio" | "checkbox" | "select": include "options": ["..."] with 2–6 sensible values.
+- For "radioGrid": include "rows": ["..."] and "columns": [{ "label": "...", "points": 1 }, ...].
+- For "range": include integer "min" and "max" if inferable (e.g., 1..5 or 0..10).
+- Do not include "correctAnswer" unless the user's prompt clearly implies a knowledge quiz; otherwise omit quiz-specific fields.
+
+Naming rule:
+- Generate a URL-safe snake_case "name" from the label (lowercase, underscores, only [a-z0-9_]). Do not include spaces.
+
+User prompt: "${prompt}"
+    `;
+
+    const result = await model.generateContent(masterPrompt);
+    const response = await result.response;
+
+    const promptFeedback = response?.promptFeedback;
+    if (promptFeedback?.blockReason) {
+      console.warn('[SAFETY] Assist prompt blocked:', promptFeedback.blockReason, promptFeedback);
+      return res.status(400).json({
+        error: 'Prompt rejected for safety reasons.',
+        reason: promptFeedback.blockReason,
+      });
+    }
+
+    const text = (response?.text?.() ?? '').trim();
+    if (!text) {
+      console.error('[assist-question] Empty model response.');
+      return res.status(502).json({ error: 'Upstream model returned an empty response.' });
+    }
+
+    let fieldJson;
+    try {
+      fieldJson = JSON.parse(text);
+    } catch {
+      const start = text.indexOf('{');
+      const end = text.lastIndexOf('}');
+      if (start !== -1 && end !== -1 && end > start) {
+        const slice = text.slice(start, end + 1);
+        fieldJson = JSON.parse(slice);
+      } else {
+        throw new Error('Model response was not valid JSON.');
+      }
+    }
+
+    return res.json(fieldJson);
+  } catch (e) {
+    console.error('[assist-question] error:', e);
+    return res.status(500).json({
+      error: 'Internal server error.',
+      message: e?.message || 'Unknown error',
+    });
+  }
+});
 
 /**
  * Vision-based form generation endpoint

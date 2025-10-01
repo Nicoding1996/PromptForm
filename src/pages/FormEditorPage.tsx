@@ -485,6 +485,95 @@ const handleUpdateRangeBounds = (fieldIndex: number, min: number, max: number) =
     return { ...prev, fields };
   });
 };
+
+// AI Assist: replace a partial question with an AI-completed field
+const handleAiAssistQuestion = async (fieldIndex: number) => {
+  try {
+    const label = String(formJson?.fields?.[fieldIndex]?.label ?? '').trim();
+    const prompt = label || 'New question';
+
+    const resp = await fetch('http://localhost:3001/assist-question', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt }),
+    });
+
+    let data: any = null;
+    try {
+      data = await resp.json();
+    } catch {
+      // ignore parse error; handled by !resp.ok
+    }
+    if (!resp.ok) {
+      const msg = (data && (data.error || data.message)) || `Assist failed (${resp.status})`;
+      throw new Error(msg);
+    }
+    if (!data || typeof data !== 'object') {
+      throw new Error('Assist returned invalid data.');
+    }
+
+    const makeSnake = (s: string) =>
+      s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+
+    // Build a normalized FormField and ensure unique name
+    setFormJson((prev) => {
+      if (!prev) return prev;
+      const fields = [...prev.fields];
+
+      let name =
+        typeof data.name === 'string' && data.name.trim().length
+          ? makeSnake(data.name)
+          : makeSnake(String(data.label || 'question'));
+
+      const used = new Set(fields.map((f) => f.name));
+      if (used.has(name)) {
+        const base = name || 'question';
+        let i = 1;
+        while (used.has(`${base}_${i}`)) i++;
+        name = `${base}_${i}`;
+      }
+
+      const allowedTypes = new Set([
+        'text','email','password','textarea','radio','checkbox','select','date','time','file','range','radioGrid'
+      ]);
+      const type =
+        typeof data.type === 'string' && allowedTypes.has(data.type) ? data.type : 'text';
+
+      const next: FormField = {
+        label: String(data.label || label || 'New Question'),
+        type: type as any,
+        name,
+        ...(Array.isArray(data.options) ? { options: data.options.map(String) } : {}),
+        ...(Array.isArray(data.rows) ? { rows: data.rows.map(String) } : {}),
+        ...(Array.isArray(data.columns)
+          ? {
+              columns: data.columns.map((c: any) =>
+                typeof c === 'string'
+                  ? c
+                  : {
+                      label: String(c?.label ?? ''),
+                      points: Number.isFinite(Number(c?.points)) ? Number(c.points) : 1,
+                    }
+              ),
+            }
+          : {}),
+      };
+
+      fields[fieldIndex] = next;
+
+      // Keep submit field last
+      const submitIdx = fields.findIndex((f) => f.type === 'submit');
+      if (submitIdx >= 0 && submitIdx !== fields.length - 1) {
+        const [submit] = fields.splice(submitIdx, 1);
+        fields.push(submit);
+      }
+
+      return { ...prev, fields };
+    });
+  } catch (e: any) {
+    setError(e?.message || 'AI Assist failed.');
+  }
+};
   // ===== Quiz mode + handlers =====
   const handleUpdateFieldCorrectAnswer = (
     fieldIndex: number,
@@ -883,6 +972,7 @@ const handleUpdateRangeBounds = (fieldIndex: number, min: number, max: number) =
                     onReorderFields={handleReorderFields}
                     onAddField={handleAddField}
                     onAddSection={handleAddSection}
+                    onAiAssistQuestion={handleAiAssistQuestion}
                     onUpdateFormTitle={handleUpdateFormTitle}
                     onUpdateFormDescription={handleUpdateFormDescription}
                     // Advanced editor props
