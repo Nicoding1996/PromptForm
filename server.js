@@ -111,7 +111,7 @@ app.post('/generate-form', async (req, res) => {
         "fields": [
           {
             "label": "Field Label",
-            "type": "text | email | password | textarea | radio | checkbox | select | date | time | file | range | radioGrid | submit",
+            "type": "text | email | password | textarea | radio | checkbox | select | date | time | file | range | radioGrid | section | submit",
             "name": "lowercase_field_label_with_underscores",
             "options": ["Option 1", "Option 2"],
             "rows": ["Row 1", "Row 2"],       // only for radioGrid
@@ -154,6 +154,10 @@ app.post('/generate-form', async (req, res) => {
         - "columns": an array of objects for each column choice, each like { "label": "Very Satisfied", "points": 1 }.
           Default "points" to 1 when unspecified. Use these per-column points for per-row scoring in radioGrid.
         - "label": the main title of the grid.
+      - 'section': This is a visual heading used to organize long or complex forms. It is NOT an input field.
+        - Insert a field object before each thematic group: { "label": "Section Title", "type": "section", "name": "section_section_title" }
+        - Do NOT include options/rows/columns/correctAnswer/points on a section.
+        - Sections must not be counted for scoring even when "isQuiz": true.
       - 'submit': Ensure there is exactly one field with type "submit".
       - If the user's request implies a longer introduction or context, include a helpful summary in the "description" field.
 
@@ -280,7 +284,7 @@ Additional user instructions (context): "${context.trim()}". Use these instructi
         "fields": [
           {
             "label": "Field Label",
-            "type": "text | email | password | textarea | radio | checkbox | select | date | time | file | range | radioGrid | submit",
+            "type": "text | email | password | textarea | radio | checkbox | select | date | time | file | range | radioGrid | section | submit",
             "name": "lowercase_field_label_with_underscores",
             "options": ["Option 1", "Option 2"],
             "rows": ["Row 1", "Row 2"],       // only for radioGrid
@@ -317,6 +321,10 @@ Additional user instructions (context): "${context.trim()}". Use these instructi
         - "columns": an array of objects for each column choice, each like { "label": "Very Satisfied", "points": 1 }.
           Default "points" to 1 when unspecified. Use these per-column points for per-row scoring in radioGrid.
         - "label": the main title of the grid.
+      - 'section': This is a visual heading used to organize long or complex forms. It is NOT an input field.
+        - Insert a field object before each thematic group: { "label": "Section Title", "type": "section", "name": "section_section_title" }
+        - Do NOT include options/rows/columns/correctAnswer/points on a section.
+        - Sections must not be counted for scoring even when "isQuiz": true.
       - 'submit': Ensure there is exactly one field with type "submit".
       - If the user's request implies a longer introduction or context, include a helpful summary in the "description" field.
 
@@ -507,7 +515,7 @@ Additional user instructions (context): "${userContext}"
         "fields": [
           {
             "label": "Field Label",
-            "type": "text | email | password | textarea | radio | checkbox | select | date | time | file | range | radioGrid | submit",
+            "type": "text | email | password | textarea | radio | checkbox | select | date | time | file | range | radioGrid | section | submit",
             "name": "lowercase_field_label_with_underscores",
             "options": ["Option 1", "Option 2"],
             "rows": ["Row 1", "Row 2"],       // only for radioGrid
@@ -544,6 +552,10 @@ Additional user instructions (context): "${userContext}"
         - "columns": an array of objects for each column choice, each like { "label": "Very Satisfied", "points": 1 }.
           Default "points" to 1 when unspecified. Use these per-column points for per-row scoring in radioGrid.
         - "label": the main title of the grid.
+      - 'section': This is a visual heading used to organize long or complex forms. It is NOT an input field.
+        - Insert a field object before each thematic group: { "label": "Section Title", "type": "section", "name": "section_section_title" }
+        - Do NOT include options/rows/columns/correctAnswer/points on a section.
+        - Sections must not be counted for scoring even when "isQuiz": true.
       - 'submit': Ensure there is exactly one field with type "submit".
       - If the user's request implies a longer introduction or context, include a helpful summary in the "description" field.
 

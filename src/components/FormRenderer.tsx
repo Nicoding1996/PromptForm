@@ -18,6 +18,7 @@ export interface FormField {
     | 'file'
     | 'range'
     | 'radioGrid'
+    | 'section'
     | 'submit';
   name: string;
   options?: string[]; // required for radio | checkbox | select
@@ -52,6 +53,7 @@ interface FormRendererProps {
   onDeleteField: (index: number) => void;
   onReorderFields: (oldIndex: number, newIndex: number) => void;
   onAddField: () => void;
+  onAddSection?: () => void;
 
   // Form-level edits
   onUpdateFormTitle: (newTitle: string) => void;
@@ -275,6 +277,7 @@ const AdvancedEditor: React.FC<{
     'file',
     'range',
     'radioGrid',
+    'section',
     'submit',
   ];
   const needsOptions = field.type === 'radio' || field.type === 'checkbox' || field.type === 'select';
@@ -315,15 +318,17 @@ const AdvancedEditor: React.FC<{
           <FiCopy /> Duplicate
         </button>
 
-        <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-          <input
-            type="checkbox"
-            checked={(field as any).required === true}
-            onChange={() => onToggleRequiredField(index)}
-            className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-          />
-          Required
-        </label>
+        {field.type !== 'section' && (
+          <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={(field as any).required === true}
+              onChange={() => onToggleRequiredField(index)}
+              className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+            />
+            Required
+          </label>
+        )}
       </div>
 
       {/* Options editor for radio/checkbox/select */}
@@ -579,6 +584,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
   onDeleteField,
   onReorderFields,
   onAddField,
+  onAddSection,
   onUpdateFormTitle,
   onUpdateFormDescription,
   focusedFieldIndex,
@@ -666,6 +672,21 @@ const FormRenderer: React.FC<FormRendererProps> = ({
               field.type === 'range' ? 'h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-200 accent-indigo-600' : baseInputClass;
 
             let content = (() => {
+              // Section heading (non-input)
+              if (field.type === 'section') {
+                return (
+                  <div className="flex flex-col gap-1">
+                    <EditableLabel
+                      label={field.label}
+                      htmlFor={field.name}
+                      className="text-lg font-semibold text-gray-900"
+                      onCommit={(newLabel) => onUpdateFieldLabel(idx, newLabel)}
+                    />
+                    <div className="h-px bg-gray-200 mt-1" />
+                  </div>
+                );
+              }
+
               // Text-like inputs
               if (
                 field.type === 'text' ||
@@ -946,8 +967,8 @@ const FormRenderer: React.FC<FormRendererProps> = ({
         </div>
       </DndContext>
 
-      {/* Add Question */}
-      <div className="mt-6">
+      {/* Add Question / Section */}
+      <div className="mt-6 flex items-center gap-3">
         <button
           type="button"
           onClick={onAddField}
@@ -955,6 +976,15 @@ const FormRenderer: React.FC<FormRendererProps> = ({
         >
           <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-indigo-100 text-indigo-700">+</span>
           Add Question
+        </button>
+        <button
+          type="button"
+          onClick={() => onAddSection?.()}
+          className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-medium text-violet-700 ring-1 ring-violet-200 transition hover:bg-violet-50"
+          title="Insert a new section heading"
+        >
+          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-violet-100 text-violet-700">#</span>
+          Add Section
         </button>
       </div>
     </section>

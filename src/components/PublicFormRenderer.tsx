@@ -236,6 +236,16 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId }) => {
       </label>
     );
 
+    // Section heading (visual only)
+    if (field.type === 'section') {
+      return (
+        <div className="mt-6 mb-2" key={`${field.name}-${idx}`}>
+          <h3 className="text-lg font-semibold text-gray-900">{field.label}</h3>
+          <div className="h-px bg-gray-200 mt-1" />
+        </div>
+      );
+    }
+
     // Simple inputs
     if (
       field.type === 'text' ||

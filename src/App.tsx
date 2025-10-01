@@ -106,6 +106,26 @@ const App: React.FC = () => {
     });
   };
 
+  // Smart Sections: Add a new section heading
+  const handleAddSection = () => {
+    setFormJson((prev) => {
+      if (!prev) return prev;
+      const fields = [...prev.fields];
+      const base = 'section';
+      const used = new Set(fields.map((f) => f.name));
+      let name = base;
+      let i = 1;
+      while (used.has(name)) {
+        name = `${base}_${i++}`;
+      }
+      const sectionField: FormField = { label: 'New Section', type: 'section' as any, name };
+      const submitIdx = fields.findIndex((f) => f.type === 'submit');
+      if (submitIdx >= 0) fields.splice(submitIdx, 0, sectionField);
+      else fields.push(sectionField);
+      return { ...prev, fields };
+    });
+  };
+
   // ===== Form-level editors =====
   const handleUpdateFormTitle = (newTitle: string) => {
     setFormJson((prev) => (prev ? { ...prev, title: newTitle } : prev));
@@ -555,6 +575,7 @@ const App: React.FC = () => {
               onDeleteField={handleDeleteField}
               onReorderFields={handleReorderFields}
               onAddField={handleAddField}
+              onAddSection={handleAddSection}
               onUpdateFormTitle={handleUpdateFormTitle}
               onUpdateFormDescription={handleUpdateFormDescription}
               // Advanced editor props

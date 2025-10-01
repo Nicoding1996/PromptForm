@@ -119,16 +119,43 @@ const FormEditorPage: React.FC = () => {
     setFormJson((prev) => {
       if (!prev) return prev;
       const fields = [...prev.fields];
-      if (
-        oldIndex < 0 ||
-        newIndex < 0 ||
-        oldIndex >= fields.length ||
-        newIndex >= fields.length
-      ) {
-        return prev;
+      const n = fields.length;
+      if (oldIndex < 0 || newIndex < 0 || oldIndex >= n || newIndex >= n) return prev;
+
+      const src = fields[oldIndex];
+
+      // If dragging a section heading, move the whole contiguous block [section .. before next section/submit]
+      if (src?.type === 'section') {
+        // Determine block [start, end]
+        const start = oldIndex;
+        let end = n - 1;
+        for (let i = start + 1; i < n; i++) {
+          const t = fields[i]?.type;
+          if (t === 'section' || t === 'submit') {
+            end = i - 1;
+            break;
+          }
+        }
+        const len = end - start + 1;
+        if (newIndex >= start && newIndex <= end) {
+          // No-op if dropped inside the same block
+          return prev;
+        }
+        const block = fields.splice(start, len);
+
+        // Adjust insertion index after removal if original target was after the block
+        let insertAt = newIndex;
+        if (newIndex > end) insertAt = Math.max(0, newIndex - len);
+
+        // Clamp
+        insertAt = Math.max(0, Math.min(insertAt, fields.length));
+
+        fields.splice(insertAt, 0, ...block);
+      } else {
+        // Default single-item move
+        const [moved] = fields.splice(oldIndex, 1);
+        fields.splice(newIndex, 0, moved);
       }
-      const [moved] = fields.splice(oldIndex, 1);
-      fields.splice(newIndex, 0, moved);
 
       // Ensure any submit field always stays at the end
       const submitIdx = fields.findIndex((f) => f.type === 'submit');
@@ -172,6 +199,27 @@ const FormEditorPage: React.FC = () => {
   };
   const handleUpdateFormDescription = (newDescription: string) => {
     setFormJson((prev) => (prev ? { ...prev, description: newDescription } : prev));
+  };
+
+  // ===== Section handling =====
+  const handleAddSection = () => {
+    setFormJson((prev) => {
+      if (!prev) return prev;
+      const fields = [...prev.fields];
+      const base = 'section';
+      const used = new Set(fields.map((f) => f.name));
+      let name = base;
+      let i = 1;
+      while (used.has(name)) {
+        name = `${base}_${i++}`;
+      }
+      const newField: FormField = { label: 'New Section', type: 'section' as any, name };
+      // Insert before submit so submit remains last
+      const submitIdx = fields.findIndex((f) => f.type === 'submit');
+      if (submitIdx >= 0) fields.splice(submitIdx, 0, newField);
+      else fields.push(newField);
+      return { ...prev, fields };
+    });
   };
 
   // ===== Advanced editor handlers =====
@@ -834,6 +882,7 @@ const handleUpdateRangeBounds = (fieldIndex: number, min: number, max: number) =
                     onDeleteField={handleDeleteField}
                     onReorderFields={handleReorderFields}
                     onAddField={handleAddField}
+                    onAddSection={handleAddSection}
                     onUpdateFormTitle={handleUpdateFormTitle}
                     onUpdateFormDescription={handleUpdateFormDescription}
                     // Advanced editor props
