@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import CommandBar from '../components/CommandBar';
 import FormRenderer from '../components/FormRenderer';
-import type { FormData, FormField } from '../components/FormRenderer';
+import type { FormData, FormField, ResultPage } from '../components/FormRenderer';
+import ResultCard from '../components/editor/ResultCard';
 import { useAuth } from '../context/AuthContext';
 import LoginButton from '../components/LoginButton';
 import { getFormById, saveFormForUser, listResponsesForForm, type StoredResponse } from '../services/forms';
@@ -321,8 +322,16 @@ const FormEditorPage: React.FC = () => {
       const f = fields[fieldIndex];
       if (!f || f.type !== 'radioGrid') return prev;
       const columns = f.columns ? [...f.columns] : [];
+      // Ensure element exists
       while (columns.length <= colIndex) columns.push(`Column ${columns.length + 1}`);
-      columns[colIndex] = newText.trim();
+      const current = columns[colIndex];
+      const label = newText.trim();
+      // Normalize to object { label, points }
+      if (typeof current === 'string') {
+        columns[colIndex] = { label, points: 1 };
+      } else {
+        columns[colIndex] = { label, points: Number.isFinite(current?.points as any) ? (current as any).points : 1 };
+      }
       fields[fieldIndex] = { ...f, columns };
       return { ...prev, fields };
     });
@@ -348,7 +357,8 @@ const FormEditorPage: React.FC = () => {
       const f = fields[fieldIndex];
       if (!f || f.type !== 'radioGrid') return prev;
       const columns = f.columns ? [...f.columns] : [];
-      columns.push(`Column ${columns.length + 1}`);
+      const nextLabel = `Column ${columns.length + 1}`;
+      columns.push({ label: nextLabel, points: 1 });
       fields[fieldIndex] = { ...f, columns };
       return { ...prev, fields };
     });
@@ -382,22 +392,51 @@ const FormEditorPage: React.FC = () => {
     });
   };
 
-  const handleUpdateRangeBounds = (fieldIndex: number, min: number, max: number) => {
+  const handleUpdateGridColumnPoints = (fieldIndex: number, colIndex: number, newPoints: number) => {
     setFormJson((prev) => {
       if (!prev) return prev;
       const fields = [...prev.fields];
       const f = fields[fieldIndex];
-      if (!f || f.type !== 'range') return prev;
-      const nextMin = Number.isFinite(min) ? min : 0;
-      const nextMax = Number.isFinite(max) ? max : 10;
-      fields[fieldIndex] = { ...f, min: nextMin, max: nextMax } as FormField & {
-        min?: number;
-        max?: number;
-      };
+      if (!f || f.type !== 'radioGrid') return prev;
+      const columns = f.columns ? [...f.columns] : [];
+      while (columns.length <= colIndex) columns.push({ label: `Column ${columns.length + 1}`, points: 1 });
+      const current = columns[colIndex];
+      const points = Math.max(0, Math.floor(Number(newPoints) || 0));
+      if (typeof current === 'string') {
+        columns[colIndex] = { label: current, points };
+      } else {
+        columns[colIndex] = { label: current?.label ?? `Column ${colIndex + 1}`, points };
+      }
+      fields[fieldIndex] = { ...f, columns };
       return { ...prev, fields };
     });
   };
 
+// Range bounds handler (for range field min/max)
+const handleUpdateRangeBounds = (fieldIndex: number, min: number, max: number) => {
+  setFormJson((prev) => {
+    if (!prev) return prev;
+    const fields = [...prev.fields];
+    const f = fields[fieldIndex];
+    if (!f) return prev;
+
+    const next: any = { ...f };
+    const minV = Number.isFinite(min) ? Math.floor(Number(min)) : (next.min ?? 0);
+    const maxV = Number.isFinite(max) ? Math.floor(Number(max)) : (next.max ?? 10);
+
+    // Ensure min <= max by swapping if needed
+    if (minV <= maxV) {
+      next.min = minV;
+      next.max = maxV;
+    } else {
+      next.min = maxV;
+      next.max = minV;
+    }
+
+    fields[fieldIndex] = next as FormField;
+    return { ...prev, fields };
+  });
+};
   // ===== Quiz mode + handlers =====
   const handleUpdateFieldCorrectAnswer = (
     fieldIndex: number,
@@ -463,6 +502,49 @@ const FormEditorPage: React.FC = () => {
     setFormJson((prev) => {
       if (!prev) return prev;
       return { ...prev, isQuiz: !!enabled };
+    });
+  };
+  
+  // ===== Outcomes (Result Pages) handlers =====
+  const handleAddResultPage = () => {
+    setFormJson((prev) => {
+      if (!prev) return prev;
+      const pages = Array.isArray((prev as any).resultPages) ? [...(prev as any).resultPages as ResultPage[]] : [];
+      pages.push({
+        title: 'New Outcome',
+        description: 'Describe this outcome...',
+        scoreRange: { from: 0, to: 0 },
+      });
+      return { ...prev, resultPages: pages };
+    });
+  };
+  
+  const handleUpdateResultPage = (index: number, patch: Partial<ResultPage>) => {
+    setFormJson((prev) => {
+      if (!prev) return prev;
+      const pages = Array.isArray((prev as any).resultPages) ? [...(prev as any).resultPages as ResultPage[]] : [];
+      if (!pages[index]) return prev;
+      const current = pages[index];
+      const next: ResultPage = {
+        title: patch.title ?? current.title,
+        description: patch.description ?? current.description,
+        scoreRange: {
+          from: patch.scoreRange?.from ?? current.scoreRange?.from ?? 0,
+          to: patch.scoreRange?.to ?? current.scoreRange?.to ?? 0,
+        },
+      };
+      pages[index] = next;
+      return { ...prev, resultPages: pages };
+    });
+  };
+  
+  const handleDeleteResultPage = (index: number) => {
+    setFormJson((prev) => {
+      if (!prev) return prev;
+      const pages = Array.isArray((prev as any).resultPages) ? [...(prev as any).resultPages as ResultPage[]] : [];
+      if (index < 0 || index >= pages.length) return prev;
+      pages.splice(index, 1);
+      return { ...prev, resultPages: pages };
     });
   };
 
@@ -692,8 +774,44 @@ const FormEditorPage: React.FC = () => {
                   />
                   Make this a quiz
                 </label>
-                {quizMode && <span className="text-xs text-gray-500">Mark correct answers and assign points in each choice question.</span>}
+                {quizMode && <span className="text-xs text-gray-500">Mark correct answers and assign points in each choice question. Define outcomes below.</span>}
               </div>
+  
+              {/* Outcomes / Result Pages (visible only in quiz mode) */}
+              {quizMode && (
+                <section className="rounded-md border border-indigo-100 bg-indigo-50/20 p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-gray-900">Outcomes</h3>
+                    <button
+                      type="button"
+                      onClick={handleAddResultPage}
+                      className="rounded-md bg-white px-2 py-1 text-xs font-medium text-indigo-700 ring-1 ring-indigo-200 hover:bg-indigo-50"
+                    >
+                      + Add an Outcome
+                    </button>
+                  </div>
+  
+                  <p className="mb-3 text-xs text-gray-600">
+                    Outcomes map total quiz score ranges to a result page (e.g., personality type). You can define a title, description, and a score range for each outcome.
+                  </p>
+  
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {(formJson as any)?.resultPages?.length ? (
+                      (formJson as any).resultPages.map((page: ResultPage, i: number) => (
+                        <ResultCard
+                          key={`result-page-${i}`}
+                          index={i}
+                          page={page}
+                          onChange={handleUpdateResultPage}
+                          onDelete={handleDeleteResultPage}
+                        />
+                      ))
+                    ) : (
+                      <div className="text-xs text-gray-500">No outcomes yet. Click "Add an Outcome" to create one.</div>
+                    )}
+                  </div>
+                </section>
+              )}
 
               {/* Loading placeholder / generated form */}
               {isLoading ? (
@@ -738,6 +856,7 @@ const FormEditorPage: React.FC = () => {
                     onAddGridColumn={handleAddGridColumn}
                     onRemoveGridRow={handleRemoveGridRow}
                     onRemoveGridColumn={handleRemoveGridColumn}
+                    onUpdateGridColumnPoints={handleUpdateGridColumnPoints}
                     onUpdateRangeBounds={handleUpdateRangeBounds}
                   />
                 )

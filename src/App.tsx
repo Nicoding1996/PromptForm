@@ -284,6 +284,30 @@ const App: React.FC = () => {
     });
   };
 
+  // Per-column points for radioGrid (normalize legacy strings to {label, points})
+  const handleUpdateGridColumnPoints = (fieldIndex: number, colIndex: number, newPoints: number) => {
+    setFormJson((prev) => {
+      if (!prev) return prev;
+      const fields = [...prev.fields];
+      const f = fields[fieldIndex];
+      if (!f || f.type !== 'radioGrid') return prev;
+      const columns = f.columns ? [...f.columns] : [];
+      while (columns.length <= colIndex) {
+        const idx = columns.length;
+        columns.push({ label: `Column ${idx + 1}`, points: 1 });
+      }
+      const current = columns[colIndex] as any;
+      const points = Math.max(0, Math.floor(Number(newPoints) || 0));
+      if (typeof current === 'string') {
+        columns[colIndex] = { label: current, points };
+      } else {
+        columns[colIndex] = { label: current?.label ?? `Column ${colIndex + 1}`, points };
+      }
+      fields[fieldIndex] = { ...f, columns };
+      return { ...prev, fields };
+    });
+  };
+
   const handleAddGridRow = (fieldIndex: number) => {
     setFormJson((prev) => {
       if (!prev) return prev;
@@ -549,6 +573,7 @@ const App: React.FC = () => {
               onAddGridColumn={handleAddGridColumn}
               onRemoveGridRow={handleRemoveGridRow}
               onRemoveGridColumn={handleRemoveGridColumn}
+              onUpdateGridColumnPoints={handleUpdateGridColumnPoints}
               onUpdateRangeBounds={handleUpdateRangeBounds}
             />
           )

@@ -28,7 +28,14 @@ export interface FormField {
 
   // radioGrid-specific structure:
   rows?: string[]; // array of row labels/questions
-  columns?: string[]; // array of column choices
+  // Supports legacy string[] and new detailed objects { label, points }
+  columns?: (string | { label: string; points?: number })[]; // array of column choices
+}
+
+export interface ResultPage {
+  title: string;
+  description: string;
+  scoreRange?: { from: number; to: number };
 }
 
 export interface FormData {
@@ -36,6 +43,7 @@ export interface FormData {
   description?: string;
   isQuiz?: boolean;
   fields: FormField[];
+  resultPages?: ResultPage[];
 }
 
 interface FormRendererProps {
@@ -75,6 +83,7 @@ interface FormRendererProps {
   onAddGridColumn: (fieldIndex: number) => void;
   onRemoveGridRow: (fieldIndex: number, rowIndex: number) => void;
   onRemoveGridColumn: (fieldIndex: number, colIndex: number) => void;
+  onUpdateGridColumnPoints: (fieldIndex: number, colIndex: number, newPoints: number) => void;
 
   // Range editing
   onUpdateRangeBounds: (fieldIndex: number, min: number, max: number) => void;
@@ -229,6 +238,7 @@ const AdvancedEditor: React.FC<{
   onAddGridColumn: (fieldIndex: number) => void;
   onRemoveGridRow: (fieldIndex: number, rowIndex: number) => void;
   onRemoveGridColumn: (fieldIndex: number, colIndex: number) => void;
+  onUpdateGridColumnPoints: (fieldIndex: number, colIndex: number, newPoints: number) => void;
   onUpdateRangeBounds: (fieldIndex: number, min: number, max: number) => void;
 }> = ({
   field,
@@ -245,6 +255,7 @@ const AdvancedEditor: React.FC<{
   onRemoveFieldOption,
   onUpdateGridRow,
   onUpdateGridColumn,
+  onUpdateGridColumnPoints,
   onAddGridRow,
   onAddGridColumn,
   onRemoveGridRow,
@@ -420,24 +431,43 @@ const AdvancedEditor: React.FC<{
           <div>
             <div className="mb-1 text-xs font-medium text-gray-600">Columns</div>
             <div className="flex flex-wrap gap-2">
-              {(field.columns ?? []).map((col, cIdx) => (
-                <div key={`${field.name}-col-edit-${cIdx}`} className="flex items-center gap-2">
-                  <input
-                    className="w-40 rounded-md border border-gray-300 px-2 py-1 text-sm"
-                    value={col}
-                    onChange={(e) => onUpdateGridColumn(index, cIdx, e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    aria-label="Remove column"
-                    title="Remove column"
-                    onClick={() => onRemoveGridColumn(index, cIdx)}
-                    className="inline-flex h-7 w-7 items-center justify-center rounded-md text-red-600 hover:bg-red-50 ring-1 ring-red-200"
-                  >
-                    <FiTrash2 />
-                  </button>
-                </div>
-              ))}
+              {(field.columns ?? []).map((col, cIdx) => {
+                const label = typeof col === 'string' ? col : col?.label ?? '';
+                const pts = typeof col === 'string' ? 1 : (Number.isFinite((col as any)?.points) ? (col as any).points : 1);
+                return (
+                  <div key={`${field.name}-col-edit-${cIdx}`} className="flex items-center gap-2">
+                    <input
+                      className="w-40 rounded-md border border-gray-300 px-2 py-1 text-sm"
+                      value={label}
+                      onChange={(e) => onUpdateGridColumn(index, cIdx, e.target.value)}
+                    />
+                    {quizMode && (
+                      <>
+                        <label className="text-xs text-gray-600">pts</label>
+                        <input
+                          type="number"
+                          min={0}
+                          className="w-20 rounded-md border border-gray-300 px-2 py-1 text-sm"
+                          value={pts}
+                          onChange={(e) => {
+                            const n = Number(e.target.value);
+                            onUpdateGridColumnPoints?.(index, cIdx, Number.isFinite(n) ? n : pts);
+                          }}
+                        />
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      aria-label="Remove column"
+                      title="Remove column"
+                      onClick={() => onRemoveGridColumn(index, cIdx)}
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-md text-red-600 hover:bg-red-50 ring-1 ring-red-200"
+                    >
+                      <FiTrash2 />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
             <button
               type="button"
@@ -570,6 +600,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
   onAddGridColumn,
   onRemoveGridRow,
   onRemoveGridColumn,
+  onUpdateGridColumnPoints,
   onUpdateRangeBounds,
 }) => {
   // Ensure the submit field (if any) always renders last
@@ -788,11 +819,14 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                         <thead>
                           <tr>
                             <th className="p-2 text-left text-xs font-semibold text-gray-600"></th>
-                            {cols.map((col, cIdx) => (
-                              <th key={`${field.name}-col-${cIdx}`} className="p-2 text-xs font-semibold text-gray-600">
-                                {col}
-                              </th>
-                            ))}
+                            {cols.map((col, cIdx) => {
+                              const label = typeof col === 'string' ? col : col?.label ?? '';
+                              return (
+                                <th key={`${field.name}-col-${cIdx}`} className="p-2 text-xs font-semibold text-gray-600">
+                                  {label}
+                                </th>
+                              );
+                            })}
                           </tr>
                         </thead>
                         <tbody>
@@ -805,6 +839,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                                 </th>
                                 {cols.map((col, cIdx) => {
                                   const id = `${field.name}-${rIdx}-${cIdx}`;
+                                  const colLabel = typeof col === 'string' ? col : col?.label ?? '';
                                   return (
                                     <td key={id} className="p-2 text-center">
                                       <input
@@ -813,7 +848,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                                         name={rowName}
                                         value={String(cIdx)}
                                         className="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                                        aria-label={`${row} - ${col}`}
+                                        aria-label={`${row} - ${colLabel}`}
                                       />
                                     </td>
                                   );
@@ -869,6 +904,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                 onAddGridColumn={onAddGridColumn}
                 onRemoveGridRow={onRemoveGridRow}
                 onRemoveGridColumn={onRemoveGridColumn}
+                onUpdateGridColumnPoints={onUpdateGridColumnPoints}
                 onUpdateRangeBounds={onUpdateRangeBounds}
               />
             ) : (

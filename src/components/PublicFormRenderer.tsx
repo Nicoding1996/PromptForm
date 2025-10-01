@@ -53,6 +53,41 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId }) => {
         }
       }
   
+      // Post-process radioGrid: capture per-row selection as column label
+      // and normalize payload keys.
+      for (const f of formData.fields ?? []) {
+        if (f.type !== 'radioGrid') continue;
+        const rows = (f as any).rows ?? [];
+        const cols = (f as any).columns ?? [];
+        const gridObj: Record<string, string | null> = {};
+  
+        rows.forEach((rowLabel: string, rIdx: number) => {
+          const rowName = `${f.name}[${rIdx}]`; // matches name attribute in renderer
+          const raw = fd.get(rowName);
+  
+          // Remove raw bracket key from the flat payload if present
+          if (Object.prototype.hasOwnProperty.call(payload, rowName)) {
+            delete payload[rowName];
+          }
+  
+          let selected: string | null = null;
+          if (raw != null && String(raw).length > 0) {
+            const cIdx = Number(raw);
+            if (Number.isFinite(cIdx) && cols[cIdx] != null) {
+              const colVal = cols[cIdx];
+              selected = typeof colVal === 'string' ? colVal : (colVal?.label ?? null);
+            }
+          }
+  
+          // Store both nested and flattened keys for easy consumption
+          gridObj[rowLabel] = selected;
+          payload[`${f.name}.${rowLabel}`] = selected;
+        });
+  
+        // Nested object under the grid field name
+        payload[f.name] = gridObj;
+      }
+  
       // Quiz scoring (local) if enabled
       let scoreToSend: number | null = null;
       let maxToSend: number | null = null;
@@ -74,6 +109,61 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId }) => {
           }
   
           let ok: boolean | null = null; // null = not gradable, don't add to max
+  
+          // RadioGrid scoring: sum selected column points per row.
+          // Max score = sum over rows of the max available points for that row.
+          // If all column points are equal or missing, fall back to ordinal 1..N.
+          if (f.type === 'radioGrid') {
+            const rows = (f as any).rows ?? [];
+            const cols = (f as any).columns ?? [];
+
+            // Build raw points array from columns
+            const rawPoints: number[] = cols.map((c: any) => {
+              if (typeof c === 'string') return NaN; // no explicit points in legacy string
+              const p = Number(c?.points);
+              return Number.isFinite(p) ? p : NaN;
+            });
+
+            const allMissing = rawPoints.every((p) => !Number.isFinite(p));
+            const allEqualFinite =
+              rawPoints.every((p) => Number.isFinite(p)) &&
+              rawPoints.every((p) => p === rawPoints[0]);
+
+            // Fallback mode: if points are all missing or all equal, treat as ordinal scale 1..N
+            const fallbackOrdinal = allMissing || allEqualFinite;
+
+            const effectivePoints = (idx: number): number => {
+              if (fallbackOrdinal) {
+                // 1..N mapping
+                return idx + 1;
+              }
+              const p = rawPoints[idx];
+              return Number.isFinite(p) ? p : 1;
+            };
+
+            const maxColPts =
+              cols.length > 0
+                ? Math.max(
+                    ...cols.map((_: any, i: number) => effectivePoints(i))
+                  )
+                : 0;
+
+            rows.forEach((_rowLabel: string, rIdx: number) => {
+              // Add potential max for this row
+              max += maxColPts;
+
+              // Read selected column index directly from the form data
+              const rowName = `${f.name}[${rIdx}]`;
+              const raw = fd.get(rowName);
+              if (raw != null && String(raw).length > 0) {
+                const cIdx = Number(raw);
+                if (Number.isFinite(cIdx) && cIdx >= 0 && cIdx < cols.length) {
+                  score += effectivePoints(cIdx);
+                }
+              }
+            });
+            continue;
+          }
   
           if (f.type === 'radio' || f.type === 'select') {
             const correct = (f as any).correctAnswer as string | undefined;
@@ -326,11 +416,14 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId }) => {
               <thead>
                 <tr>
                   <th className="p-2 text-left text-xs font-semibold text-gray-600"></th>
-                  {cols.map((col, cIdx) => (
-                    <th key={`${field.name}-col-${cIdx}`} className="p-2 text-xs font-semibold text-gray-600">
-                      {col}
-                    </th>
-                  ))}
+                  {cols.map((col, cIdx) => {
+                    const colLabel = typeof col === 'string' ? col : col?.label ?? '';
+                    return (
+                      <th key={`${field.name}-col-${cIdx}`} className="p-2 text-xs font-semibold text-gray-600">
+                        {colLabel}
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
@@ -343,6 +436,7 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId }) => {
                       </th>
                       {cols.map((col, cIdx) => {
                         const id = `${field.name}-${rIdx}-${cIdx}`;
+                        const colLabel = typeof col === 'string' ? col : col?.label ?? '';
                         return (
                           <td key={id} className="p-2 text-center">
                             <input
@@ -351,7 +445,7 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId }) => {
                               name={rowName}
                               value={String(cIdx)}
                               className="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                              aria-label={`${row} - ${col}`}
+                              aria-label={`${row} - ${colLabel}`}
                               required={required && cIdx === 0}
                             />
                           </td>
@@ -386,6 +480,37 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId }) => {
   };
 
   if (submitted) {
+    // Outcome-based rendering (personality / result pages)
+    const pages = (formData as any)?.resultPages as Array<any> | undefined;
+    const hasOutcomes = Array.isArray(pages) && pages.length > 0;
+  
+    let matched: any = null;
+    if ((formData as any)?.isQuiz === true && hasOutcomes && lastScore != null) {
+      matched =
+        pages.find((p) => {
+          const from = Number(p?.scoreRange?.from ?? NaN);
+          const to = Number(p?.scoreRange?.to ?? NaN);
+          if (!Number.isFinite(from) || !Number.isFinite(to)) return false;
+          return lastScore >= from && lastScore <= to;
+        }) || null;
+    }
+  
+    if (matched) {
+      return (
+        <section className="mt-8 rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
+          <div className="mx-auto max-w-2xl space-y-3 text-center">
+            <h2 className="text-xl font-bold text-gray-900">{matched.title || 'Your Result'}</h2>
+            <p className="text-sm text-gray-500">
+              Score: {lastScore}
+              {lastMaxScore != null ? ` / ${lastMaxScore}` : ''}
+            </p>
+            <p className="whitespace-pre-wrap text-gray-800">{matched.description || '—'}</p>
+          </div>
+        </section>
+      );
+    }
+  
+    // Default "score only" rendering
     return (
       <section className="mt-8 rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
         <div className="text-center">

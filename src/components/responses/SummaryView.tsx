@@ -75,33 +75,62 @@ function buildCounts(options: string[] | undefined, values: (string | string[])[
 
 /**
  * Build datasets for radioGrid:
- * For each row, count occurrences of column index (as label or index string).
+ * For each row, count occurrences of selected column label.
+ * Supports legacy payloads (bracket keys with index) and new payloads
+ * (nested objects and/or flattened dot keys with labels).
  */
 function buildRadioGridCounts(field: FormField, responses: StoredResponse[]) {
   const rows = field.rows ?? [];
   const cols = field.columns ?? [];
+  const labelForCol = (cIdx: number) => {
+    const c = (cols as any[])[cIdx];
+    return typeof c === 'string' ? (c as string) : (c?.label ?? String(cIdx));
+  };
+
   const perRow: { row: string; data: { name: string; value: number }[] }[] = [];
 
   for (let rIdx = 0; rIdx < rows.length; rIdx++) {
-    const key = `${field.name}[${rIdx}]`;
+    const rowLabel = rows[rIdx] ?? `Row ${rIdx + 1}`;
+    const bracketKey = `${field.name}[${rIdx}]`;
+    const dotKey = `${field.name}.${rowLabel}`;
     const counts: Record<string, number> = Object.create(null);
-    // seed
+
+    // seed counts with column labels
     for (let cIdx = 0; cIdx < cols.length; cIdx++) {
-      const label = cols[cIdx] ?? String(cIdx);
+      const label = labelForCol(cIdx);
       counts[label] = 0;
     }
 
     for (const resp of responses) {
-      const raw = resp.payload?.[key];
-      if (raw == null) continue;
-      // raw is column index string (from our public renderer)
-      const idx = Number(raw);
-      const label = Number.isFinite(idx) && cols[idx] ? cols[idx]! : String(raw);
-      counts[label] = (counts[label] ?? 0) + 1;
+      let selLabel: string | null = null;
+
+      // New nested structure: payload[field.name][rowLabel] = "Column Label"
+      const nested = (resp.payload?.[field.name] as any) ?? null;
+      if (nested && typeof nested === 'object' && nested[rowLabel] != null) {
+        selLabel = String(nested[rowLabel]);
+      } else if (resp.payload && Object.prototype.hasOwnProperty.call(resp.payload, dotKey)) {
+        // New flattened dot key: payload["grid.Row Label"] = "Column Label"
+        selLabel = String(resp.payload[dotKey]);
+      } else {
+        // Legacy bracket key: payload["grid[0]"] = "2" (index)
+        const raw = resp.payload?.[bracketKey];
+        if (raw != null) {
+          const idx = Number(raw);
+          if (Number.isFinite(idx) && idx >= 0 && idx < cols.length) {
+            selLabel = labelForCol(idx);
+          } else {
+            selLabel = String(raw);
+          }
+        }
+      }
+
+      if (selLabel != null && selLabel.length > 0) {
+        counts[selLabel] = (counts[selLabel] ?? 0) + 1;
+      }
     }
 
     perRow.push({
-      row: rows[rIdx] ?? `Row ${rIdx + 1}`,
+      row: rowLabel,
       data: Object.entries(counts).map(([name, value]) => ({ name, value })),
     });
   }

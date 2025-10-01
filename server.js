@@ -115,9 +115,21 @@ app.post('/generate-form', async (req, res) => {
             "name": "lowercase_field_label_with_underscores",
             "options": ["Option 1", "Option 2"],
             "rows": ["Row 1", "Row 2"],       // only for radioGrid
-            "columns": ["Col A", "Col B"],    // only for radioGrid
+            "columns": [                      // only for radioGrid; per-column scoring objects
+              { "label": "Col A", "points": 1 },
+              { "label": "Col B", "points": 1 }
+            ],
             "correctAnswer": "Option 1",      // when isQuiz is true and applicable (radio/checkbox/select)
             "points": 1                       // when isQuiz is true; default to 1 if not specified
+          }
+        ],
+        // Optional for personality/typology assessments when isQuiz is true:
+        // Each outcome page covers a score range; the client can edit these.
+        "resultPages": [
+          {
+            "title": "Outcome A",
+            "description": "A short description for this result.",
+            "scoreRange": { "from": 0, "to": 0 }
           }
         ]
       }
@@ -139,7 +151,8 @@ app.post('/generate-form', async (req, res) => {
       - 'options': This key MUST be included for types "radio", "checkbox", and "select". It MUST be omitted for all other types (including "radioGrid").
       - 'radioGrid' structure: Use when the question is a matrix/grid. Include:
         - "rows": an array of strings for each row's question/label.
-        - "columns": an array of strings for each column choice (e.g., "Very Satisfied", "Satisfied", ...).
+        - "columns": an array of objects for each column choice, each like { "label": "Very Satisfied", "points": 1 }.
+          Default "points" to 1 when unspecified. Use these per-column points for per-row scoring in radioGrid.
         - "label": the main title of the grid.
       - 'submit': Ensure there is exactly one field with type "submit".
       - If the user's request implies a longer introduction or context, include a helpful summary in the "description" field.
@@ -151,6 +164,18 @@ app.post('/generate-form', async (req, res) => {
         - For "checkbox", if multiple options are correct, set "correctAnswer" to an array of all correct option values (e.g., ["A","C"]). If only one is correct, you may still use a single string.
         - Always add a "points" key with value 1 on that field.
       - Only set "correctAnswer" on fields that actually have options (radio/checkbox/select). Do NOT add it for text-like or radioGrid fields.
+      
+      PERSONALITY / OUTCOME-BASED ASSESSMENTS:
+      - If the prompt implies a personality/typology outcome (e.g., contains phrases like "personality test", "assessment" with outcomes, "enneagram", "DISC", "MBTI", "what type of", "find out your", "which kind of"), you MUST:
+        - Set "isQuiz": true.
+        - Attempt to pre-populate a top-level "resultPages" array with 2–6 placeholder outcomes.
+          Each object MUST include:
+            {
+              "title": "Result Name",
+              "description": "Short description of this personality/result",
+              "scoreRange": { "from": 0, "to": 0 }
+            }
+        - Provide reasonable placeholder score ranges that partition the total possible points, if inferable; otherwise set { "from": 0, "to": 0 } as placeholders.
       
       User's request: "${req.body.prompt}"
     `;
@@ -259,10 +284,16 @@ Additional user instructions (context): "${context.trim()}". Use these instructi
             "name": "lowercase_field_label_with_underscores",
             "options": ["Option 1", "Option 2"],
             "rows": ["Row 1", "Row 2"],       // only for radioGrid
-            "columns": ["Col A", "Col B"],    // only for radioGrid
+            "columns": [                      // only for radioGrid; per-column scoring objects
+              { "label": "Col A", "points": 1 },
+              { "label": "Col B", "points": 1 }
+            ],
             "correctAnswer": "Option 1",      // when isQuiz is true and applicable
             "points": 1
           }
+        ],
+        "resultPages": [
+          { "title": "Outcome A", "description": "Result description", "scoreRange": { "from": 0, "to": 0 } }
         ]
       }
  
@@ -283,7 +314,8 @@ Additional user instructions (context): "${context.trim()}". Use these instructi
       - 'options': This key MUST be included for types "radio", "checkbox", and "select". It MUST be omitted for all other types (including "radioGrid").
       - 'radioGrid' structure: Use when the question is a matrix/grid. Include:
         - "rows": an array of strings for each row's question/label.
-        - "columns": an array of strings for each column choice (e.g., "Very Satisfied", "Satisfied", ...).
+        - "columns": an array of objects for each column choice, each like { "label": "Very Satisfied", "points": 1 }.
+          Default "points" to 1 when unspecified. Use these per-column points for per-row scoring in radioGrid.
         - "label": the main title of the grid.
       - 'submit': Ensure there is exactly one field with type "submit".
       - If the user's request implies a longer introduction or context, include a helpful summary in the "description" field.
@@ -295,6 +327,9 @@ Additional user instructions (context): "${context.trim()}". Use these instructi
         - For "checkbox", if multiple options are correct, set "correctAnswer" to an array of all correct option values (e.g., ["A","C"]). If only one is correct, you may still use a single string.
         - Always add a "points" key with value 1 on that field.
       - Only set "correctAnswer" on fields that actually have options (radio/checkbox/select). Do NOT add it for text-like or radioGrid fields.
+      
+      PERSONALITY / OUTCOME-BASED ASSESSMENTS:
+      - If the image/context implies a personality/typology outcome (e.g., "personality test", "enneagram", "DISC", "MBTI", "what type of", "find out your"), you MUST set "isQuiz": true and attempt to include a "resultPages" array with 2–6 placeholder objects, each with { "title", "description", "scoreRange": { "from": 0, "to": 0 } }.
 
       ${extraVisionContext}
     `;
@@ -476,10 +511,16 @@ Additional user instructions (context): "${userContext}"
             "name": "lowercase_field_label_with_underscores",
             "options": ["Option 1", "Option 2"],
             "rows": ["Row 1", "Row 2"],       // only for radioGrid
-            "columns": ["Col A", "Col B"],    // only for radioGrid
+            "columns": [                      // only for radioGrid; per-column scoring objects
+              { "label": "Col A", "points": 1 },
+              { "label": "Col B", "points": 1 }
+            ],
             "correctAnswer": "Option 1",      // when isQuiz is true and applicable
             "points": 1
           }
+        ],
+        "resultPages": [
+          { "title": "Outcome A", "description": "Result description", "scoreRange": { "from": 0, "to": 0 } }
         ]
       }
       
@@ -500,7 +541,8 @@ Additional user instructions (context): "${userContext}"
       - 'options': This key MUST be included for types "radio", "checkbox", and "select". It MUST be omitted for all other types (including "radioGrid").
       - 'radioGrid' structure: Use when the question is a matrix/grid. Include:
         - "rows": an array of strings for each row's question/label.
-        - "columns": an array of strings for each column choice (e.g., "Very Satisfied", "Satisfied", ...).
+        - "columns": an array of objects for each column choice, each like { "label": "Very Satisfied", "points": 1 }.
+          Default "points" to 1 when unspecified. Use these per-column points for per-row scoring in radioGrid.
         - "label": the main title of the grid.
       - 'submit': Ensure there is exactly one field with type "submit".
       - If the user's request implies a longer introduction or context, include a helpful summary in the "description" field.
@@ -512,6 +554,9 @@ Additional user instructions (context): "${userContext}"
         - For "checkbox", if multiple options are correct, set "correctAnswer" to an array of all correct option values (e.g., ["A","C"]). If only one is correct, you may still use a single string.
         - Always add a "points" key with value 1 on that field.
       - Only set "correctAnswer" on fields that actually have options (radio/checkbox/select). Do NOT add it for text-like or radioGrid fields.
+      
+      PERSONALITY / OUTCOME-BASED ASSESSMENTS:
+      - If the document implies a personality/typology outcome (e.g., "personality test", "enneagram", "DISC", "MBTI", "what type of", "find out your"), set "isQuiz": true and include a "resultPages" array (2–6 items) with { "title", "description", "scoreRange": { "from": 0, "to": 0 } } placeholders.
       
       ${contextBlock}
       Document content to analyze and transform:
