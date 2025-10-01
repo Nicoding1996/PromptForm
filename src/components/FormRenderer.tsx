@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { DndContext, useDraggable, useDroppable, type DragEndEvent } from '@dnd-kit/core';
-import { FiTrash2, FiCopy, FiCheckCircle, FiZap } from 'react-icons/fi';
+import { FiTrash2, FiCopy, FiCheckCircle } from 'react-icons/fi';
+import { RiOpenaiFill } from 'react-icons/ri';
+import { AiOutlineLoading3Quarters } from 'react-icons/ai';
 import { RxDragHandleDots2 } from 'react-icons/rx';
 
 export interface FormField {
@@ -55,6 +57,7 @@ interface FormRendererProps {
   onAddField: () => void;
   onAddSection?: () => void;
   onAiAssistQuestion?: (index: number) => void;
+  assistingIndex?: number | null;
 
   // Form-level edits
   onUpdateFormTitle: (newTitle: string) => void;
@@ -219,6 +222,7 @@ const AdvancedEditor: React.FC<{
   field: FormField;
   index: number;
 
+  assistingIndex?: number | null;
   onAiAssistQuestion?: (index: number) => void;
 
   onUpdateFieldLabel: (index: number, newLabel: string) => void;
@@ -248,6 +252,7 @@ const AdvancedEditor: React.FC<{
 }> = ({
   field,
   index,
+  assistingIndex,
   onAiAssistQuestion,
   onUpdateFieldLabel,
   onUpdateFieldOption,
@@ -291,6 +296,7 @@ const AdvancedEditor: React.FC<{
   const rmax = (field as any).max ?? 10;
 
   const correctSet = quizMode ? resolveCorrectSet(field, options) : new Set<string>();
+  const isAssisting = assistingIndex === index;
 
   return (
     <div className="flex flex-col gap-4 rounded-md bg-indigo-50/20 p-3 ring-1 ring-indigo-100" data-adv-editor="true">
@@ -303,12 +309,14 @@ const AdvancedEditor: React.FC<{
         />
         <button
           type="button"
-          title="AI Assist"
-          aria-label="AI Assist for this question"
-          onClick={() => onAiAssistQuestion?.(index)}
-          className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-white text-indigo-700 ring-1 ring-indigo-200 hover:bg-indigo-50"
+          title={isAssisting ? 'Generating…' : 'AI Assist'}
+          aria-label={isAssisting ? 'Generating…' : 'AI Assist for this question'}
+          aria-busy={isAssisting}
+          disabled={isAssisting}
+          onClick={() => !isAssisting && onAiAssistQuestion?.(index)}
+          className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-white text-indigo-700 ring-1 ring-indigo-200 hover:bg-indigo-50 disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          <FiZap />
+          {isAssisting ? <AiOutlineLoading3Quarters className="animate-spin" /> : <RiOpenaiFill />}
         </button>
       </div>
 
@@ -605,6 +613,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
   onAddField,
   onAddSection,
   onAiAssistQuestion,
+  assistingIndex,
   onUpdateFormTitle,
   onUpdateFormDescription,
   focusedFieldIndex,
@@ -935,6 +944,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                 onDuplicateField={onDuplicateField}
                 onToggleRequiredField={onToggleRequiredField}
                 // AI assist
+                assistingIndex={assistingIndex}
                 onAiAssistQuestion={onAiAssistQuestion}
                 // Quiz
                 quizMode={quizMode}

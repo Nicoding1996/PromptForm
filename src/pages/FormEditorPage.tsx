@@ -37,6 +37,8 @@ const FormEditorPage: React.FC = () => {
   const [saving, setSaving] = useState<boolean>(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [lastSavedId, setLastSavedId] = useState<string | null>(null);
+  // AI assist in-flight indicator (index of field being generated)
+  const [assistingIndex, setAssistingIndex] = useState<number | null>(null);
 
   // Responses state for the Responses tab
   const [responses, setResponses] = useState<StoredResponse[]>([]);
@@ -488,6 +490,8 @@ const handleUpdateRangeBounds = (fieldIndex: number, min: number, max: number) =
 
 // AI Assist: replace a partial question with an AI-completed field
 const handleAiAssistQuestion = async (fieldIndex: number) => {
+  if (assistingIndex !== null) return; // prevent concurrent requests
+  setAssistingIndex(fieldIndex);
   try {
     const label = String(formJson?.fields?.[fieldIndex]?.label ?? '').trim();
     const prompt = label || 'New question';
@@ -572,6 +576,8 @@ const handleAiAssistQuestion = async (fieldIndex: number) => {
     });
   } catch (e: any) {
     setError(e?.message || 'AI Assist failed.');
+  } finally {
+    setAssistingIndex(null);
   }
 };
   // ===== Quiz mode + handlers =====
@@ -973,6 +979,7 @@ const handleAiAssistQuestion = async (fieldIndex: number) => {
                     onAddField={handleAddField}
                     onAddSection={handleAddSection}
                     onAiAssistQuestion={handleAiAssistQuestion}
+                    assistingIndex={assistingIndex}
                     onUpdateFormTitle={handleUpdateFormTitle}
                     onUpdateFormDescription={handleUpdateFormDescription}
                     // Advanced editor props
