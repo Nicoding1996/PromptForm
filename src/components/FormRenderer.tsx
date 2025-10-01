@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { DndContext, useDraggable, useDroppable, type DragEndEvent } from '@dnd-kit/core';
-import { FiTrash2, FiCopy, FiCheckCircle } from 'react-icons/fi';
-import { RiOpenaiFill } from 'react-icons/ri';
+import { FiTrash2, FiCopy, FiCheckCircle, FiZap } from 'react-icons/fi';
 import { AiOutlineLoading3Quarters } from 'react-icons/ai';
 import { RxDragHandleDots2 } from 'react-icons/rx';
 
@@ -316,7 +315,7 @@ const AdvancedEditor: React.FC<{
           onClick={() => !isAssisting && onAiAssistQuestion?.(index)}
           className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-white text-indigo-700 ring-1 ring-indigo-200 hover:bg-indigo-50 disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          {isAssisting ? <AiOutlineLoading3Quarters className="animate-spin" /> : <RiOpenaiFill />}
+          {isAssisting ? <AiOutlineLoading3Quarters className="animate-spin" /> : <FiZap />}
         </button>
       </div>
 
