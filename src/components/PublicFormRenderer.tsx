@@ -16,6 +16,35 @@ type Props = {
   formId: string;
 };
 
+// Live range control with reactive value display
+const LiveRange: React.FC<{
+  id: string;
+  name: string;
+  min: number;
+  max: number;
+  defaultValue: number;
+  required?: boolean;
+  className?: string;
+}> = ({ id, name, min, max, defaultValue, required, className }) => {
+  const [value, setValue] = useState<number>(defaultValue);
+  return (
+    <div className="flex items-center gap-4">
+      <input
+        type="range"
+        id={id}
+        name={name}
+        min={min}
+        max={max}
+        value={value}
+        required={required}
+        onChange={(e) => setValue(Number(e.target.value))}
+        onInput={(e) => setValue(Number((e.target as HTMLInputElement).value))}
+        className={className}
+      />
+      <output className="min-w-[40px] text-center text-sm font-semibold text-gray-700">{value}</output>
+    </div>
+  );
+};
 const PublicFormRenderer: React.FC<Props> = ({ formData, formId }) => {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -329,18 +358,15 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId }) => {
       return (
         <div className="flex flex-col gap-2" key={`${field.name}-${idx}`}>
           {labelNode}
-          <div className="flex items-center gap-4">
-            <input
-              type="range"
-              id={field.name}
-              name={field.name}
-              min={min}
-              max={max}
-              defaultValue={def}
-              className="h-2 w-full appearance-none rounded-lg bg-gray-200 accent-indigo-600"
-            />
-            <output className="min-w-[40px] text-center text-sm font-semibold text-gray-700">{def}</output>
-          </div>
+          <LiveRange
+            id={field.name}
+            name={field.name}
+            min={min}
+            max={max}
+            defaultValue={def}
+            required={required}
+            className="h-2 w-full appearance-none rounded-lg bg-gray-200 accent-indigo-600"
+          />
         </div>
       );
     }
