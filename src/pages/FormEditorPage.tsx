@@ -4,6 +4,7 @@ import CommandBar from '../components/CommandBar';
 import FormRenderer from '../components/FormRenderer';
 import type { FormData, FormField, ResultPage } from '../components/FormRenderer';
 import ResultCard from '../components/editor/ResultCard';
+import FloatingToolbar from '../components/editor/FloatingToolbar';
 import { useAuth } from '../context/AuthContext';
 import LoginButton from '../components/LoginButton';
 import { getFormById, saveFormForUser, listResponsesForForm, type StoredResponse } from '../services/forms';
@@ -183,27 +184,39 @@ const FormEditorPage: React.FC = () => {
     });
   };
 
-  const handleAddField = () => {
+  // Enhanced add field: can insert after a given index and set desired type (defaults to text)
+  const handleAddField = (opts?: { afterIndex?: number | null; type?: FormField['type'] }) => {
+    const { afterIndex = null, type = 'text' } = opts ?? {};
     setFormJson((prev) => {
       if (!prev) return prev;
-      const base = 'new_question';
-      const used = new Set(prev.fields.map((f) => f.name));
+      const fields = [...prev.fields];
+  
+      // Create unique name
+      const base = 'question';
+      const used = new Set(fields.map((f) => f.name));
       let name = base;
       let i = 1;
-      while (used.has(name)) {
-        name = `${base}_${i++}`;
+      while (used.has(name)) name = `${base}_${i++}`;
+  
+      // Build new field (Google default is Multiple choice -> 'radio')
+      let newField: FormField = { label: 'Untitled question', type, name };
+      if (type === 'radio' || type === 'checkbox' || type === 'select') {
+        newField = { ...newField, options: ['Option 1', 'Option 2'] };
       }
-      const newField: FormField = { label: 'New Question', type: 'text', name };
-      const fields = [...prev.fields];
-
-      // Insert the new field before any submit field so submit remains last
-      const submitIdx = fields.findIndex((f) => f.type === 'submit');
-      if (submitIdx >= 0) {
-        fields.splice(submitIdx, 0, newField);
+  
+      // Compute insertion index: below focused if provided; else before submit; else push
+      let insertAt: number;
+      if (afterIndex != null && Number.isFinite(afterIndex) && afterIndex >= 0 && afterIndex < fields.length) {
+        insertAt = afterIndex + 1;
       } else {
-        fields.push(newField);
+        const submitIdx = fields.findIndex((f) => f.type === 'submit');
+        insertAt = submitIdx >= 0 ? submitIdx : fields.length;
       }
-
+      fields.splice(insertAt, 0, newField);
+  
+      // Focus the newly inserted field
+      setFocusedFieldIndex(insertAt);
+  
       return { ...prev, fields };
     });
   };
@@ -217,7 +230,9 @@ const FormEditorPage: React.FC = () => {
   };
 
   // ===== Section handling =====
-  const handleAddSection = () => {
+  // Enhanced add section: insert below focused when available
+  const handleAddSection = (opts?: { afterIndex?: number | null }) => {
+    const { afterIndex = null } = opts ?? {};
     setFormJson((prev) => {
       if (!prev) return prev;
       const fields = [...prev.fields];
@@ -225,14 +240,18 @@ const FormEditorPage: React.FC = () => {
       const used = new Set(fields.map((f) => f.name));
       let name = base;
       let i = 1;
-      while (used.has(name)) {
-        name = `${base}_${i++}`;
-      }
+      while (used.has(name)) name = `${base}_${i++}`;
       const newField: FormField = { label: 'New Section', type: 'section' as any, name };
-      // Insert before submit so submit remains last
-      const submitIdx = fields.findIndex((f) => f.type === 'submit');
-      if (submitIdx >= 0) fields.splice(submitIdx, 0, newField);
-      else fields.push(newField);
+  
+      let insertAt: number;
+      if (afterIndex != null && Number.isFinite(afterIndex) && afterIndex >= 0 && afterIndex < fields.length) {
+        insertAt = afterIndex + 1;
+      } else {
+        const submitIdx = fields.findIndex((f) => f.type === 'submit');
+        insertAt = submitIdx >= 0 ? submitIdx : fields.length;
+      }
+      fields.splice(insertAt, 0, newField);
+      setFocusedFieldIndex(insertAt);
       return { ...prev, fields };
     });
   };
@@ -818,7 +837,7 @@ const handleAiAssistQuestion = async (fieldIndex: number) => {
   // UI rendering
   return (
     <div className="min-h-screen bg-slate-100">
-      <main className="app-container flex flex-col gap-6">
+      <main id="form-editor-container" className="app-container flex flex-col gap-6">
         {/* Header with title and actions */}
         <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -1005,40 +1024,49 @@ const handleAiAssistQuestion = async (fieldIndex: number) => {
                 </section>
               ) : (
                 formJson && (
-                  <FormRenderer
-                    formData={formJson}
-                    onUpdateFieldLabel={handleUpdateFieldLabel}
-                    onDeleteField={handleDeleteField}
-                    onReorderFields={handleReorderFields}
-                    onAddField={handleAddField}
-                    onAddSection={handleAddSection}
-                    onAiAssistQuestion={handleAiAssistQuestion}
-                    assistingIndex={assistingIndex}
-                    onUpdateFormTitle={handleUpdateFormTitle}
-                    onUpdateFormDescription={handleUpdateFormDescription}
-                    // Advanced editor props
-                    focusedFieldIndex={focusedFieldIndex}
-                    setFocusedFieldIndex={setFocusedFieldIndex}
-                    onUpdateFieldOption={handleUpdateFieldOption}
-                    onAddFieldOption={handleAddFieldOption}
-                    onRemoveFieldOption={handleRemoveFieldOption}
-                    onChangeFieldType={handleChangeFieldType}
-                    onDuplicateField={handleDuplicateField}
-                    onToggleRequiredField={handleToggleRequiredField}
-                    // Quiz
-                    quizMode={quizMode}
-                    onUpdateFieldCorrectAnswer={handleUpdateFieldCorrectAnswer}
-                    onUpdateFieldPoints={handleUpdateFieldPoints}
-                    // Grid + range
-                    onUpdateGridRow={handleUpdateGridRow}
-                    onUpdateGridColumn={handleUpdateGridColumn}
-                    onAddGridRow={handleAddGridRow}
-                    onAddGridColumn={handleAddGridColumn}
-                    onRemoveGridRow={handleRemoveGridRow}
-                    onRemoveGridColumn={handleRemoveGridColumn}
-                    onUpdateGridColumnPoints={handleUpdateGridColumnPoints}
-                    onUpdateRangeBounds={handleUpdateRangeBounds}
-                  />
+                  <>
+                    <FormRenderer
+                      formData={formJson}
+                      onUpdateFieldLabel={handleUpdateFieldLabel}
+                      onDeleteField={handleDeleteField}
+                      onReorderFields={handleReorderFields}
+                      onAddField={handleAddField}
+                      onAddSection={handleAddSection}
+                      onAiAssistQuestion={handleAiAssistQuestion}
+                      assistingIndex={assistingIndex}
+                      onUpdateFormTitle={handleUpdateFormTitle}
+                      onUpdateFormDescription={handleUpdateFormDescription}
+                      // Advanced editor props
+                      focusedFieldIndex={focusedFieldIndex}
+                      setFocusedFieldIndex={setFocusedFieldIndex}
+                      onUpdateFieldOption={handleUpdateFieldOption}
+                      onAddFieldOption={handleAddFieldOption}
+                      onRemoveFieldOption={handleRemoveFieldOption}
+                      onChangeFieldType={handleChangeFieldType}
+                      onDuplicateField={handleDuplicateField}
+                      onToggleRequiredField={handleToggleRequiredField}
+                      // Quiz
+                      quizMode={quizMode}
+                      onUpdateFieldCorrectAnswer={handleUpdateFieldCorrectAnswer}
+                      onUpdateFieldPoints={handleUpdateFieldPoints}
+                      // Grid + range
+                      onUpdateGridRow={handleUpdateGridRow}
+                      onUpdateGridColumn={handleUpdateGridColumn}
+                      onAddGridRow={handleAddGridRow}
+                      onAddGridColumn={handleAddGridColumn}
+                      onRemoveGridRow={handleRemoveGridRow}
+                      onRemoveGridColumn={handleRemoveGridColumn}
+                      onUpdateGridColumnPoints={handleUpdateGridColumnPoints}
+                      onUpdateRangeBounds={handleUpdateRangeBounds}
+                    />
+                    {/* Floating Actions */}
+                    <FloatingToolbar
+                      // Insert new question (default Multiple choice) right below the focused question
+                      onAddField={() => handleAddField({ afterIndex: focusedFieldIndex, type: 'radio' })}
+                      onAddSection={() => handleAddSection({ afterIndex: focusedFieldIndex })}
+                      focusedFieldIndex={focusedFieldIndex}
+                    />
+                  </>
                 )
               )}
             </div>
