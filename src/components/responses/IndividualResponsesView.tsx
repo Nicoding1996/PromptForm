@@ -2,7 +2,6 @@ import React, { useMemo, useRef, useState } from 'react';
 import type { FormData, FormField } from '../FormRenderer';
 import type { StoredResponse } from '../../services/forms';
 import { FiDownload } from 'react-icons/fi';
-import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 
 export type Column = { key: string; label: string; field: FormField };
@@ -18,6 +17,7 @@ type Props = {
 const IndividualResponsesView: React.FC<Props> = ({ form, responses, columns = [], height = '70vh' }) => {
   const [selectedResponseIndex, setSelectedResponseIndex] = useState(0);
   const contentRef = useRef<HTMLDivElement | null>(null);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   const orderedColumns: Column[] = useMemo(() => {
     // Highest priority: caller-provided columns
@@ -47,44 +47,105 @@ const IndividualResponsesView: React.FC<Props> = ({ form, responses, columns = [
     );
   }
 
+  // Fully deterministic, data-driven PDF (no canvas). This avoids blank/blocked PDFs across browsers.
   const handleExportPdf = async () => {
+    const r = responses[selectedResponseIndex];
+    if (!r) return;
+
+    setExportingPdf(true);
     try {
-      const node = contentRef.current;
-      if (!node) return;
-      // Render the content at higher scale for crisper PDFs
-      const canvas = await html2canvas(node, {
-        scale: 2,
-        useCORS: true,
-        windowWidth: node.scrollWidth,
-      });
-      const imgData = canvas.toDataURL('image/png');
+      const pairs =
+        orderedColumns.length > 0
+          ? orderedColumns.map((c) => ({ label: c.label, value: r.payload?.[c.key] }))
+          : Object.entries(r.payload || {}).map(([k, v]) => ({ label: k, value: v }));
+
+      const toStr = (v: any) =>
+        Array.isArray(v) ? v.join(', ') : typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v ?? '');
+
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 12;
+      let y = margin;
 
-      const imgWidth = pageWidth;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      // Title
+      const title = (form?.title || 'Form Submission').toString();
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(14);
+      pdf.text(title, margin, y);
+      y += 8;
 
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-      heightLeft -= pageHeight;
-
-      while (heightLeft > 0) {
-        position = position - pageHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-        heightLeft -= pageHeight;
+      // Timestamp
+      const ts = r.createdAt?.toDate ? r.createdAt.toDate() : undefined;
+      if (ts) {
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(10);
+        pdf.text(ts.toLocaleString(), margin, y);
+        y += 8;
       }
 
+      // Fields
+      pdf.setFontSize(11);
+      for (const p of pairs) {
+        const label = String(p.label ?? '');
+        const val = toStr(p.value);
+        const wrapWidth = pageWidth - margin * 2;
+
+        // Page break if needed before label
+        if (y + 6 > pageHeight - margin) {
+          pdf.addPage();
+          y = margin;
+        }
+
+        pdf.setFont('helvetica', 'bold');
+        pdf.text(label, margin, y);
+        y += 5;
+
+        pdf.setFont('helvetica', 'normal');
+        const lines = pdf.splitTextToSize(val, wrapWidth) as string[];
+        for (const line of lines) {
+          if (y + 6 > pageHeight - margin) {
+            pdf.addPage();
+            y = margin;
+          }
+          pdf.text(line, margin, y);
+          y += 5;
+        }
+
+        y += 4; // spacing between fields
+      }
+
+      // Filename
       const idx = selectedResponseIndex + 1;
-      const ts = responses[selectedResponseIndex]?.createdAt?.toDate?.() as Date | undefined;
       const tsStr = ts ? ts.toISOString().slice(0, 19).replace(/[:T]/g, '-') : 'unknown';
       const base = (form?.title || 'form').toLowerCase().replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '');
-      pdf.save(`${base || 'form'}-submission-${idx}-${tsStr}.pdf`);
+      const filename = `${base || 'form'}-submission-${idx}-${tsStr}.pdf`;
+
+      try {
+        pdf.save(filename);
+      } catch {
+        // Fallback save
+        const blob = pdf.output('blob');
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }, 0);
+      }
     } catch {
-      // swallow errors to avoid breaking UX
+      // If anything throws, create a minimal error PDF so the user still gets feedback
+      try {
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        pdf.text('Failed to generate PDF (data mode).', 10, 10);
+        pdf.save('export-error.pdf');
+      } catch {}
+    } finally {
+      setExportingPdf(false);
     }
   };
 
@@ -103,8 +164,7 @@ const IndividualResponsesView: React.FC<Props> = ({ form, responses, columns = [
                     type="button"
                     onClick={() => setSelectedResponseIndex(idx)}
                     className={
-                      'w-full text-left px-3 py-3 transition ' +
-                      (active ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-gray-50')
+                      'w-full text-left px-3 py-3 transition ' + (active ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-gray-50')
                     }
                     title={`Open submission #${idx + 1}`}
                   >
@@ -124,10 +184,12 @@ const IndividualResponsesView: React.FC<Props> = ({ form, responses, columns = [
             <button
               type="button"
               onClick={handleExportPdf}
-              className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50"
+              disabled={exportingPdf}
+              aria-busy={exportingPdf}
+              className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
               title="Download this submission as a PDF"
             >
-              <FiDownload /> Download PDF
+              {exportingPdf ? 'Downloading…' : (<><FiDownload /> Download PDF</>)}
             </button>
           </div>
 
@@ -154,7 +216,7 @@ const IndividualResponsesView: React.FC<Props> = ({ form, responses, columns = [
                 : String(v ?? '');
 
             return (
-              <div ref={contentRef} className="space-y-4">
+              <div ref={contentRef} id="pdf-capture" className="space-y-4">
                 <div className="mb-2">
                   <div className="text-sm text-gray-500">
                     {r.createdAt?.toDate ? r.createdAt.toDate().toLocaleString() : ''}
