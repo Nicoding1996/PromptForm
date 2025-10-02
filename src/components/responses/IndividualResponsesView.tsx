@@ -3,6 +3,7 @@ import type { FormData, FormField } from '../FormRenderer';
 import type { StoredResponse } from '../../services/forms';
 import { FiDownload } from 'react-icons/fi';
 import { jsPDF } from 'jspdf';
+import GridResponseDisplay from './GridResponseDisplay';
 
 export type Column = { key: string; label: string; field: FormField };
 
@@ -56,8 +57,8 @@ const IndividualResponsesView: React.FC<Props> = ({ form, responses, columns = [
     try {
       const pairs =
         orderedColumns.length > 0
-          ? orderedColumns.map((c) => ({ label: c.label, value: r.payload?.[c.key] }))
-          : Object.entries(r.payload || {}).map(([k, v]) => ({ label: k, value: v }));
+          ? orderedColumns.map((c) => ({ label: c.label, value: r.payload?.[c.key], field: c.field }))
+          : Object.entries(r.payload || {}).map(([k, v]) => ({ label: k, value: v, field: undefined }));
 
       const toStr = (v: any) =>
         Array.isArray(v) ? v.join(', ') : typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v ?? '');
@@ -88,7 +89,6 @@ const IndividualResponsesView: React.FC<Props> = ({ form, responses, columns = [
       pdf.setFontSize(11);
       for (const p of pairs) {
         const label = String(p.label ?? '');
-        const val = toStr(p.value);
         const wrapWidth = pageWidth - margin * 2;
 
         // Page break if needed before label
@@ -102,7 +102,38 @@ const IndividualResponsesView: React.FC<Props> = ({ form, responses, columns = [
         y += 5;
 
         pdf.setFont('helvetica', 'normal');
-        const lines = pdf.splitTextToSize(val, wrapWidth) as string[];
+
+        let lines: string[] = [];
+        if (p.field?.type === 'radioGrid') {
+          const f = p.field as any;
+          const rows: string[] = f.rows ?? [];
+          const cols: any[] = f.columns ?? [];
+          const colLabel = (idx: number) => {
+            const c = cols[idx];
+            return typeof c === 'string' ? c : (c?.label ?? String(idx));
+          };
+          const nested = (r.payload?.[f.name] as any) ?? null;
+          rows.forEach((rowLabel: string, rIdx: number) => {
+            let ans: string = '';
+            if (nested && typeof nested === 'object' && nested[rowLabel] != null) {
+              ans = String(nested[rowLabel] ?? '');
+            } else if (Object.prototype.hasOwnProperty.call(r.payload || {}, `${f.name}.${rowLabel}`)) {
+              ans = String((r.payload as any)[`${f.name}.${rowLabel}`] ?? '');
+            } else {
+              const raw = (r.payload as any)?.[`${f.name}[${rIdx}]`];
+              if (raw != null) {
+                const n = Number(raw);
+                if (Number.isFinite(n) && n >= 0 && n < cols.length) ans = colLabel(n);
+                else ans = String(raw);
+              }
+            }
+            lines.push(`${rowLabel}: ${ans || '—'}`);
+          });
+        } else {
+          const val = toStr(p.value);
+          lines = pdf.splitTextToSize(val, wrapWidth) as string[];
+        }
+
         for (const line of lines) {
           if (y + 6 > pageHeight - margin) {
             pdf.addPage();
@@ -205,8 +236,9 @@ const IndividualResponsesView: React.FC<Props> = ({ form, responses, columns = [
                 ? orderedColumns.map((c) => ({
                     label: c.label,
                     value: r.payload?.[c.key],
+                    field: c.field,
                   }))
-                : Object.entries(r.payload || {}).map(([k, v]) => ({ label: k, value: v }));
+                : Object.entries(r.payload || {}).map(([k, v]) => ({ label: k, value: v, field: undefined }));
 
             const format = (v: any) =>
               Array.isArray(v)
@@ -226,7 +258,13 @@ const IndividualResponsesView: React.FC<Props> = ({ form, responses, columns = [
                 {pairs.map((p, i) => (
                   <div key={i} className="pb-4 border-b border-gray-100">
                     <strong className="block text-sm text-gray-700">{p.label}</strong>
-                    <p className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{format(p.value)}</p>
+                    {p.field?.type === 'radioGrid' ? (
+                      <div className="mt-1">
+                        <GridResponseDisplay field={p.field as any} payload={r.payload} />
+                      </div>
+                    ) : (
+                      <p className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{format(p.value)}</p>
+                    )}
                   </div>
                 ))}
               </div>

@@ -218,7 +218,7 @@ const SummaryView: React.FC<Props> = ({ form, responses, height = '70vh' }) => {
         const rows = f.rows ?? [];
         for (let rIdx = 0; rIdx < rows.length; rIdx++) {
           const rowLabel = rows[rIdx] ?? `Row ${rIdx + 1}`;
-          const header = `${f.label} - ${rowLabel}`;
+          const header = `${f.label}: ${rowLabel}`;
           const bracketKey = `${f.name}[${rIdx}]`;
           const dotKey = `${f.name}.${rowLabel}`;
           cols.push({
