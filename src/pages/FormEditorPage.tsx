@@ -871,8 +871,15 @@ const handleAiAssistQuestion = async (fieldIndex: number) => {
 
         {/* Tabs */}
         <div className="card p-2">
-          <div className="mb-4 flex items-center gap-2">
+          <div
+            className="mb-4 flex items-center gap-2"
+            role="tablist"
+            aria-label="Editor tabs"
+          >
             <button
+              id="tab-questions"
+              role="tab"
+              aria-controls="panel-questions"
               type="button"
               onClick={() => setActiveTab('questions')}
               className={
@@ -886,6 +893,9 @@ const handleAiAssistQuestion = async (fieldIndex: number) => {
               Questions
             </button>
             <button
+              id="tab-responses"
+              role="tab"
+              aria-controls="panel-responses"
               type="button"
               onClick={() => setActiveTab('responses')}
               className={
@@ -902,7 +912,7 @@ const handleAiAssistQuestion = async (fieldIndex: number) => {
 
           {/* Tab content */}
           {activeTab === 'questions' ? (
-            <div className="space-y-6">
+            <div id="panel-questions" role="tabpanel" aria-labelledby="tab-questions" className="space-y-6" tabIndex={0}>
               {/* CommandBar (prompt + file + send) */}
               <CommandBar
                 prompt={promptText}
@@ -931,7 +941,7 @@ const handleAiAssistQuestion = async (fieldIndex: number) => {
                     onChange={(e) => handleSetQuizMode(e.target.checked)}
                     className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                   />
-                  Make this a quiz
+                  Enable scoring and outcomes
                 </label>
                 {quizMode && <span className="text-xs text-gray-500">Mark correct answers and assign points in each choice question. Define outcomes below.</span>}
               </div>
@@ -1022,10 +1032,17 @@ const handleAiAssistQuestion = async (fieldIndex: number) => {
               )}
             </div>
           ) : (
-            <div className="card p-4">
+            <div id="panel-responses" role="tabpanel" aria-labelledby="tab-responses" className="card p-4" tabIndex={0}>
               {/* Sub-tabs: Summary | Question | Individual */}
-              <div className="mb-4 flex items-center gap-2">
+              <div
+                className="mb-4 flex items-center gap-2"
+                role="tablist"
+                aria-label="Responses subtabs"
+              >
                 <button
+                  id="rs-tab-summary"
+                  role="tab"
+                  aria-controls="rs-panel-summary"
                   type="button"
                   onClick={() => setResponsesSubTab('summary')}
                   className={
@@ -1039,6 +1056,9 @@ const handleAiAssistQuestion = async (fieldIndex: number) => {
                   Summary
                 </button>
                 <button
+                  id="rs-tab-question"
+                  role="tab"
+                  aria-controls="rs-panel-question"
                   type="button"
                   onClick={() => setResponsesSubTab('question')}
                   className={
@@ -1052,6 +1072,9 @@ const handleAiAssistQuestion = async (fieldIndex: number) => {
                   Question
                 </button>
                 <button
+                  id="rs-tab-individual"
+                  role="tab"
+                  aria-controls="rs-panel-individual"
                   type="button"
                   onClick={() => setResponsesSubTab('individual')}
                   className={
@@ -1068,18 +1091,36 @@ const handleAiAssistQuestion = async (fieldIndex: number) => {
 
               {/* Sub-tab content */}
               {responsesSubTab === 'summary' && (
-                <SummaryView form={formJson} responses={responses} height="70vh" />
+                <div
+                  id="rs-panel-summary"
+                  role="tabpanel"
+                  aria-labelledby="rs-tab-summary"
+                  tabIndex={0}
+                >
+                  <SummaryView form={formJson} responses={responses} height="70vh" />
+                </div>
               )}
 
               {responsesSubTab === 'question' && (
-                <div className="rounded-lg border border-dashed border-gray-300 p-6 text-sm text-gray-700">
+                <div
+                  id="rs-panel-question"
+                  role="tabpanel"
+                  aria-labelledby="rs-tab-question"
+                  className="rounded-lg border border-dashed border-gray-300 p-6 text-sm text-gray-700"
+                  tabIndex={0}
+                >
                   <h2 className="text-base font-semibold text-gray-900">Question View (Coming Soon)</h2>
                   <p className="mt-1 text-gray-600">Per-question breakdown will appear here.</p>
                 </div>
               )}
 
               {responsesSubTab === 'individual' && (
-                <>
+                <div
+                  id="rs-panel-individual"
+                  role="tabpanel"
+                  aria-labelledby="rs-tab-individual"
+                  tabIndex={0}
+                >
                   {respLoading ? (
                     <section className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
                       <div className="animate-pulse space-y-3">
@@ -1100,7 +1141,7 @@ const handleAiAssistQuestion = async (fieldIndex: number) => {
                       height="70vh"
                     />
                   )}
-                </>
+                </div>
               )}
             </div>
           )}

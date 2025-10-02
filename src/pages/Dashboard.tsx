@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { listFormsForUser, type StoredForm, deleteForm } from '../services/forms';
@@ -13,6 +13,11 @@ const Dashboard: React.FC = () => {
   const [shareOpenId, setShareOpenId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  // Focus management for modals
+  const lastFocusRef = useRef<HTMLElement | null>(null);
+  const shareInitialRef = useRef<HTMLButtonElement | null>(null);
+  const deleteInitialRef = useRef<HTMLButtonElement | null>(null);
 
   const baseUrl = useMemo(() => {
     // Assumes app runs on same origin for public links
@@ -37,6 +42,21 @@ const Dashboard: React.FC = () => {
     run();
     return () => { isMounted = false; };
   }, [user]);
+
+  // When Share modal opens, focus Copy button
+  useEffect(() => {
+    if (shareOpenId) {
+      // Defer to ensure element exists in DOM
+      setTimeout(() => shareInitialRef.current?.focus(), 0);
+    }
+  }, [shareOpenId]);
+
+  // When Delete confirm opens, focus the destructive action
+  useEffect(() => {
+    if (confirmDeleteId) {
+      setTimeout(() => deleteInitialRef.current?.focus(), 0);
+    }
+  }, [confirmDeleteId]);
 
   if (initializing) {
     return (
@@ -132,9 +152,13 @@ const Dashboard: React.FC = () => {
 
                         <button
                           type="button"
-                          onClick={() => setShareOpenId((s) => (s === f.id ? null : f.id))}
+                          onClick={(e) => {
+                            lastFocusRef.current = e.currentTarget as HTMLElement;
+                            setShareOpenId((s) => (s === f.id ? null : f.id));
+                          }}
                           className="btn-brand"
                           title="Share"
+                          aria-label="Open share dialog"
                         >
                           <span className="inline-flex items-center gap-1">
                             <Share2 className="h-4 w-4" /> Share
@@ -144,7 +168,11 @@ const Dashboard: React.FC = () => {
                         <button
                           type="button"
                           title="Delete form"
-                          onClick={() => setConfirmDeleteId(f.id)}
+                          aria-label="Open delete confirmation"
+                          onClick={(e) => {
+                            lastFocusRef.current = e.currentTarget as HTMLElement;
+                            setConfirmDeleteId(f.id);
+                          }}
                           disabled={deletingId === f.id}
                           className="inline-flex items-center gap-1 rounded-md bg-white px-2.5 py-1.5 text-sm font-medium text-red-600 ring-1 ring-red-200 hover:bg-red-50 disabled:opacity-60"
                         >
@@ -154,18 +182,32 @@ const Dashboard: React.FC = () => {
                     </div>
 
                     {shareOpenId === f.id && (
-                      <div className="fixed inset-0 z-50 flex items-center justify-center">
-                        <div className="absolute inset-0 bg-black/40" onClick={() => setShareOpenId(null)} />
+                      <div
+                        className="fixed inset-0 z-50 flex items-center justify-center"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby={`share-title-${f.id}`}
+                      >
+                        <div
+                          className="absolute inset-0 bg-black/40"
+                          onClick={() => {
+                            setShareOpenId(null);
+                            setTimeout(() => lastFocusRef.current?.focus(), 0);
+                          }}
+                        />
                         <div className="relative mx-4 w-full max-w-lg rounded-lg bg-white shadow-xl ring-1 ring-gray-200">
                           <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3">
-                            <h3 className="text-base font-semibold text-gray-900 inline-flex items-center gap-2">
+                            <h3 id={`share-title-${f.id}`} className="text-base font-semibold text-gray-900 inline-flex items-center gap-2">
                               <Share2 className="h-4 w-4" /> Share form
                             </h3>
                             <button
                               type="button"
-                              onClick={() => setShareOpenId(null)}
+                              onClick={() => {
+                                setShareOpenId(null);
+                                setTimeout(() => lastFocusRef.current?.focus(), 0);
+                              }}
                               className="inline-flex h-7 w-7 items-center justify-center rounded-md hover:bg-gray-100"
-                              aria-label="Close"
+                              aria-label="Close dialog"
                             >
                               <X className="h-4 w-4" />
                             </button>
@@ -180,6 +222,7 @@ const Dashboard: React.FC = () => {
                                 className="w-full rounded-md border border-indigo-200 bg-white px-2 py-1 text-sm text-slate-800"
                               />
                               <button
+                                ref={shareInitialRef}
                                 type="button"
                                 onClick={async () => {
                                   try {
@@ -191,6 +234,7 @@ const Dashboard: React.FC = () => {
                                 }}
                                 className="btn-ghost"
                                 title="Copy link to clipboard"
+                                aria-label="Copy link to clipboard"
                               >
                                 <span className="inline-flex items-center gap-1">
                                   <Copy className="h-4 w-4" /> Copy
@@ -205,7 +249,10 @@ const Dashboard: React.FC = () => {
                           <div className="flex justify-end gap-2 border-t border-gray-200 px-5 py-3">
                             <button
                               type="button"
-                              onClick={() => setShareOpenId(null)}
+                              onClick={() => {
+                                setShareOpenId(null);
+                                setTimeout(() => lastFocusRef.current?.focus(), 0);
+                              }}
                               className="rounded-md bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-200"
                             >
                               Close
@@ -215,18 +262,32 @@ const Dashboard: React.FC = () => {
                       </div>
                     )}
                     {confirmDeleteId === f.id && (
-                      <div className="fixed inset-0 z-50 flex items-center justify-center">
-                        <div className="absolute inset-0 bg-black/40" onClick={() => setConfirmDeleteId(null)} />
+                      <div
+                        className="fixed inset-0 z-50 flex items-center justify-center"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby={`delete-title-${f.id}`}
+                      >
+                        <div
+                          className="absolute inset-0 bg-black/40"
+                          onClick={() => {
+                            setConfirmDeleteId(null);
+                            setTimeout(() => lastFocusRef.current?.focus(), 0);
+                          }}
+                        />
                         <div className="relative mx-4 w-full max-w-sm rounded-lg bg-white shadow-xl ring-1 ring-gray-200">
                           <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3">
-                            <h3 className="text-base font-semibold text-gray-900 inline-flex items-center gap-2">
+                            <h3 id={`delete-title-${f.id}`} className="text-base font-semibold text-gray-900 inline-flex items-center gap-2">
                               <Trash2 className="h-4 w-4 text-red-600" /> Delete form
                             </h3>
                             <button
                               type="button"
-                              onClick={() => setConfirmDeleteId(null)}
+                              onClick={() => {
+                                setConfirmDeleteId(null);
+                                setTimeout(() => lastFocusRef.current?.focus(), 0);
+                              }}
                               className="inline-flex h-7 w-7 items-center justify-center rounded-md hover:bg-gray-100"
-                              aria-label="Close"
+                              aria-label="Close dialog"
                             >
                               <X className="h-4 w-4" />
                             </button>
@@ -239,12 +300,16 @@ const Dashboard: React.FC = () => {
                           <div className="flex justify-end gap-2 border-t border-gray-200 px-5 py-3">
                             <button
                               type="button"
-                              onClick={() => setConfirmDeleteId(null)}
+                              onClick={() => {
+                                setConfirmDeleteId(null);
+                                setTimeout(() => lastFocusRef.current?.focus(), 0);
+                              }}
                               className="rounded-md bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-200"
                             >
                               Cancel
                             </button>
                             <button
+                              ref={deleteInitialRef}
                               type="button"
                               onClick={async () => {
                                 try {
@@ -258,10 +323,12 @@ const Dashboard: React.FC = () => {
                                 } finally {
                                   setDeletingId(null);
                                   setConfirmDeleteId(null);
+                                  setTimeout(() => lastFocusRef.current?.focus(), 0);
                                 }
                               }}
                               disabled={deletingId === f.id}
                               className="rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-60"
+                              aria-label="Confirm delete form"
                             >
                               Delete
                             </button>

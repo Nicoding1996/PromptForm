@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { toast } from 'react-hot-toast';
 
 type Props = {
@@ -8,18 +8,35 @@ type Props = {
 };
 
 const ReportModal: React.FC<Props> = ({ text, onClose, title = 'AI-Powered Summary Report' }) => {
+  const closeRef = useRef<HTMLButtonElement | null>(null);
+
+  // Move focus to close on open; restore focus to opener on unmount
+  useEffect(() => {
+    const opener = (document.activeElement as HTMLElement | null) ?? null;
+    setTimeout(() => closeRef.current?.focus(), 0);
+    return () => {
+      setTimeout(() => opener?.focus(), 0);
+    };
+  }, []);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="report-modal-title"
+    >
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
 
       <div className="relative mx-4 w-full max-w-3xl rounded-lg bg-white shadow-xl ring-1 ring-gray-200">
         <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3">
-          <h3 className="text-base font-semibold text-gray-900">{title}</h3>
+          <h3 id="report-modal-title" className="text-base font-semibold text-gray-900">{title}</h3>
           <button
+            ref={closeRef}
             type="button"
             onClick={onClose}
             className="rounded-md px-2 py-1 text-sm text-gray-600 hover:bg-gray-100"
-            aria-label="Close"
+            aria-label="Close dialog"
           >
             Close
           </button>
@@ -44,6 +61,7 @@ const ReportModal: React.FC<Props> = ({ text, onClose, title = 'AI-Powered Summa
             }}
             className="rounded-md bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-200"
             title="Copy report to clipboard"
+            aria-label="Copy report to clipboard"
           >
             Copy
           </button>
