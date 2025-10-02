@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { listFormsForUser, type StoredForm, deleteForm } from '../services/forms';
+import { listFormsForUser, type StoredForm, deleteForm, updateFormTitle } from '../services/forms';
 import LoginButton from '../components/LoginButton';
 import FormCard from '../components/dashboard/FormCard';
 import { Trash2, Share2, Copy, X } from 'lucide-react';
@@ -14,11 +14,15 @@ const Dashboard: React.FC = () => {
   const [shareOpenId, setShareOpenId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [renameOpenId, setRenameOpenId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState<string>('');
+  const [renaming, setRenaming] = useState<boolean>(false);
 
   // Focus management for modals
   const lastFocusRef = useRef<HTMLElement | null>(null);
   const shareInitialRef = useRef<HTMLButtonElement | null>(null);
   const deleteInitialRef = useRef<HTMLButtonElement | null>(null);
+  const renameInputRef = useRef<HTMLInputElement | null>(null);
 
   const baseUrl = useMemo(() => {
     // Assumes app runs on same origin for public links
@@ -74,6 +78,18 @@ const Dashboard: React.FC = () => {
       setTimeout(() => deleteInitialRef.current?.focus(), 0);
     }
   }, [confirmDeleteId]);
+
+  // When Rename opens, focus and select the input text
+  useEffect(() => {
+    if (renameOpenId) {
+      setTimeout(() => {
+        try {
+          renameInputRef.current?.focus();
+          renameInputRef.current?.select();
+        } catch {}
+      }, 0);
+    }
+  }, [renameOpenId]);
 
   if (initializing) {
     return (
@@ -154,8 +170,12 @@ const Dashboard: React.FC = () => {
                       } catch {}
                       setConfirmDeleteId(id);
                     }}
-                    onRenamed={(id, newTitle) => {
-                      setForms((rows) => rows.map((x) => (x.id === id ? { ...x, title: newTitle } : x)));
+                    onRename={(id: string, currentTitle: string) => {
+                      try {
+                        lastFocusRef.current = (document.activeElement as HTMLElement) ?? null;
+                      } catch {}
+                      setRenameOpenId(id);
+                      setRenameValue(currentTitle);
                     }}
                   />
                 ))}
@@ -240,6 +260,99 @@ const Dashboard: React.FC = () => {
                         className="rounded-md bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-200"
                       >
                         Close
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Rename modal */}
+              {renameOpenId && (
+                <div
+                  className="fixed inset-0 z-50 flex items-center justify-center"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="rename-title"
+                >
+                  <div
+                    className="absolute inset-0 bg-black/40"
+                    onClick={() => {
+                      setRenameOpenId(null);
+                      setTimeout(() => lastFocusRef.current?.focus(), 0);
+                    }}
+                  />
+                  <div className="relative mx-4 w-full max-w-md rounded-lg bg-white shadow-xl ring-1 ring-gray-200">
+                    <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3">
+                      <h3 id="rename-title" className="text-base font-semibold text-gray-900">
+                        Rename form
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRenameOpenId(null);
+                          setTimeout(() => lastFocusRef.current?.focus(), 0);
+                        }}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md hover:bg-gray-100"
+                        aria-label="Close dialog"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    <div className="px-5 py-4">
+                      <label htmlFor="rename-input" className="mb-1 block text-xs font-medium text-gray-600">
+                        Title
+                      </label>
+                      <input
+                        id="rename-input"
+                        ref={renameInputRef}
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            (document.getElementById('rename-save-btn') as HTMLButtonElement)?.click();
+                          }
+                        }}
+                        className="w-full rounded-md border border-indigo-200 bg-white px-2 py-1 text-sm text-slate-800"
+                      />
+                    </div>
+
+                    <div className="flex justify-end gap-2 border-t border-gray-200 px-5 py-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRenameOpenId(null);
+                          setTimeout(() => lastFocusRef.current?.focus(), 0);
+                        }}
+                        className="rounded-md bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-200"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        id="rename-save-btn"
+                        type="button"
+                        disabled={renaming || !renameValue.trim()}
+                        onClick={async () => {
+                          const id = renameOpenId;
+                          const title = renameValue.trim();
+                          if (!id || !title) return;
+                          try {
+                            setRenaming(true);
+                            await updateFormTitle(id, title);
+                            setForms((rows) => rows.map((x) => (x.id === id ? { ...x, title } : x)));
+                            toast.success('Form renamed');
+                          } catch {
+                            // optionally toast error
+                          } finally {
+                            setRenaming(false);
+                            setRenameOpenId(null);
+                            setTimeout(() => lastFocusRef.current?.focus(), 0);
+                          }
+                        }}
+                        className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+                      >
+                        Save
                       </button>
                     </div>
                   </div>

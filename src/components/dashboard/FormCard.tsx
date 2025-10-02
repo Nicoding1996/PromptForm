@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { updateFormTitle, type StoredForm } from '../../services/forms';
+import type { StoredForm } from '../../services/forms';
 import PublicFormRenderer from '../PublicFormRenderer';
 import { FileText, MoreVertical, Share2, Trash2, ExternalLink, TextCursorInput } from 'lucide-react';
 
@@ -8,7 +8,7 @@ type Props = {
   form: StoredForm;
   onShare: (formId: string) => void;
   onDelete: (formId: string) => void;
-  onRenamed?: (formId: string, newTitle: string) => void;
+  onRename: (formId: string, currentTitle: string) => void;
 };
 
 function formatOpened(ts?: any): string {
@@ -34,7 +34,7 @@ function formatOpened(ts?: any): string {
   }
 }
 
-const FormCard: React.FC<Props> = ({ form, onShare, onDelete, onRenamed }) => {
+const FormCard: React.FC<Props> = ({ form, onShare, onDelete, onRename }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const btnRef = useRef<HTMLButtonElement | null>(null);
@@ -160,21 +160,10 @@ const FormCard: React.FC<Props> = ({ form, onShare, onDelete, onRenamed }) => {
                   type="button"
                   role="menuitem"
                   className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-gray-50"
-                  onClick={async (e) => {
+                  onClick={(e) => {
                     e.stopPropagation();
                     setMenuOpen(false);
-                    const next = window.prompt('Rename form', form.title || 'Untitled form');
-                    if (next != null) {
-                      const title = String(next).trim();
-                      if (title && title !== form.title) {
-                        try {
-                          await updateFormTitle(form.id, title);
-                          onRenamed?.(form.id, title);
-                        } catch {
-                          // swallow; parent may toast errors if needed
-                        }
-                      }
-                    }
+                    onRename(form.id, form.title || 'Untitled form');
                   }}
                 >
                   <TextCursorInput className="h-4 w-4 text-slate-700" /> Rename
