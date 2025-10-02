@@ -16,6 +16,7 @@ import {
 } from 'recharts';
 import ReportModal from '../common/ReportModal';
 import Papa from 'papaparse';
+import { Download, FileText, Loader2 } from 'lucide-react';
 type Props = {
   form: FormData | null;
   responses: StoredResponse[];
@@ -315,7 +316,9 @@ const SummaryView: React.FC<Props> = ({ form, responses, height = '70vh' }) => {
           className="rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 disabled:opacity-60"
           title="Download all responses as a CSV file"
         >
-          Download as CSV
+          <span className="inline-flex items-center gap-1">
+            <Download className="h-4 w-4" /> CSV
+          </span>
         </button>
 
         <button
@@ -325,7 +328,15 @@ const SummaryView: React.FC<Props> = ({ form, responses, height = '70vh' }) => {
           className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
           title="Analyze responses and generate a professional Markdown report"
         >
-          {isReportLoading ? 'Generating…' : 'Generate AI Report'}
+          {isReportLoading ? (
+            <span className="inline-flex items-center gap-1">
+              <Loader2 className="h-4 w-4 animate-spin" /> Generating…
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1">
+              <FileText className="h-4 w-4" /> Generate Report
+            </span>
+          )}
         </button>
       </div>
 

@@ -1,5 +1,6 @@
 import React from 'react';
 import type { ResultPage } from '../FormRenderer';
+import { Trash2 } from 'lucide-react';
 
 type Props = {
   index: number;
@@ -35,7 +36,9 @@ const ResultCard: React.FC<Props> = ({ index, page, onChange, onDelete }) => {
           title="Delete this outcome"
           aria-label="Delete outcome"
         >
-          Delete
+          <span className="inline-flex items-center gap-1">
+            <Trash2 className="h-4 w-4" /> Delete
+          </span>
         </button>
       </div>
 

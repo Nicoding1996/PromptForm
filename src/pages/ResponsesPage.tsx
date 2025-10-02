@@ -52,22 +52,16 @@ const ResponsesPage: React.FC = () => {
 
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <main className="mx-auto max-w-5xl px-4 py-10">
+    <div className="min-h-screen bg-slate-100">
+      <main className="app-container">
         <header className="mb-6 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900">Responses</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Responses</h1>
           <div className="flex items-center gap-2">
-            <Link
-              to="/dashboard"
-              className="rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50"
-            >
+            <Link to="/dashboard" className="btn-ghost">
               Back to Dashboard
             </Link>
             {formId && (
-              <Link
-                to={`/form/${formId}`}
-                className="rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50"
-              >
+              <Link to={`/form/${formId}`} className="btn-ghost">
                 View Public Form
               </Link>
             )}
@@ -75,7 +69,7 @@ const ResponsesPage: React.FC = () => {
         </header>
 
         {loading ? (
-          <section className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
+          <section className="card p-6">
             <div className="animate-pulse space-y-3">
               <div className="h-6 w-1/3 rounded bg-gray-200" />
               <div className="h-5 w-2/3 rounded bg-gray-200" />
@@ -83,19 +77,19 @@ const ResponsesPage: React.FC = () => {
             </div>
           </section>
         ) : error ? (
-          <section className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
+          <section className="card p-6">
             <p className="text-sm text-red-700">Error: {error}</p>
           </section>
         ) : !form ? (
-          <section className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-            <p className="text-sm text-gray-700">Form not found.</p>
+          <section className="card p-6">
+            <p className="text-sm text-slate-700">Form not found.</p>
           </section>
         ) : responses.length === 0 ? (
-          <section className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-            <p className="text-sm text-gray-700">No responses yet.</p>
+          <section className="card p-6">
+            <p className="text-sm text-slate-700">No responses yet.</p>
           </section>
         ) : (
-          <section className="rounded-xl bg-white p-0 shadow-sm ring-1 ring-gray-200 overflow-hidden">
+          <section className="card p-0 overflow-hidden">
             <div className="flex h-[70vh]">
               {/* Left Sidebar: Submission list */}
               <aside className="w-64 border-r border-gray-200 overflow-y-auto">

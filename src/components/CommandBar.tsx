@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { FiPlus, FiSend, FiX } from 'react-icons/fi';
+import { Paperclip, Send, X, Loader2 } from 'lucide-react';
 
 interface CommandBarProps {
   prompt: string;
@@ -90,7 +90,7 @@ const CommandBar: React.FC<CommandBarProps> = ({
         disabled={isLoading}
         className="absolute left-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-700 shadow-sm hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        <FiPlus />
+        <Paperclip className="h-4 w-4" />
       </button>
 
       {/* Right (Send) button */}
@@ -102,7 +102,7 @@ const CommandBar: React.FC<CommandBarProps> = ({
         disabled={!canSend}
         className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-indigo-600 text-white shadow-sm hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        <FiSend />
+        {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
       </button>
 
       {/* Textarea */}
@@ -131,7 +131,7 @@ const CommandBar: React.FC<CommandBarProps> = ({
               onClick={() => onFileChange(null)}
               className="inline-flex h-5 w-5 items-center justify-center rounded-full hover:bg-gray-200"
             >
-              <FiX className="h-3.5 w-3.5" />
+              <X className="h-3.5 w-3.5" />
             </button>
           </span>
         ) : (

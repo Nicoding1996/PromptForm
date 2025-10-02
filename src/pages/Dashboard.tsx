@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { listFormsForUser, type StoredForm, deleteForm } from '../services/forms';
 import LoginButton from '../components/LoginButton';
-import { FiTrash2 } from 'react-icons/fi';
+import { Trash2, Share2, Pencil, Copy } from 'lucide-react';
 
 const Dashboard: React.FC = () => {
   const { user, initializing } = useAuth();
@@ -38,13 +38,13 @@ const Dashboard: React.FC = () => {
 
   if (initializing) {
     return (
-      <div className="min-h-screen bg-gray-100">
-        <main className="mx-auto max-w-3xl px-4 py-10">
+      <div className="min-h-screen bg-slate-100">
+        <main className="app-container">
           <header className="mb-6 flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-gray-900">My Forms</h1>
+            <h1 className="text-2xl font-bold text-slate-900">My Forms</h1>
             <LoginButton />
           </header>
-          <div className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
+          <div className="card p-6">
             <div className="animate-pulse space-y-3">
               <div className="h-6 w-1/3 rounded bg-gray-200" />
               <div className="h-5 w-1/2 rounded bg-gray-200" />
@@ -58,14 +58,14 @@ const Dashboard: React.FC = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gray-100">
-        <main className="mx-auto max-w-3xl px-4 py-10">
+      <div className="min-h-screen bg-slate-100">
+        <main className="app-container">
           <header className="mb-6 flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-gray-900">My Forms</h1>
+            <h1 className="text-2xl font-bold text-slate-900">My Forms</h1>
             <LoginButton />
           </header>
-          <div className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-            <p className="text-sm text-gray-700">
+          <div className="card p-6">
+            <p className="text-sm text-slate-700">
               You must log in to view your saved forms.
             </p>
           </div>
@@ -75,14 +75,14 @@ const Dashboard: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <main className="mx-auto max-w-3xl px-4 py-10">
+    <div className="min-h-screen bg-slate-100">
+      <main className="app-container">
         <header className="mb-6 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900">My Forms</h1>
+          <h1 className="text-2xl font-bold text-slate-900">My Forms</h1>
           <div className="flex items-center gap-3">
             <Link
               to="/"
-              className="rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50"
+              className="btn-ghost"
             >
               Home
             </Link>
@@ -90,7 +90,7 @@ const Dashboard: React.FC = () => {
           </div>
         </header>
 
-        <section className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
+        <section className="card p-6">
           {loading ? (
             <div className="animate-pulse space-y-3">
               <div className="h-5 w-1/2 rounded bg-gray-200" />
@@ -98,7 +98,7 @@ const Dashboard: React.FC = () => {
               <div className="h-5 w-1/3 rounded bg-gray-200" />
             </div>
           ) : forms.length === 0 ? (
-            <p className="text-sm text-gray-700">No forms saved yet.</p>
+            <p className="text-sm text-slate-700">No forms saved yet.</p>
           ) : (
             <ul className="divide-y divide-gray-100">
               {forms.map((f) => {
@@ -107,11 +107,11 @@ const Dashboard: React.FC = () => {
                   <li key={f.id} className="py-4">
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <div className="font-medium text-gray-900">{f.title || 'Untitled form'}</div>
+                        <div className="font-medium text-slate-900">{f.title || 'Untitled form'}</div>
                         {f.description && (
-                          <div className="text-sm text-gray-600">{f.description}</div>
+                          <div className="text-sm text-slate-600">{f.description}</div>
                         )}
-                        <div className="mt-1 text-xs text-gray-500">
+                        <div className="mt-1 text-xs text-slate-500">
                           {f.createdAt?.toDate
                             ? `Created ${f.createdAt.toDate().toLocaleString()}`
                             : null}
@@ -120,19 +120,23 @@ const Dashboard: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <Link
                           to={`/form/${f.id}/edit`}
-                          className="rounded-md bg-white px-2.5 py-1.5 text-sm font-medium text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50"
+                          className="btn-ghost"
                           title="Edit form"
                         >
-                          Edit Form
+                          <span className="inline-flex items-center gap-1">
+                            <Pencil className="h-4 w-4" /> Edit
+                          </span>
                         </Link>
 
                         <button
                           type="button"
                           onClick={() => setShareOpenId((s) => (s === f.id ? null : f.id))}
-                          className="rounded-md bg-indigo-600 px-2.5 py-1.5 text-sm font-medium text-white hover:bg-indigo-500"
+                          className="btn-brand"
                           title="Share"
                         >
-                          Share
+                          <span className="inline-flex items-center gap-1">
+                            <Share2 className="h-4 w-4" /> Share
+                          </span>
                         </button>
 
                         <button
@@ -153,7 +157,7 @@ const Dashboard: React.FC = () => {
                           disabled={deletingId === f.id}
                           className="inline-flex items-center gap-1 rounded-md bg-white px-2.5 py-1.5 text-sm font-medium text-red-600 ring-1 ring-red-200 hover:bg-red-50 disabled:opacity-60"
                         >
-                          <FiTrash2 /> Delete
+                          <Trash2 className="h-4 w-4" /> Delete
                         </button>
                       </div>
                     </div>
@@ -164,23 +168,23 @@ const Dashboard: React.FC = () => {
                           <input
                             readOnly
                             value={url}
-                            className="w-full rounded-md border border-indigo-200 bg-white px-2 py-1 text-sm text-gray-800"
+                            className="w-full rounded-md border border-indigo-200 bg-white px-2 py-1 text-sm text-slate-800"
                           />
                           <button
                             type="button"
                             onClick={async () => {
                               try {
                                 await navigator.clipboard.writeText(url);
-                                // basic feedback
                                 alert('Link copied to clipboard');
                               } catch {
-                                // fallback
                                 prompt('Copy this link:', url);
                               }
                             }}
-                            className="rounded-md bg-white px-2 py-1 text-sm font-medium text-gray-700 ring-1 ring-indigo-200 hover:bg-gray-50"
+                            className="btn-ghost"
                           >
-                            Copy
+                            <span className="inline-flex items-center gap-1">
+                              <Copy className="h-4 w-4" /> Copy
+                            </span>
                           </button>
                         </div>
                         <div className="mt-1 text-xs text-indigo-700">

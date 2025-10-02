@@ -9,6 +9,7 @@ import LoginButton from '../components/LoginButton';
 import { getFormById, saveFormForUser, listResponsesForForm, type StoredResponse } from '../services/forms';
 import IndividualResponsesView from '../components/responses/IndividualResponsesView';
 import SummaryView from '../components/responses/SummaryView';
+import { Save, ExternalLink, LayoutDashboard, Loader2 } from 'lucide-react';
 
 /**
  * Unified tab-based editor similar to MS/Google Forms.
@@ -801,13 +802,13 @@ const handleAiAssistQuestion = async (fieldIndex: number) => {
 
   // UI rendering
   return (
-    <div className="min-h-screen bg-gray-100">
-      <main className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8">
+    <div className="min-h-screen bg-slate-100">
+      <main className="app-container flex flex-col gap-6">
         {/* Header with title and actions */}
         <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-gray-900">Form Editor</h1>
-            <p className="mt-1 text-sm text-gray-600">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Form Editor</h1>
+            <p className="mt-1 text-sm text-slate-600">
               Build your form and manage responses in one place.
             </p>
           </div>
@@ -818,31 +819,42 @@ const handleAiAssistQuestion = async (fieldIndex: number) => {
                 type="button"
                 onClick={handleSaveForm}
                 disabled={saving || !!lastSavedId}
-                className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+                className="btn-brand"
                 title="Save this form"
               >
-                {lastSavedId ? '✓ Saved!' : saving ? 'Saving...' : 'Save Form'}
+                {lastSavedId ? (
+                  '✓ Saved!'
+                ) : (
+                  <span className="inline-flex items-center gap-1">
+                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    <span>{saving ? 'Saving...' : 'Save'}</span>
+                  </span>
+                )}
               </button>
             )}
 
             {lastSavedId && (
               <Link
                 to={`/form/${lastSavedId}`}
-                className="rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50"
+                className="btn-ghost"
                 title="Open the public link for this form"
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                View link
+                <span className="inline-flex items-center gap-1">
+                  <ExternalLink className="h-4 w-4" /> View
+                </span>
               </Link>
             )}
 
             <Link
               to="/dashboard"
-              className="rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50"
+              className="btn-ghost"
               title="Back to My Forms"
             >
-              Dashboard
+              <span className="inline-flex items-center gap-1">
+                <LayoutDashboard className="h-4 w-4" /> Dashboard
+              </span>
             </Link>
 
             <LoginButton />
@@ -854,7 +866,7 @@ const handleAiAssistQuestion = async (fieldIndex: number) => {
         )}
 
         {/* Tabs */}
-        <div className="rounded-lg bg-white p-2 ring-1 ring-gray-200">
+        <div className="card p-2">
           <div className="mb-4 flex items-center gap-2">
             <button
               type="button"
@@ -958,11 +970,8 @@ const handleAiAssistQuestion = async (fieldIndex: number) => {
 
               {/* Loading placeholder / generated form */}
               {isLoading ? (
-                <section
-                  aria-label="Loading form"
-                  className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200"
-                >
-                  <div className="animate-pulse space-y-4">
+                <section aria-label="Loading form" className="card">
+                  <div className="card-body animate-pulse space-y-4">
                     <div className="h-6 w-1/3 rounded bg-gray-200" />
                     <div className="h-10 w-full rounded bg-gray-200" />
                     <div className="h-24 w-full rounded bg-gray-200" />
@@ -1009,7 +1018,7 @@ const handleAiAssistQuestion = async (fieldIndex: number) => {
               )}
             </div>
           ) : (
-            <div className="rounded-lg p-4 ring-1 ring-gray-200">
+            <div className="card p-4">
               {/* Sub-tabs: Summary | Question | Individual */}
               <div className="mb-4 flex items-center gap-2">
                 <button

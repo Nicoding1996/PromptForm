@@ -1,2 +1,65 @@
 @import "tailwindcss";
+
+/* Tailwind v4 CSS theme variables for custom tokens */
+@theme {
+  /* Typography */
+  --font-sans: Inter, ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+
+  /* Brand color scale */
+  --color-brand-50:  #EEF2FF;
+  --color-brand-100: #E0E7FF;
+  --color-brand-200: #C7D2FE;
+  --color-brand-300: #A5B4FC;
+  --color-brand-400: #818CF8;
+  --color-brand-500: #6366F1;
+  --color-brand-600: #4F46E5; /* primary */
+  --color-brand-700: #4338CA;
+  --color-brand-800: #3730A3;
+  --color-brand-900: #312E81;
+  --color-brand:     #4F46E5;
+
+  /* Container max width to mirror JS config (optional) */
+  --container-2xl: 1280px;
+}
+
+/* Visual Foundation: Global base styles */
+@layer base {
+  html {
+    /* Use CSS theme var so it works without JS config resolution */
+    font-family: var(--font-sans);
+  }
+  body {
+    @apply bg-slate-100 text-slate-800 antialiased;
+  }
+
+  /* Improve default headings rhythm */
+  h1 { @apply font-bold tracking-tight text-slate-900; }
+  h2 { @apply font-semibold text-slate-900; }
+  h3, h4 { @apply font-semibold text-slate-900; }
+}
+
+/* Components: shared layout + card primitives */
+@layer components {
+  /* Centered, responsive page container */
+  .app-container {
+    @apply container mx-auto px-4 sm:px-6 lg:px-8 py-6;
+  }
+  /* Clean card surface used across the app */
+  .card {
+    @apply rounded-xl bg-white shadow-sm ring-1 ring-gray-200;
+  }
+  .card-body {
+    @apply p-4 sm:p-6;
+  }
+  /* Brand button variants */
+  .btn-brand {
+    /* Use stable Tailwind default colors to avoid config/variable issues */
+    @apply inline-flex items-center justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center rounded-md bg-white px-3 py-1.5 text-sm font-medium text-slate-700 ring-1 ring-gray-200 transition-colors hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed;
+  }
+}
+
+/* Utilities */
 html, body, #root { height: 100%; }

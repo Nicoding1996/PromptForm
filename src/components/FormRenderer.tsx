@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { DndContext, useDraggable, useDroppable, type DragEndEvent } from '@dnd-kit/core';
-import { FiTrash2, FiCopy, FiCheckCircle, FiZap } from 'react-icons/fi';
-import { AiOutlineLoading3Quarters } from 'react-icons/ai';
-import { RxDragHandleDots2 } from 'react-icons/rx';
+import { Trash2, Copy, CheckCircle2, Zap, Loader2, GripVertical, PlusCircle, Heading2 } from 'lucide-react';
+
+
 
 export interface FormField {
   label: string;
@@ -315,7 +315,7 @@ const AdvancedEditor: React.FC<{
           onClick={() => !isAssisting && onAiAssistQuestion?.(index)}
           className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-white text-indigo-700 ring-1 ring-indigo-200 hover:bg-indigo-50 disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          {isAssisting ? <AiOutlineLoading3Quarters className="animate-spin" /> : <FiZap />}
+          {isAssisting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
         </button>
       </div>
 
@@ -341,7 +341,7 @@ const AdvancedEditor: React.FC<{
           title="Duplicate question"
           aria-label="Duplicate question"
         >
-          <FiCopy /> Duplicate
+          <Copy className="h-4 w-4" /> Duplicate
         </button>
 
         {field.type !== 'section' && (
@@ -383,7 +383,7 @@ const AdvancedEditor: React.FC<{
                       (isCorrect ? 'text-green-700 ring-green-300 bg-green-100' : 'text-gray-500 ring-gray-200 hover:bg-gray-50')
                     }
                   >
-                    <FiCheckCircle />
+                    <CheckCircle2 className="h-4 w-4" />
                   </button>
                 )}
                 <button
@@ -393,7 +393,7 @@ const AdvancedEditor: React.FC<{
                   onClick={() => onRemoveFieldOption(index, optIdx)}
                   className="inline-flex h-7 w-7 items-center justify-center rounded-md text-red-600 hover:bg-red-50 ring-1 ring-red-200"
                 >
-                  <FiTrash2 />
+                  <Trash2 className="h-4 w-4" />
                 </button>
               </div>
             );
@@ -494,7 +494,7 @@ const AdvancedEditor: React.FC<{
                       onClick={() => onRemoveGridColumn(index, cIdx)}
                       className="inline-flex h-7 w-7 items-center justify-center rounded-md text-red-600 hover:bg-red-50 ring-1 ring-red-200"
                     >
-                      <FiTrash2 />
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
                 );
@@ -526,7 +526,7 @@ const AdvancedEditor: React.FC<{
                     onClick={() => onRemoveGridRow(index, rIdx)}
                     className="inline-flex h-7 w-7 items-center justify-center rounded-md text-red-600 hover:bg-red-50 ring-1 ring-red-200"
                   >
-                    <FiTrash2 />
+                    <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
               ))}
@@ -976,7 +976,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                     className="inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100"
                     {...attrs}
                   >
-                    <RxDragHandleDots2 className="h-5 w-5" />
+                    <GripVertical className="h-5 w-5" />
                   </button>
                 )}
               >
@@ -988,7 +988,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                   onClick={() => onDeleteField(idx)}
                   className="absolute -right-3 top-3 hidden h-7 w-7 items-center justify-center rounded-md bg-white text-red-600 shadow ring-1 ring-red-200 hover:bg-red-50 group-hover:flex"
                 >
-                  <FiTrash2 />
+                  <Trash2 className="h-4 w-4" />
                 </button>
 
                 {rendered}
@@ -1005,7 +1005,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
           onClick={onAddField}
           className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-medium text-indigo-700 ring-1 ring-indigo-200 transition hover:bg-indigo-50"
         >
-          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-indigo-100 text-indigo-700">+</span>
+          <PlusCircle className="h-5 w-5" />
           Add Question
         </button>
         <button
@@ -1014,7 +1014,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
           className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-medium text-violet-700 ring-1 ring-violet-200 transition hover:bg-violet-50"
           title="Insert a new section heading"
         >
-          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-violet-100 text-violet-700">#</span>
+          <Heading2 className="h-5 w-5" />
           Add Section
         </button>
       </div>

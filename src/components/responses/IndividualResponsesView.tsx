@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import type { FormData, FormField } from '../FormRenderer';
 import type { StoredResponse } from '../../services/forms';
-import { FiDownload } from 'react-icons/fi';
+import { Download, Loader2 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import GridResponseDisplay from './GridResponseDisplay';
 
@@ -220,7 +220,11 @@ const IndividualResponsesView: React.FC<Props> = ({ form, responses, columns = [
               className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
               title="Download this submission as a PDF"
             >
-              {exportingPdf ? 'Downloading…' : (<><FiDownload /> Download PDF</>)}
+              {exportingPdf ? (
+                <><Loader2 className="h-4 w-4 animate-spin" /> Downloading…</>
+              ) : (
+                <><Download className="h-4 w-4" /> Download PDF</>
+              )}
             </button>
           </div>
 

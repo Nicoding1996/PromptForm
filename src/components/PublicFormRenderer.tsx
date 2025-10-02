@@ -2,8 +2,8 @@ import React, { useMemo, useRef, useState } from 'react';
 import type { FormData, FormField } from './FormRenderer';
 
 const baseInputClass =
-  'block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500';
-const baseLabelClass = 'text-sm font-medium text-gray-700';
+  'block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-[--color-brand-600] focus:outline-none focus:ring-2 focus:ring-[--color-brand-600]';
+const baseLabelClass = 'text-sm font-medium text-slate-700';
 
 // Helpers for deterministic grading of text and choice answers
 const normalize = (v: any) => String(v ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -437,7 +437,7 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId }) => {
             max={max}
             defaultValue={def}
             required={required}
-            className="h-2 w-full appearance-none rounded-lg bg-gray-200 accent-indigo-600"
+            className="h-2 w-full appearance-none rounded-lg bg-slate-200 accent-[--color-brand-600]"
             ariaLabelledBy={labelId}
           />
         </div>
@@ -662,7 +662,7 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId }) => {
 
     if (matched) {
       return (
-        <section className="mt-8 rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
+        <section className="mt-8 card p-6">
           <div className="mx-auto max-w-2xl space-y-3 text-center">
             <h2 className="text-xl font-bold text-gray-900">{matched.title || 'Your Result'}</h2>
             <p className="text-sm text-gray-500">
@@ -676,7 +676,7 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId }) => {
     }
 
     return (
-      <section className="mt-8 rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
+      <section className="mt-8 card p-6">
         <div className="text-center">
           <h2 className="text-lg font-semibold text-gray-900">Thank you for your response!</h2>
           {(formData as any)?.isQuiz === true && lastScore != null && lastMaxScore != null ? (
@@ -693,7 +693,7 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId }) => {
 
   // Wizard UI
   return (
-    <section className="mt-8 rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
+    <section className="mt-8 card p-6">
       <div className="mb-6">
         <h2 className="block text-xl font-semibold text-gray-900">{formData.title}</h2>
         {formData.description && <p className="mt-1 text-sm text-gray-600">{formData.description}</p>}
