@@ -1,4 +1,5 @@
 import React from 'react';
+import { toast } from 'react-hot-toast';
 
 type Props = {
   text: string;
@@ -33,7 +34,14 @@ const ReportModal: React.FC<Props> = ({ text, onClose, title = 'AI-Powered Summa
         <div className="flex justify-end gap-2 border-t border-gray-200 px-5 py-3">
           <button
             type="button"
-            onClick={() => navigator.clipboard.writeText(text).catch(() => {})}
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(text);
+                toast.success('Report copied to clipboard!');
+              } catch {
+                toast.error('Copy failed. Please try again.');
+              }
+            }}
             className="rounded-md bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-200"
             title="Copy report to clipboard"
           >

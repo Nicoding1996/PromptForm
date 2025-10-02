@@ -7,6 +7,7 @@ import LoginButton from './components/LoginButton';
 import { Link } from 'react-router-dom';
 import { saveFormForUser } from './services/forms';
 import { Save, ExternalLink, LayoutDashboard, Loader2 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
 const App: React.FC = () => {
   const [promptText, setPromptText] = useState<string>('');
@@ -570,8 +571,11 @@ const App: React.FC = () => {
     try {
       const id = await saveFormForUser(user.uid, formJson as FormData);
       setLastSavedId(id);
+      toast.success('Form saved successfully!');
     } catch (e: any) {
-      setSaveError(e?.message || 'Failed to save form.');
+      const msg = e?.message || 'Failed to save form.';
+      setSaveError(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }

@@ -10,6 +10,7 @@ import { getFormById, saveFormForUser, listResponsesForForm, type StoredResponse
 import IndividualResponsesView from '../components/responses/IndividualResponsesView';
 import SummaryView from '../components/responses/SummaryView';
 import { Save, ExternalLink, LayoutDashboard, Loader2 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
 /**
  * Unified tab-based editor similar to MS/Google Forms.
@@ -793,8 +794,11 @@ const handleAiAssistQuestion = async (fieldIndex: number) => {
     try {
       const id = await saveFormForUser(user.uid, formJson as FormData, formId);
       setLastSavedId(id);
+      toast.success('Form saved successfully!');
     } catch (e: any) {
-      setSaveError(e?.message || 'Failed to save form.');
+      const msg = e?.message || 'Failed to save form.';
+      setSaveError(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }

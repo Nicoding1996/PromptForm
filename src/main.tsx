@@ -7,7 +7,7 @@ import App from './App.tsx'
 import Dashboard from './pages/Dashboard.tsx'
 import PublicFormPage from './pages/PublicFormPage.tsx'
 import FormEditorPage from './pages/FormEditorPage.tsx'
-
+import { Toaster } from 'react-hot-toast'
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AuthProvider>
@@ -19,6 +19,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="/form/:formId/edit" element={<FormEditorPage />} />
         </Routes>
       </BrowserRouter>
+      <Toaster position="top-right" />
     </AuthProvider>
   </StrictMode>,
 )
