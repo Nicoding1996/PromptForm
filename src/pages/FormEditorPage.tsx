@@ -89,6 +89,17 @@ const FormEditorPage: React.FC = () => {
     };
   }, [formId, activeTab]);
 
+  // Click outside to unfocus
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (target.closest('[data-adv-editor="true"]')) return;
+      setFocusedFieldIndex(null);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   // Derive columns from form fields (excluding submit)
   const responseColumns = useMemo(() => {
     if (!formJson) return [];
