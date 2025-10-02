@@ -25,7 +25,8 @@ const LiveRange: React.FC<{
   defaultValue: number;
   required?: boolean;
   className?: string;
-}> = ({ id, name, min, max, defaultValue, required, className }) => {
+  ariaLabelledBy?: string;
+}> = ({ id, name, min, max, defaultValue, required, className, ariaLabelledBy }) => {
   const [value, setValue] = useState<number>(defaultValue);
   return (
     <div className="flex items-center gap-4">
@@ -40,6 +41,7 @@ const LiveRange: React.FC<{
         onChange={(e) => setValue(Number(e.target.value))}
         onInput={(e) => setValue(Number((e.target as HTMLInputElement).value))}
         className={className}
+        aria-labelledby={ariaLabelledBy}
       />
       <output className="min-w-[40px] text-center text-sm font-semibold text-gray-700">{value}</output>
     </div>
@@ -52,10 +54,15 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId }) => {
   const [lastScore, setLastScore] = useState<number | null>(null);
   const [lastMaxScore, setLastMaxScore] = useState<number | null>(null);
 
+  // Guard window to prevent accidental submit when navigating to last section
+  const [navBlockUntil, setNavBlockUntil] = useState<number>(0);
+  const [navBlockActive, setNavBlockActive] = useState<boolean>(false);
+
   // Wizard state
   const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
   const [allAnswers, setAllAnswers] = useState<Record<string, any>>({});
   const formRef = useRef<HTMLFormElement>(null);
+  const submitBtnRef = useRef<HTMLButtonElement>(null);
 
   const actionBase = useMemo(() => {
     return (import.meta as any)?.env?.VITE_API_BASE || 'http://localhost:3001';
@@ -162,12 +169,35 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId }) => {
     return payload;
   };
 
-  const handleNext = () => {
+  const handleNext = (e?: React.MouseEvent<HTMLButtonElement>) => {
     setError(null);
+
+    // If triggered by a click, prevent the click from re-targeting after re-render
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      try {
+        (e.currentTarget as HTMLButtonElement)?.blur();
+      } catch {}
+    }
+
     if (!formRef.current?.reportValidity()) return;
+
+    // Read answers before changing section
     const pagePayload = collectCurrentSectionAnswers();
     setAllAnswers((prev) => mergePayload(prev, pagePayload));
-    setCurrentSectionIndex((i) => Math.min(i + 1, totalSections - 1));
+
+    // Start a short guard window to ignore any accidental submit that may
+    // occur immediately after this navigation due to click retargeting
+    setNavBlockUntil(Date.now() + 800);
+    setNavBlockActive(true);
+    setTimeout(() => setNavBlockActive(false), 850);
+
+    // Defer the section change to the next tick so the original click
+    // cannot land on the newly rendered submit button
+    setTimeout(() => {
+      setCurrentSectionIndex((i) => Math.min(i + 1, totalSections - 1));
+    }, 0);
   };
 
   const handlePrev = () => {
@@ -175,8 +205,48 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId }) => {
     setCurrentSectionIndex((i) => Math.max(i - 1, 0));
   };
 
+  // Intercept Enter on non-final pages to prevent implicit submit
+  const onFormKeyDown: React.KeyboardEventHandler<HTMLFormElement> = (e) => {
+    if (e.key !== 'Enter' || e.shiftKey) return;
+    const target = e.target as HTMLElement | null;
+    const tag = target?.tagName?.toLowerCase();
+    const type = (target as HTMLInputElement)?.type?.toLowerCase?.();
+    const isLast = currentSectionIndex >= totalSections - 1;
+
+    // Allow Enter inside textarea for newlines; only advance when not last
+    if (!isLast && tag !== 'textarea' && type !== 'submit') {
+      e.preventDefault();
+      handleNext();
+    }
+  };
+
+
   const onSubmit: React.FormEventHandler<HTMLFormElement> = async (e) => {
     e.preventDefault();
+
+    const nativeEv = e.nativeEvent as SubmitEvent;
+    const submitter = (nativeEv && (nativeEv as any).submitter) as HTMLElement | null;
+    const isLast = currentSectionIndex >= totalSections - 1;
+
+    // If not on the final section, any submit should act as Next (prevent real submit)
+    if (!isLast) {
+      handleNext();
+      return;
+    }
+
+    // On the last section: require an explicit click on our own submit button.
+    // This avoids retargeted clicks or implicit submits (e.g., Enter on a field).
+    if (submitBtnRef.current && submitter && submitter !== submitBtnRef.current) {
+      // Ignore implicit/retargeted submit
+      return;
+    }
+
+    // Also guard right after navigation or while guard is active
+    if (navBlockActive || Date.now() < navBlockUntil) {
+      e.stopPropagation();
+      return;
+    }
+
     setError(null);
     if (!formRef.current?.reportValidity()) return;
     setSubmitting(true);
@@ -317,11 +387,12 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId }) => {
 
   const renderField = (field: FormField, idx: number) => {
     const required = (field as any).required === true;
+    const labelId = `${field.name}-label`;
     const labelNode = (
-      <label className={baseLabelClass} htmlFor={field.name}>
+      <span id={labelId} className={baseLabelClass}>
         {field.label}
         {required ? <span className="ml-1 text-red-600">*</span> : null}
-      </label>
+      </span>
     );
 
     // Simple inputs
@@ -344,6 +415,7 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId }) => {
             className={baseInputClass}
             required={required}
             defaultValue={field.type === 'file' ? undefined : defaultVal}
+            aria-labelledby={labelId}
           />
         </div>
       );
@@ -366,6 +438,7 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId }) => {
             defaultValue={def}
             required={required}
             className="h-2 w-full appearance-none rounded-lg bg-gray-200 accent-indigo-600"
+            ariaLabelledBy={labelId}
           />
         </div>
       );
@@ -383,6 +456,7 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId }) => {
             className={baseInputClass}
             required={required}
             defaultValue={defaultVal}
+            aria-labelledby={labelId}
           />
         </div>
       );
@@ -481,6 +555,7 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId }) => {
             className={baseInputClass}
             defaultValue={saved || ''}
             required={required}
+            aria-labelledby={labelId}
           >
             <option value="" disabled>
               Select an option
@@ -637,7 +712,7 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId }) => {
         </p>
       </div>
 
-      <form ref={formRef} onSubmit={onSubmit} className="space-y-4">
+      <form ref={formRef} onSubmit={onSubmit} onKeyDown={onFormKeyDown} className="space-y-4">
         {(currentSection?.fields ?? []).map((f, idx) => renderField(f, idx))}
 
         <div className="mt-6 flex items-center justify-between gap-2">
@@ -653,15 +728,17 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId }) => {
           {currentSectionIndex < totalSections - 1 ? (
             <button
               type="button"
-              onClick={handleNext}
+              onClick={(e) => handleNext(e)}
               className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
             >
               Next
             </button>
           ) : (
             <button
+              ref={submitBtnRef}
               type="submit"
-              disabled={submitting}
+              disabled={submitting || navBlockActive}
+              style={{ pointerEvents: navBlockActive ? 'none' as const : undefined }}
               className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-500 focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {submitting ? 'Submitting...' : submitLabel}

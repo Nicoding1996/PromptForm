@@ -1,6 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import type { FormData, FormField } from '../FormRenderer';
 import type { StoredResponse } from '../../services/forms';
+import { FiDownload } from 'react-icons/fi';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 
 export type Column = { key: string; label: string; field: FormField };
 
@@ -14,6 +17,7 @@ type Props = {
 
 const IndividualResponsesView: React.FC<Props> = ({ form, responses, columns = [], height = '70vh' }) => {
   const [selectedResponseIndex, setSelectedResponseIndex] = useState(0);
+  const contentRef = useRef<HTMLDivElement | null>(null);
 
   const orderedColumns: Column[] = useMemo(() => {
     // Highest priority: caller-provided columns
@@ -42,6 +46,47 @@ const IndividualResponsesView: React.FC<Props> = ({ form, responses, columns = [
       </div>
     );
   }
+
+  const handleExportPdf = async () => {
+    try {
+      const node = contentRef.current;
+      if (!node) return;
+      // Render the content at higher scale for crisper PDFs
+      const canvas = await html2canvas(node, {
+        scale: 2,
+        useCORS: true,
+        windowWidth: node.scrollWidth,
+      });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      const imgWidth = pageWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
+      heightLeft -= pageHeight;
+
+      while (heightLeft > 0) {
+        position = position - pageHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
+        heightLeft -= pageHeight;
+      }
+
+      const idx = selectedResponseIndex + 1;
+      const ts = responses[selectedResponseIndex]?.createdAt?.toDate?.() as Date | undefined;
+      const tsStr = ts ? ts.toISOString().slice(0, 19).replace(/[:T]/g, '-') : 'unknown';
+      const base = (form?.title || 'form').toLowerCase().replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '');
+      pdf.save(`${base || 'form'}-submission-${idx}-${tsStr}.pdf`);
+    } catch {
+      // swallow errors to avoid breaking UX
+    }
+  };
 
   return (
     <section className="rounded-xl bg-white p-0 shadow-sm ring-1 ring-gray-200 overflow-hidden">
@@ -74,6 +119,18 @@ const IndividualResponsesView: React.FC<Props> = ({ form, responses, columns = [
 
         {/* Main Content: Selected response details */}
         <main className="flex-1 overflow-y-auto p-6">
+          {/* Toolbar */}
+          <div className="mb-3 flex items-center justify-end">
+            <button
+              type="button"
+              onClick={handleExportPdf}
+              className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50"
+              title="Download this submission as a PDF"
+            >
+              <FiDownload /> Download PDF
+            </button>
+          </div>
+
           {(() => {
             const r = responses[selectedResponseIndex];
             if (!r) {
@@ -97,7 +154,7 @@ const IndividualResponsesView: React.FC<Props> = ({ form, responses, columns = [
                 : String(v ?? '');
 
             return (
-              <div className="space-y-4">
+              <div ref={contentRef} className="space-y-4">
                 <div className="mb-2">
                   <div className="text-sm text-gray-500">
                     {r.createdAt?.toDate ? r.createdAt.toDate().toLocaleString() : ''}

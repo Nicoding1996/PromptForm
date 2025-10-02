@@ -15,6 +15,7 @@ import {
   CartesianGrid,
 } from 'recharts';
 import ReportModal from '../common/ReportModal';
+import Papa from 'papaparse';
 type Props = {
   form: FormData | null;
   responses: StoredResponse[];
@@ -191,9 +192,132 @@ const SummaryView: React.FC<Props> = ({ form, responses, height = '70vh' }) => {
     }
   };
 
+  // Download all responses as CSV using schema-on-read (unified headers)
+  const handleExportCsv = () => {
+    if (!form || !responses || responses.length === 0) return;
+
+    const fields = (form.fields ?? []).filter((f) => f.type !== 'submit');
+
+    type ColDesc = {
+      header: string;
+      extractor: (r: StoredResponse) => string | number | null;
+    };
+
+    const cols: ColDesc[] = [];
+
+    // Helper for radioGrid to map column index -> label
+    const gridLabelForCol = (field: FormField, idx: number): string => {
+      const c: any = (field as any).columns?.[idx];
+      if (typeof c === 'string') return c;
+      return String(c?.label ?? idx);
+      };
+
+    for (const f of fields) {
+      // radioGrid expands into multiple columns (one per row)
+      if (f.type === 'radioGrid') {
+        const rows = f.rows ?? [];
+        for (let rIdx = 0; rIdx < rows.length; rIdx++) {
+          const rowLabel = rows[rIdx] ?? `Row ${rIdx + 1}`;
+          const header = `${f.label} - ${rowLabel}`;
+          const bracketKey = `${f.name}[${rIdx}]`;
+          const dotKey = `${f.name}.${rowLabel}`;
+          cols.push({
+            header,
+            extractor: (resp) => {
+              // New nested: payload[fieldName][rowLabel] = "Column Label"
+              const nested = (resp.payload?.[f.name] as any) ?? null;
+              if (nested && typeof nested === 'object' && nested[rowLabel] != null) {
+                return String(nested[rowLabel]);
+              }
+              // New flattened dot key
+              if (resp.payload && Object.prototype.hasOwnProperty.call(resp.payload, dotKey)) {
+                return String(resp.payload[dotKey]);
+              }
+              // Legacy: bracket key may be a column index
+              const raw = resp.payload?.[bracketKey];
+              if (raw != null) {
+                const n = Number(raw);
+                if (Number.isFinite(n)) {
+                  return gridLabelForCol(f, n);
+                }
+                return String(raw);
+              }
+              return '';
+            },
+          });
+        }
+        continue;
+      }
+
+      // checkbox joins multiple values into CSV-friendly string
+      if (f.type === 'checkbox') {
+        cols.push({
+          header: f.label,
+          extractor: (resp) => {
+            const v = resp.payload?.[f.name];
+            if (Array.isArray(v)) return v.join(', ');
+            if (v != null) return String(v);
+            return '';
+          },
+        });
+        continue;
+      }
+
+      // default: single value
+      cols.push({
+        header: f.label,
+        extractor: (resp) => {
+          const v = resp.payload?.[f.name];
+          if (v == null) return '';
+          if (Array.isArray(v)) return v.join(', ');
+          if (typeof v === 'object') return JSON.stringify(v);
+          return String(v);
+        },
+      });
+    }
+
+    // Optional: submission timestamp column at the end
+    cols.push({
+      header: 'Submitted At',
+      extractor: (resp) => (resp.createdAt?.toDate ? resp.createdAt.toDate().toISOString() : ''),
+    });
+
+    // Build CSV rows with unified headers
+    const rows = responses.map((r) => {
+      const out: Record<string, string | number> = {};
+      for (const c of cols) {
+        const val = c.extractor(r);
+        out[c.header] = (val == null ? '' : (val as any)) as string | number;
+      }
+      return out;
+    });
+
+    const csv = Papa.unparse(rows);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const base = (form.title || 'form').toLowerCase().replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '');
+    a.download = `${base || 'form'}-responses.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <section className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-200 overflow-auto" style={{ maxHeight: height }}>
-      <div className="mb-4 flex items-center justify-end">
+      <div className="mb-4 flex items-center justify-between">
+        <button
+          type="button"
+          onClick={handleExportCsv}
+          disabled={!form || responses.length === 0}
+          className="rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 disabled:opacity-60"
+          title="Download all responses as a CSV file"
+        >
+          Download as CSV
+        </button>
+
         <button
           type="button"
           onClick={handleGenerateReport}
