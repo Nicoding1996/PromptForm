@@ -91,6 +91,14 @@ export async function listResponsesForForm(formId: string): Promise<StoredRespon
   });
 }
 
+/**
+ * Update only the form title (used for quick rename from dashboard).
+ */
+export async function updateFormTitle(id: string, title: string): Promise<void> {
+  const ref = doc(db, FORMS_COL, id);
+  await updateDoc(ref, { title, updatedAt: serverTimestamp() });
+}
+
 export async function deleteForm(id: string): Promise<void> {
   // Perform delete on the client with the current authenticated user so Firestore rules apply:
   // allow delete: if request.auth != null && get(...forms/$(formId)).data.userId == request.auth.uid;
