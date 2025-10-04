@@ -58,30 +58,30 @@ interface FormRendererProps {
   onAddSection?: () => void;
   onAiAssistQuestion?: (index: number) => void;
   assistingIndex?: number | null;
-
+  
   // Form-level edits
   onUpdateFormTitle: (newTitle: string) => void;
   onUpdateFormDescription: (newDescription: string) => void;
-
+  
   // Implicit edit mode focus
   focusedFieldIndex: number | null;
   setFocusedFieldIndex: (index: number | null) => void;
-
+  
   // Advanced editor handlers
   onUpdateFieldOption: (fieldIndex: number, optionIndex: number, newText: string) => void;
   onAddFieldOption: (fieldIndex: number) => void;
   onChangeFieldType: (fieldIndex: number, newType: FormField['type']) => void;
   onDuplicateField: (fieldIndex: number) => void;
   onToggleRequiredField: (fieldIndex: number) => void;
-
+  
   // Quiz mode and related handlers
   quizMode?: boolean;
   onUpdateFieldCorrectAnswer?: (fieldIndex: number, value: string) => void;
   onUpdateFieldPoints?: (fieldIndex: number, points: number) => void;
-
+  
   // Remove handlers
   onRemoveFieldOption: (fieldIndex: number, optionIndex: number) => void;
-
+  
   // Grid editing
   onUpdateGridRow: (fieldIndex: number, rowIndex: number, newText: string) => void;
   onUpdateGridColumn: (fieldIndex: number, colIndex: number, newText: string) => void;
@@ -90,9 +90,10 @@ interface FormRendererProps {
   onRemoveGridRow: (fieldIndex: number, rowIndex: number) => void;
   onRemoveGridColumn: (fieldIndex: number, colIndex: number) => void;
   onUpdateGridColumnPoints: (fieldIndex: number, colIndex: number, newPoints: number) => void;
-
+  
   // Range editing
   onUpdateRangeBounds: (fieldIndex: number, min: number, max: number) => void;
+  
 }
 
 
@@ -578,9 +579,9 @@ export const FieldRow: React.FC<{
 }> = ({ id, children, onDragHandleReady, onClick }) => {
   const { attributes, listeners, setNodeRef: setDragRef, transform } = useDraggable({ id });
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id });
-
+  
   const style: React.CSSProperties = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : {};
-
+  
   return (
     <div
       ref={(node) => {
@@ -602,6 +603,55 @@ export const FieldRow: React.FC<{
     </div>
   );
 };
+
+/**
+ * Visual insertion line shown between questions.
+ * Hovering this line sets the "afterIndex" for accurate insertion.
+ * afterIndex = -1 means "before the first question".
+ */
+
+/** Type palette for adding questions/sections (Microsoft Forms-like) */
+const TYPE_TILES: { key: FormField['type']; label: string }[] = [
+  { key: 'radio', label: 'Choice' },
+  { key: 'text', label: 'Text' },
+  { key: 'textarea', label: 'Long answer' },
+  { key: 'checkbox', label: 'Checkboxes' },
+  { key: 'select', label: 'Dropdown' },
+  { key: 'date', label: 'Date' },
+  { key: 'time', label: 'Time' },
+  { key: 'file', label: 'File upload' },
+  { key: 'range', label: 'Rating' },
+  { key: 'radioGrid', label: 'Likert / Grid' },
+  { key: 'section', label: 'Section' },
+];
+
+const TypePalette: React.FC<{
+  onPick: (t: FormField['type']) => void;
+  onClose: () => void;
+}> = ({ onPick, onClose }) => {
+  return (
+    <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+      {TYPE_TILES.map((t) => (
+        <button
+          key={t.key}
+          type="button"
+          onClick={() => onPick(t.key)}
+          className="rounded-md border border-teal-300 bg-white px-3 py-2 text-left text-sm font-medium text-teal-900 shadow-sm transition hover:bg-teal-50"
+        >
+          {t.label}
+        </button>
+      ))}
+      <button
+        type="button"
+        onClick={onClose}
+        className="col-span-full justify-self-start text-sm text-gray-600 hover:underline"
+      >
+        Close
+      </button>
+    </div>
+  );
+};
+
 
 const FormRenderer: React.FC<FormRendererProps> = ({
   formData,
@@ -642,6 +692,9 @@ const FormRenderer: React.FC<FormRendererProps> = ({
   const nonSubmitFields = rawFields.filter((f) => f.type !== 'submit');
   const fields = [...nonSubmitFields, ...submitFields];
 
+  // Where to open the type chooser (after which index)
+  const [chooserAfter, setChooserAfter] = useState<number | null>(null);
+
   const indexFromId = (id: string) => {
     const n = Number(id.replace('field-', ''));
     return Number.isFinite(n) ? n : -1;
@@ -678,46 +731,107 @@ const FormRenderer: React.FC<FormRendererProps> = ({
       </div>
 
       <DndContext onDragEnd={handleDragEnd}>
-        <div className="space-y-4">
+        <div className="space-y-2">
           {fields.map((field, idx) => (
-            <QuestionCard
-              key={`${field.name}-${idx}`}
-              field={field}
-              index={idx}
-              isFocused={focusedFieldIndex === idx}
-              onFocus={setFocusedFieldIndex}
-              {...{
-                
-                onUpdateFieldLabel,
-                onDeleteField,
-                onReorderFields,
-                onAddField,
-                onAddSection,
-                onAiAssistQuestion,
-                assistingIndex,
-                onUpdateFormTitle,
-                onUpdateFormDescription,
-                focusedFieldIndex,
-                setFocusedFieldIndex,
-                onUpdateFieldOption,
-                onAddFieldOption,
-                onRemoveFieldOption,
-                onChangeFieldType,
-                onDuplicateField,
-                onToggleRequiredField,
-                quizMode,
-                onUpdateFieldCorrectAnswer,
-                onUpdateFieldPoints,
-                onUpdateGridRow,
-                onUpdateGridColumn,
-                onAddGridRow,
-                onAddGridColumn,
-                onRemoveGridRow,
-                onRemoveGridColumn,
-                onUpdateGridColumnPoints,
-                onUpdateRangeBounds,
-              }}
-            />
+            <React.Fragment key={`${field.name}-${idx}`}>
+              {/* Page separator between sections (Microsoft Forms-like) */}
+              {field.type === 'section' && idx > 0 && (
+                <div className="my-6 border-t-4 border-gray-300" aria-hidden />
+              )}
+              <QuestionCard
+                field={field}
+                index={idx}
+                isFocused={focusedFieldIndex === idx}
+                onFocus={setFocusedFieldIndex}
+                {...{
+                  onUpdateFieldLabel,
+                  onDeleteField,
+                  onReorderFields,
+                  onAddField,
+                  onAddSection,
+                  onAiAssistQuestion,
+                  assistingIndex,
+                  onUpdateFormTitle,
+                  onUpdateFormDescription,
+                  focusedFieldIndex,
+                  setFocusedFieldIndex,
+                  onUpdateFieldOption,
+                  onAddFieldOption,
+                  onRemoveFieldOption,
+                  onChangeFieldType,
+                  onDuplicateField,
+                  onToggleRequiredField,
+                  quizMode,
+                  onUpdateFieldCorrectAnswer,
+                  onUpdateFieldPoints,
+                  onUpdateGridRow,
+                  onUpdateGridColumn,
+                  onAddGridRow,
+                  onAddGridColumn,
+                  onRemoveGridRow,
+                  onRemoveGridColumn,
+                  onUpdateGridColumnPoints,
+                  onUpdateRangeBounds,
+                }}
+              />
+
+              {/* Inline "Add question here" CTA under the focused question */}
+              {focusedFieldIndex === idx && (
+                <div className="mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setChooserAfter(idx)}
+                    className="inline-flex items-center gap-2 rounded-md border border-indigo-200 bg-white px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-50"
+                  >
+                    <PlusCircle className="h-4 w-4" />
+                    Add question here
+                  </button>
+                  {chooserAfter === idx && (
+                    <TypePalette
+                      onPick={(t) => {
+                        if (t === 'section') {
+                          (onAddSection as any)({ afterIndex: idx });
+                        } else {
+                          (onAddField as any)({ afterIndex: idx, type: t });
+                        }
+                        setChooserAfter(null);
+                      }}
+                      onClose={() => setChooserAfter(null)}
+                    />
+                  )}
+                </div>
+              )}
+
+              {/* Section-end CTA: show after the last question in a section (or before next section/submit) */}
+              {field.type !== 'section' &&
+                (idx === fields.length - 1 ||
+                  (fields[idx + 1] &&
+                    (fields[idx + 1].type === 'section' || fields[idx + 1].type === 'submit'))) && (
+                  <div className="mt-4">
+                    <button
+                      type="button"
+                      onClick={() => setChooserAfter(idx)}
+                      className="inline-flex items-center gap-2 rounded-md border border-teal-300 bg-white px-3 py-2 text-sm font-medium text-teal-700 hover:bg-teal-50"
+                    >
+                      <PlusCircle className="h-4 w-4" />
+                      Add new question
+                    </button>
+                    {chooserAfter === idx && (
+                      <TypePalette
+                        onPick={(t) => {
+                          if (t === 'section') {
+                            (onAddSection as any)({ afterIndex: idx });
+                          } else {
+                            (onAddField as any)({ afterIndex: idx, type: t });
+                          }
+                          setChooserAfter(null);
+                        }}
+                        onClose={() => setChooserAfter(null)}
+                      />
+                    )}
+                  </div>
+                )}
+            </React.Fragment>
           ))}
         </div>
       </DndContext>

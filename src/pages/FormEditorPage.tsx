@@ -4,7 +4,6 @@ import CommandBar from '../components/CommandBar';
 import FormRenderer from '../components/FormRenderer';
 import type { FormData, FormField, ResultPage } from '../components/FormRenderer';
 import ResultCard from '../components/editor/ResultCard';
-import FloatingToolbar from '../components/editor/FloatingToolbar';
 import { useAuth } from '../context/AuthContext';
 import LoginButton from '../components/LoginButton';
 import { getFormById, saveFormForUser, listResponsesForForm, type StoredResponse } from '../services/forms';
@@ -34,11 +33,8 @@ const FormEditorPage: React.FC = () => {
 
   // Focused question index for "Implicit Edit Mode"
   const [focusedFieldIndex, setFocusedFieldIndex] = useState<number | null>(null);
-  // Remember last focused index so toolbar actions can insert below it even when toolbar is shown (no focus)
-  const [lastFocusedIndex, setLastFocusedIndex] = useState<number | null>(null);
   const setFocus = (index: number | null) => {
     setFocusedFieldIndex(index);
-    if (index !== null && index !== undefined) setLastFocusedIndex(index);
   };
 
   // Auth + Save state
@@ -212,9 +208,14 @@ const FormEditorPage: React.FC = () => {
         newField = { ...newField, options: ['Option 1', 'Option 2'] };
       }
   
-      // Compute insertion index: below focused if provided; else before submit; else push
+      // Compute insertion index:
+      // - If afterIndex === -1 -> insert at the very top
+      // - Else if afterIndex is a valid index -> insert after it
+      // - Else -> insert before submit if exists, otherwise append
       let insertAt: number;
-      if (afterIndex != null && Number.isFinite(afterIndex) && afterIndex >= 0 && afterIndex < fields.length) {
+      if (afterIndex === -1) {
+        insertAt = 0;
+      } else if (afterIndex != null && Number.isFinite(afterIndex) && afterIndex >= 0 && afterIndex < fields.length) {
         insertAt = afterIndex + 1;
       } else {
         const submitIdx = fields.findIndex((f) => f.type === 'submit');
@@ -252,7 +253,9 @@ const FormEditorPage: React.FC = () => {
       const newField: FormField = { label: 'New Section', type: 'section' as any, name };
   
       let insertAt: number;
-      if (afterIndex != null && Number.isFinite(afterIndex) && afterIndex >= 0 && afterIndex < fields.length) {
+      if (afterIndex === -1) {
+        insertAt = 0;
+      } else if (afterIndex != null && Number.isFinite(afterIndex) && afterIndex >= 0 && afterIndex < fields.length) {
         insertAt = afterIndex + 1;
       } else {
         const submitIdx = fields.findIndex((f) => f.type === 'submit');
@@ -1066,15 +1069,6 @@ const handleAiAssistQuestion = async (fieldIndex: number) => {
                       onRemoveGridColumn={handleRemoveGridColumn}
                       onUpdateGridColumnPoints={handleUpdateGridColumnPoints}
                       onUpdateRangeBounds={handleUpdateRangeBounds}
-                    />
-                    {/* Floating Actions: outside the white sheet and sticky while editing */}
-                    <FloatingToolbar
-                      // Insert directly below the focused question if any, else the last interacted one
-                      onAddField={() => handleAddField({ afterIndex: (focusedFieldIndex ?? lastFocusedIndex), type: 'radio' })}
-                      onAddSection={() => handleAddSection({ afterIndex: (focusedFieldIndex ?? lastFocusedIndex) })}
-                      focusedFieldIndex={focusedFieldIndex}
-                      gutter={16}
-                      revertThreshold={600}
                     />
                   </>
                 )
