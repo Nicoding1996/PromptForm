@@ -34,6 +34,12 @@ const FormEditorPage: React.FC = () => {
 
   // Focused question index for "Implicit Edit Mode"
   const [focusedFieldIndex, setFocusedFieldIndex] = useState<number | null>(null);
+  // Remember last focused index so toolbar actions can insert below it even when toolbar is shown (no focus)
+  const [lastFocusedIndex, setLastFocusedIndex] = useState<number | null>(null);
+  const setFocus = (index: number | null) => {
+    setFocusedFieldIndex(index);
+    if (index !== null && index !== undefined) setLastFocusedIndex(index);
+  };
 
   // Auth + Save state
   const { user } = useAuth();
@@ -1038,7 +1044,7 @@ const handleAiAssistQuestion = async (fieldIndex: number) => {
                       onUpdateFormDescription={handleUpdateFormDescription}
                       // Advanced editor props
                       focusedFieldIndex={focusedFieldIndex}
-                      setFocusedFieldIndex={setFocusedFieldIndex}
+                      setFocusedFieldIndex={setFocus}
                       onUpdateFieldOption={handleUpdateFieldOption}
                       onAddFieldOption={handleAddFieldOption}
                       onRemoveFieldOption={handleRemoveFieldOption}
@@ -1059,12 +1065,14 @@ const handleAiAssistQuestion = async (fieldIndex: number) => {
                       onUpdateGridColumnPoints={handleUpdateGridColumnPoints}
                       onUpdateRangeBounds={handleUpdateRangeBounds}
                     />
-                    {/* Floating Actions */}
+                    {/* Floating Actions: outside the white sheet and sticky while editing */}
                     <FloatingToolbar
-                      // Insert new question (default Multiple choice) right below the focused question
-                      onAddField={() => handleAddField({ afterIndex: focusedFieldIndex, type: 'radio' })}
-                      onAddSection={() => handleAddSection({ afterIndex: focusedFieldIndex })}
+                      // Insert directly below the last interacted question (fallbacks handled in handler)
+                      onAddField={() => handleAddField({ afterIndex: lastFocusedIndex, type: 'radio' })}
+                      onAddSection={() => handleAddSection({ afterIndex: lastFocusedIndex })}
                       focusedFieldIndex={focusedFieldIndex}
+                      gutter={16}
+                      revertThreshold={600}
                     />
                   </>
                 )

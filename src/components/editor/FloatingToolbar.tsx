@@ -1,78 +1,119 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { PlusCircle, Heading2 } from 'lucide-react';
 
 type Props = {
   onAddField: () => void;
   onAddSection?: () => void;
   focusedFieldIndex: number | null;
-  // Fine-tune offsets
-  gutter?: number; // distance from editor card edge (px), default 12
-  minViewportTop?: number; // keep within viewport (px), default 80
+  // Optional tuning
+  gutter?: number; // px distance from the editor container's right edge
+  revertThreshold?: number; // px scrolled before reverting from stick -> center
 };
 
-const CONTAINER_ID = 'form-editor-container';
+const SHEET_ID = 'form-editor-sheet';
+const CONTAINER_FALLBACK_ID = 'form-editor-container';
 
 const FloatingToolbar: React.FC<Props> = ({
   onAddField,
   onAddSection,
   focusedFieldIndex,
   gutter = 12,
-  minViewportTop = 80,
+  revertThreshold = 220,
 }) => {
-  const [pos, setPos] = useState<{ top: number; right: number }>({
-    top: window.scrollY + Math.round(window.innerHeight * 0.3),
-    right: 24,
-  });
+  // Toolbar can be in two modes:
+  // - 'center' (default): vertically centered in viewport on the right of the editor container
+  // - 'stick': vertically attached to the focused question card
+  const [mode, setMode] = useState<'center' | 'stick'>('center');
 
-  // Clamp top into viewport
+  // Track left offset positioned just outside the white sheet (so it sits in the grey gutter)
+  const [left, setLeft] = useState<number>(0);
+
+  // Top in absolute page coordinates when in 'stick' mode
+  const [top, setTop] = useState<number>(window.scrollY + window.innerHeight / 2);
+
+  // Record scroll position when entering stick mode to know when to revert back to center
+  const [stickyStartY, setStickyStartY] = useState<number>(window.scrollY);
+
   const clampTop = (absTop: number) => {
     const max = window.scrollY + window.innerHeight - 140;
-    const min = window.scrollY + minViewportTop;
+    const min = window.scrollY + 80;
     return Math.max(min, Math.min(absTop, max));
   };
 
-  const recalc = useMemo(
-    () => () => {
-      const container = document.getElementById(CONTAINER_ID);
-      const containerRect = container?.getBoundingClientRect();
-      // Default right = aligned to the editor container's right edge + gutter
-      let right = 24;
-      if (containerRect) {
-        right = Math.max(8, window.innerWidth - containerRect.right + gutter);
-      }
+  const computeRight = useCallback(() => {
+    const target =
+      document.getElementById(SHEET_ID) ||
+      document.getElementById(CONTAINER_FALLBACK_ID);
+    const rect = target?.getBoundingClientRect();
+    if (!rect) {
+      // Fallback: pin near the viewport's right edge with a small padding
+      setLeft(Math.max(8, window.innerWidth - 64));
+      return;
+    }
+    // Position the toolbar OUTSIDE the white sheet, hugging its right edge.
+    // Use a fixed left coordinate based on the sheet's right + gutter, clamped to viewport.
+    const desired = rect.right + gutter;
+    const maxLeft = Math.max(8, window.innerWidth - 64); // 64px allowance for toolbar width + margin
+    setLeft(Math.min(desired, maxLeft));
+  }, [gutter]);
 
-      // Default top around upper third
-      let absTop = window.scrollY + Math.round(window.innerHeight * 0.3);
+  const questionCenterTop = useCallback((index: number | null) => {
+    if (index == null) return window.scrollY + window.innerHeight / 2;
+    const el = document.getElementById(`field-${index}`);
+    if (!el) return window.scrollY + window.innerHeight / 2;
+    const r = el.getBoundingClientRect();
+    return window.scrollY + r.top + r.height / 2 - 40;
+  }, []);
 
-      // If a question is focused, align to its vertical center
-      if (focusedFieldIndex != null) {
-        const el = document.getElementById(`field-${focusedFieldIndex}`);
-        if (el) {
-          const r = el.getBoundingClientRect();
-          absTop = window.scrollY + r.top + r.height / 2 - 40;
-        }
-      }
-
-      setPos({ top: clampTop(absTop), right });
-    },
-    [focusedFieldIndex, gutter, minViewportTop]
-  );
-
+  // When the focused question changes, stick to it (if present) or revert to center
   useEffect(() => {
-    recalc();
-    // Listen to window scroll + any scroll bubbling from inner containers
-    window.addEventListener('scroll', recalc, true);
-    window.addEventListener('resize', recalc);
-    return () => {
-      window.removeEventListener('scroll', recalc, true);
-      window.removeEventListener('resize', recalc);
+    computeRight();
+    if (focusedFieldIndex != null) {
+      setMode('stick');
+      setStickyStartY(window.scrollY);
+      setTop(clampTop(questionCenterTop(focusedFieldIndex)));
+    } else {
+      setMode('center');
+    }
+  }, [focusedFieldIndex, computeRight, questionCenterTop]);
+
+  // Keep right offset updated on resize
+  useEffect(() => {
+    computeRight();
+    const onResize = () => computeRight();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [computeRight]);
+
+  // Scroll behavior:
+  // - In center mode: do nothing (CSS keeps it centered)
+  // - In stick mode: follow the question center; if scrolled beyond threshold, revert to center
+  useEffect(() => {
+    const onScroll = () => {
+      if (mode === 'stick') {
+        const delta = Math.abs(window.scrollY - stickyStartY);
+        if (delta > revertThreshold) {
+          setMode('center');
+          return;
+        }
+        setTop(clampTop(questionCenterTop(focusedFieldIndex)));
+      }
+      // In center mode we don't move; CSS keeps top: 50% transform
     };
-  }, [recalc]);
+    window.addEventListener('scroll', onScroll, true);
+    return () => window.removeEventListener('scroll', onScroll, true);
+  }, [mode, stickyStartY, revertThreshold, focusedFieldIndex, questionCenterTop]);
+
+  // Compute style based on mode
+  const style: React.CSSProperties =
+    mode === 'center'
+      ? { left, top: '50%', transform: 'translateY(-50%)' }
+      : { left, top, transform: undefined };
 
   return (
     <div
       className="fixed z-40 flex flex-col gap-2 rounded-xl bg-white p-2 shadow-lg ring-1 ring-gray-200"
-      style={{ right: pos.right, top: pos.top }}
+      style={style}
       aria-label="Form actions"
     >
       <button

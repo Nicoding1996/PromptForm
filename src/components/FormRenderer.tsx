@@ -659,7 +659,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
   if (!formData) return null;
 
   return (
-    <section className="mt-8 rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
+    <section id="form-editor-sheet" className="mt-8 rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
       <div className="mb-6">
         <EditableLabel
           label={formData.title}
