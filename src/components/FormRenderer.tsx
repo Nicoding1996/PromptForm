@@ -1,6 +1,24 @@
 import React, { useState } from 'react';
 import { DndContext, useDraggable, useDroppable, type DragEndEvent } from '@dnd-kit/core';
-import { Trash2, Copy, CheckCircle2, Zap, Loader2, PlusCircle, Heading2 } from 'lucide-react';
+import {
+  Trash2,
+  Copy,
+  CheckCircle2,
+  Zap,
+  Loader2,
+  PlusCircle,
+  Heading2,
+  Type as IconType,
+  AlignLeft,
+  CheckSquare,
+  List,
+  Calendar,
+  Clock,
+  Upload,
+  Sliders,
+  Grid3x3,
+  CircleDot,
+} from 'lucide-react';
 import QuestionCard from './editor/QuestionCard';
 
 
@@ -25,10 +43,13 @@ export interface FormField {
   name: string;
   options?: string[]; // required for radio | checkbox | select
 
+  // Optional per-section subtitle (for type === 'section')
+  subtitle?: string;
+  
   // Quiz-related (supports single or multiple correct answers for checkbox)
   correctAnswer?: string | string[];
   points?: number;
-
+  
   // radioGrid-specific structure:
   rows?: string[]; // array of row labels/questions
   // Supports legacy string[] and new detailed objects { label, points }
@@ -94,6 +115,8 @@ interface FormRendererProps {
   // Range editing
   onUpdateRangeBounds: (fieldIndex: number, min: number, max: number) => void;
   
+  // Section editing
+  onUpdateSectionSubtitle?: (fieldIndex: number, subtitle: string) => void;
 }
 
 
@@ -248,6 +271,9 @@ export const AdvancedEditor: React.FC<{
   onRemoveGridColumn: (fieldIndex: number, colIndex: number) => void;
   onUpdateGridColumnPoints: (fieldIndex: number, colIndex: number, newPoints: number) => void;
   onUpdateRangeBounds: (fieldIndex: number, min: number, max: number) => void;
+
+  // Section
+  onUpdateSectionSubtitle?: (fieldIndex: number, subtitle: string) => void;
 }> = ({
   field,
   index,
@@ -271,6 +297,7 @@ export const AdvancedEditor: React.FC<{
   onRemoveGridRow,
   onRemoveGridColumn,
   onUpdateRangeBounds,
+  onUpdateSectionSubtitle,
 }) => {
   const optionTypes: FormField['type'][] = [
     'text',
@@ -319,6 +346,16 @@ export const AdvancedEditor: React.FC<{
         </button>
       </div>
 
+      {/* Section subtitle field */}
+      {field.type === 'section' && (
+        <input
+          placeholder="Optional subtitle"
+          defaultValue={(field as any).subtitle ?? ''}
+          onBlur={(e) => onUpdateSectionSubtitle?.(index, e.target.value)}
+          className="w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+      )}
+  
       {/* Type switcher + duplicate + required */}
       <div className="flex flex-wrap items-center gap-3">
         <label className="text-xs font-medium text-gray-600">Type</label>
@@ -333,7 +370,7 @@ export const AdvancedEditor: React.FC<{
             </option>
           ))}
         </select>
-
+  
         <button
           type="button"
           onClick={() => onDuplicateField(index)}
@@ -343,7 +380,7 @@ export const AdvancedEditor: React.FC<{
         >
           <Copy className="h-4 w-4" /> Duplicate
         </button>
-
+  
         {field.type !== 'section' && (
           <label className="inline-flex items-center gap-2 text-sm text-gray-700">
             <input
@@ -611,34 +648,35 @@ export const FieldRow: React.FC<{
  */
 
 /** Type palette for adding questions/sections (Microsoft Forms-like) */
-const TYPE_TILES: { key: FormField['type']; label: string }[] = [
-  { key: 'radio', label: 'Choice' },
-  { key: 'text', label: 'Text' },
-  { key: 'textarea', label: 'Long answer' },
-  { key: 'checkbox', label: 'Checkboxes' },
-  { key: 'select', label: 'Dropdown' },
-  { key: 'date', label: 'Date' },
-  { key: 'time', label: 'Time' },
-  { key: 'file', label: 'File upload' },
-  { key: 'range', label: 'Rating' },
-  { key: 'radioGrid', label: 'Likert / Grid' },
-  { key: 'section', label: 'Section' },
+const TYPE_TILES: { key: FormField['type']; label: string; Icon: React.ComponentType<any> }[] = [
+  { key: 'radio', label: 'Choice', Icon: CircleDot },
+  { key: 'text', label: 'Text', Icon: IconType },
+  { key: 'textarea', label: 'Long answer', Icon: AlignLeft },
+  { key: 'checkbox', label: 'Checkboxes', Icon: CheckSquare },
+  { key: 'select', label: 'Dropdown', Icon: List },
+  { key: 'date', label: 'Date', Icon: Calendar },
+  { key: 'time', label: 'Time', Icon: Clock },
+  { key: 'file', label: 'File upload', Icon: Upload },
+  { key: 'range', label: 'Rating', Icon: Sliders },
+  { key: 'radioGrid', label: 'Likert / Grid', Icon: Grid3x3 },
+  { key: 'section', label: 'Section', Icon: Heading2 },
 ];
-
+  
 const TypePalette: React.FC<{
   onPick: (t: FormField['type']) => void;
   onClose: () => void;
 }> = ({ onPick, onClose }) => {
   return (
     <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
-      {TYPE_TILES.map((t) => (
+      {TYPE_TILES.map(({ key, label, Icon }) => (
         <button
-          key={t.key}
+          key={key}
           type="button"
-          onClick={() => onPick(t.key)}
-          className="rounded-md border border-teal-300 bg-white px-3 py-2 text-left text-sm font-medium text-teal-900 shadow-sm transition hover:bg-teal-50"
+          onClick={() => onPick(key)}
+          className="flex items-center gap-2 rounded-md border border-teal-300 bg-white px-3 py-2 text-left text-sm font-medium text-teal-900 shadow-sm transition hover:bg-teal-50"
         >
-          {t.label}
+          <Icon className="h-4 w-4" />
+          {label}
         </button>
       ))}
       <button
@@ -685,6 +723,8 @@ const FormRenderer: React.FC<FormRendererProps> = ({
   onRemoveGridColumn,
   onUpdateGridColumnPoints,
   onUpdateRangeBounds,
+  // Section edit
+  onUpdateSectionSubtitle,
 }) => {
   // Ensure the submit field (if any) always renders last
   const rawFields: FormField[] = (formData?.fields ?? []) as FormField[];
@@ -732,89 +772,73 @@ const FormRenderer: React.FC<FormRendererProps> = ({
 
       <DndContext onDragEnd={handleDragEnd}>
         <div className="space-y-2">
-          {fields.map((field, idx) => (
-            <React.Fragment key={`${field.name}-${idx}`}>
-              {/* Page separator between sections (Microsoft Forms-like) */}
-              {field.type === 'section' && idx > 0 && (
-                <div className="my-6 border-t-4 border-gray-300" aria-hidden />
-              )}
-              <QuestionCard
-                field={field}
-                index={idx}
-                isFocused={focusedFieldIndex === idx}
-                onFocus={setFocusedFieldIndex}
-                {...{
-                  onUpdateFieldLabel,
-                  onDeleteField,
-                  onReorderFields,
-                  onAddField,
-                  onAddSection,
-                  onAiAssistQuestion,
-                  assistingIndex,
-                  onUpdateFormTitle,
-                  onUpdateFormDescription,
-                  focusedFieldIndex,
-                  setFocusedFieldIndex,
-                  onUpdateFieldOption,
-                  onAddFieldOption,
-                  onRemoveFieldOption,
-                  onChangeFieldType,
-                  onDuplicateField,
-                  onToggleRequiredField,
-                  quizMode,
-                  onUpdateFieldCorrectAnswer,
-                  onUpdateFieldPoints,
-                  onUpdateGridRow,
-                  onUpdateGridColumn,
-                  onAddGridRow,
-                  onAddGridColumn,
-                  onRemoveGridRow,
-                  onRemoveGridColumn,
-                  onUpdateGridColumnPoints,
-                  onUpdateRangeBounds,
-                }}
-              />
+          {fields.map((field, idx) => {
+            const isSection = field.type === 'section';
+            const sectionNumber = isSection
+              ? (fields.slice(0, idx + 1).filter((f) => f.type === 'section').length)
+              : (fields.slice(0, idx).filter((f) => f.type === 'section').length);
 
-              {/* Inline "Add question here" CTA under the focused question */}
-              {focusedFieldIndex === idx && (
-                <div className="mt-2">
-                  <button
-                    type="button"
-                    onClick={() => setChooserAfter(idx)}
-                    className="inline-flex items-center gap-2 rounded-md border border-indigo-200 bg-white px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-50"
-                  >
-                    <PlusCircle className="h-4 w-4" />
-                    Add question here
-                  </button>
-                  {chooserAfter === idx && (
-                    <TypePalette
-                      onPick={(t) => {
-                        if (t === 'section') {
-                          (onAddSection as any)({ afterIndex: idx });
-                        } else {
-                          (onAddField as any)({ afterIndex: idx, type: t });
-                        }
-                        setChooserAfter(null);
-                      }}
-                      onClose={() => setChooserAfter(null)}
-                    />
-                  )}
-                </div>
-              )}
+            return (
+              <React.Fragment key={`${field.name}-${idx}`}>
+                {/* Page separator with section number */}
+                {isSection && (
+                  <div className="my-6">
+                    <div className="rounded-md bg-gray-100 px-3 py-2 text-sm text-gray-700 flex items-center justify-between">
+                      <span>Section {sectionNumber}</span>
+                      <span className="text-gray-400">•••</span>
+                    </div>
+                    <div className="border-t-4 border-gray-300" />
+                  </div>
+                )}
 
-              {/* Section-end CTA: show after the last question in a section (or before next section/submit) */}
-              {field.type !== 'section' &&
-                (idx === fields.length - 1 ||
-                  (fields[idx + 1] &&
-                    (fields[idx + 1].type === 'section' || fields[idx + 1].type === 'submit'))) && (
-                  <div className="mt-4">
+                <QuestionCard
+                  field={field}
+                  index={idx}
+                  isFocused={focusedFieldIndex === idx}
+                  onFocus={setFocusedFieldIndex}
+                  {...{
+                    onUpdateFieldLabel,
+                    onDeleteField,
+                    onReorderFields,
+                    onAddField,
+                    onAddSection,
+                    onAiAssistQuestion,
+                    assistingIndex,
+                    onUpdateFormTitle,
+                    onUpdateFormDescription,
+                    focusedFieldIndex,
+                    setFocusedFieldIndex,
+                    onUpdateFieldOption,
+                    onAddFieldOption,
+                    onRemoveFieldOption,
+                    onChangeFieldType,
+                    onDuplicateField,
+                    onToggleRequiredField,
+                    quizMode,
+                    onUpdateFieldCorrectAnswer,
+                    onUpdateFieldPoints,
+                    onUpdateGridRow,
+                    onUpdateGridColumn,
+                    onAddGridRow,
+                    onAddGridColumn,
+                    onRemoveGridRow,
+                    onRemoveGridColumn,
+                    onUpdateGridColumnPoints,
+                    onUpdateRangeBounds,
+                    onUpdateSectionSubtitle,
+                  }}
+                />
+
+                {/* Inline "Add question here" CTA under the focused question */}
+                {focusedFieldIndex === idx && field.type !== 'submit' && (
+                  <div className="mt-2">
                     <button
                       type="button"
                       onClick={() => setChooserAfter(idx)}
-                      className="inline-flex items-center gap-2 rounded-md border border-teal-300 bg-white px-3 py-2 text-sm font-medium text-teal-700 hover:bg-teal-50"
+                      className="inline-flex items-center gap-2 rounded-md border border-indigo-200 bg-white px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-50"
                     >
                       <PlusCircle className="h-4 w-4" />
-                      Add new question
+                      Add question here
                     </button>
                     {chooserAfter === idx && (
                       <TypePalette
@@ -831,8 +855,40 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                     )}
                   </div>
                 )}
-            </React.Fragment>
-          ))}
+
+                {/* Section-end CTA: do not render after submit */}
+                {field.type !== 'section' &&
+                  field.type !== 'submit' &&
+                  (idx === fields.length - 1 ||
+                    (fields[idx + 1] &&
+                      (fields[idx + 1].type === 'section' || fields[idx + 1].type === 'submit'))) && (
+                    <div className="mt-4">
+                      <button
+                        type="button"
+                        onClick={() => setChooserAfter(idx)}
+                        className="inline-flex items-center gap-2 rounded-md border border-teal-300 bg-white px-3 py-2 text-sm font-medium text-teal-700 hover:bg-teal-50"
+                      >
+                        <PlusCircle className="h-4 w-4" />
+                        Add new question
+                      </button>
+                      {chooserAfter === idx && (
+                        <TypePalette
+                          onPick={(t) => {
+                            if (t === 'section') {
+                              (onAddSection as any)({ afterIndex: idx });
+                            } else {
+                              (onAddField as any)({ afterIndex: idx, type: t });
+                            }
+                            setChooserAfter(null);
+                          }}
+                          onClose={() => setChooserAfter(null)}
+                        />
+                      )}
+                    </div>
+                  )}
+              </React.Fragment>
+            );
+          })}
         </div>
       </DndContext>
 
