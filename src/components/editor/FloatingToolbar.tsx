@@ -18,7 +18,8 @@ const FloatingToolbar: React.FC<Props> = ({
   onAddSection,
   focusedFieldIndex,
   gutter = 12,
-  revertThreshold = 220,
+  // kept for backward-compat but unused; suppress TS unused warning
+  revertThreshold: _revertThreshold = 220,
 }) => {
   // Toolbar can be in two modes:
   // - 'center' (default): vertically centered in viewport on the right of the editor container
@@ -28,16 +29,15 @@ const FloatingToolbar: React.FC<Props> = ({
   // Track left offset positioned just outside the white sheet (so it sits in the grey gutter)
   const [left, setLeft] = useState<number>(0);
 
-  // Top in absolute page coordinates when in 'stick' mode
-  const [top, setTop] = useState<number>(window.scrollY + window.innerHeight / 2);
+  // Top in viewport coordinates when in 'stick' mode
+  const [top, setTop] = useState<number>(window.innerHeight / 2);
 
-  // Record scroll position when entering stick mode to know when to revert back to center
-  const [stickyStartY, setStickyStartY] = useState<number>(window.scrollY);
+  // (legacy) stickyStartY removed; position is now computed continuously
 
-  const clampTop = (absTop: number) => {
-    const max = window.scrollY + window.innerHeight - 140;
-    const min = window.scrollY + 80;
-    return Math.max(min, Math.min(absTop, max));
+  const clampTop = (v: number) => {
+    const max = window.innerHeight - 140;
+    const min = 80;
+    return Math.max(min, Math.min(v, max));
   };
 
   const computeRight = useCallback(() => {
@@ -58,11 +58,12 @@ const FloatingToolbar: React.FC<Props> = ({
   }, [gutter]);
 
   const questionCenterTop = useCallback((index: number | null) => {
-    if (index == null) return window.scrollY + window.innerHeight / 2;
+    if (index == null) return window.innerHeight / 2;
     const el = document.getElementById(`field-${index}`);
-    if (!el) return window.scrollY + window.innerHeight / 2;
+    if (!el) return window.innerHeight / 2;
     const r = el.getBoundingClientRect();
-    return window.scrollY + r.top + r.height / 2 - 40;
+    // Return viewport Y (do not add window.scrollY because position:fixed uses viewport coords)
+    return r.top + r.height / 2 - 40;
   }, []);
 
   // When the focused question changes, stick to it (if present) or revert to center
@@ -70,7 +71,6 @@ const FloatingToolbar: React.FC<Props> = ({
     computeRight();
     if (focusedFieldIndex != null) {
       setMode('stick');
-      setStickyStartY(window.scrollY);
       setTop(clampTop(questionCenterTop(focusedFieldIndex)));
     } else {
       setMode('center');
@@ -86,23 +86,60 @@ const FloatingToolbar: React.FC<Props> = ({
   }, [computeRight]);
 
   // Scroll behavior:
-  // - In center mode: do nothing (CSS keeps it centered)
-  // - In stick mode: follow the question center; if scrolled beyond threshold, revert to center
+  // Always keep the toolbar visible. If a question is focused, stick to it and
+  // continuously recompute position; otherwise keep it centered.
   useEffect(() => {
     const onScroll = () => {
-      if (mode === 'stick') {
-        const delta = Math.abs(window.scrollY - stickyStartY);
-        if (delta > revertThreshold) {
-          setMode('center');
-          return;
-        }
+      // Update horizontal placement in case layout shifts
+      computeRight();
+      if (focusedFieldIndex != null) {
+        if (mode !== 'stick') setMode('stick');
         setTop(clampTop(questionCenterTop(focusedFieldIndex)));
+      } else {
+        if (mode !== 'center') setMode('center');
+        // In center mode CSS keeps it vertically centered
       }
-      // In center mode we don't move; CSS keeps top: 50% transform
     };
     window.addEventListener('scroll', onScroll, true);
     return () => window.removeEventListener('scroll', onScroll, true);
-  }, [mode, stickyStartY, revertThreshold, focusedFieldIndex, questionCenterTop]);
+  }, [mode, focusedFieldIndex, questionCenterTop, computeRight]);
+
+  // When a question becomes focused, DOM content expands (advanced editor mounts).
+  // Observe that node and re-position the toolbar immediately so it never "disappears"
+  // until the next scroll. Also recompute when that card mutates.
+  useEffect(() => {
+    if (focusedFieldIndex == null) return;
+
+    const el = document.getElementById(`field-${focusedFieldIndex}`);
+
+    // Recompute after paint to account for layout shifts when the editor opens
+    computeRight();
+    requestAnimationFrame(() => {
+      setTop(clampTop(questionCenterTop(focusedFieldIndex)));
+    });
+
+    let ro: ResizeObserver | null = null;
+    let mo: MutationObserver | null = null;
+
+    if (el) {
+      ro = new ResizeObserver(() => {
+        computeRight();
+        setTop(clampTop(questionCenterTop(focusedFieldIndex)));
+      });
+      try { ro.observe(el); } catch {}
+
+      mo = new MutationObserver(() => {
+        computeRight();
+        setTop(clampTop(questionCenterTop(focusedFieldIndex)));
+      });
+      try { mo.observe(el, { attributes: true, childList: true, subtree: true }); } catch {}
+    }
+
+    return () => {
+      try { ro?.disconnect(); } catch {}
+      try { mo?.disconnect(); } catch {}
+    };
+  }, [focusedFieldIndex, questionCenterTop, computeRight]);
 
   // Compute style based on mode
   const style: React.CSSProperties =
@@ -115,6 +152,7 @@ const FloatingToolbar: React.FC<Props> = ({
       className="fixed z-40 flex flex-col gap-2 rounded-xl bg-white p-2 shadow-lg ring-1 ring-gray-200"
       style={style}
       aria-label="Form actions"
+      data-editor-toolbar="true"
     >
       <button
         type="button"

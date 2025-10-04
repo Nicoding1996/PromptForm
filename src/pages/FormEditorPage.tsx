@@ -100,7 +100,9 @@ const FormEditorPage: React.FC = () => {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
+      // Do not clear focus when interacting with the advanced editor OR the floating toolbar
       if (target.closest('[data-adv-editor="true"]')) return;
+      if (target.closest('[data-editor-toolbar="true"]')) return;
       setFocusedFieldIndex(null);
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -1067,9 +1069,9 @@ const handleAiAssistQuestion = async (fieldIndex: number) => {
                     />
                     {/* Floating Actions: outside the white sheet and sticky while editing */}
                     <FloatingToolbar
-                      // Insert directly below the last interacted question (fallbacks handled in handler)
-                      onAddField={() => handleAddField({ afterIndex: lastFocusedIndex, type: 'radio' })}
-                      onAddSection={() => handleAddSection({ afterIndex: lastFocusedIndex })}
+                      // Insert directly below the focused question if any, else the last interacted one
+                      onAddField={() => handleAddField({ afterIndex: (focusedFieldIndex ?? lastFocusedIndex), type: 'radio' })}
+                      onAddSection={() => handleAddSection({ afterIndex: (focusedFieldIndex ?? lastFocusedIndex) })}
                       focusedFieldIndex={focusedFieldIndex}
                       gutter={16}
                       revertThreshold={600}
