@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { DndContext, useDraggable, useDroppable, type DragEndEvent } from '@dnd-kit/core';
 import {
   Trash2,
@@ -735,6 +735,19 @@ const FormRenderer: React.FC<FormRendererProps> = ({
   // Where to open the type chooser (after which index)
   const [chooserAfter, setChooserAfter] = useState<number | null>(null);
 
+  // Close the palette when clicking outside
+  const paletteRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const onDocClick = (e: MouseEvent) => {
+      if (chooserAfter == null) return;
+      const target = e.target as HTMLElement;
+      if (target.closest('[data-type-palette="true"]')) return;
+      setChooserAfter(null);
+    };
+    document.addEventListener('mousedown', onDocClick, true);
+    return () => document.removeEventListener('mousedown', onDocClick, true);
+  }, [chooserAfter]);
+
   const indexFromId = (id: string) => {
     const n = Number(id.replace('field-', ''));
     return Number.isFinite(n) ? n : -1;
@@ -835,43 +848,13 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                     <button
                       type="button"
                       onClick={() => setChooserAfter(idx)}
-                      className="inline-flex items-center gap-2 rounded-md border border-indigo-200 bg-white px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-50"
+                      className="inline-flex items-center gap-2 rounded-md border border-teal-300 bg-white px-3 py-2 text-sm font-medium text-teal-700 hover:bg-teal-50"
                     >
                       <PlusCircle className="h-4 w-4" />
-                      Add question here
+                      Add new question
                     </button>
                     {chooserAfter === idx && (
-                      <TypePalette
-                        onPick={(t) => {
-                          if (t === 'section') {
-                            (onAddSection as any)({ afterIndex: idx });
-                          } else {
-                            (onAddField as any)({ afterIndex: idx, type: t });
-                          }
-                          setChooserAfter(null);
-                        }}
-                        onClose={() => setChooserAfter(null)}
-                      />
-                    )}
-                  </div>
-                )}
-
-                {/* Section-end CTA: do not render after submit */}
-                {field.type !== 'section' &&
-                  field.type !== 'submit' &&
-                  (idx === fields.length - 1 ||
-                    (fields[idx + 1] &&
-                      (fields[idx + 1].type === 'section' || fields[idx + 1].type === 'submit'))) && (
-                    <div className="mt-4">
-                      <button
-                        type="button"
-                        onClick={() => setChooserAfter(idx)}
-                        className="inline-flex items-center gap-2 rounded-md border border-teal-300 bg-white px-3 py-2 text-sm font-medium text-teal-700 hover:bg-teal-50"
-                      >
-                        <PlusCircle className="h-4 w-4" />
-                        Add new question
-                      </button>
-                      {chooserAfter === idx && (
+                      <div ref={paletteRef} data-type-palette="true" className="mt-2">
                         <TypePalette
                           onPick={(t) => {
                             if (t === 'section') {
@@ -883,35 +866,75 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                           }}
                           onClose={() => setChooserAfter(null)}
                         />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Section-end CTA: do not render after submit; hide if a question in this section is focused */}
+                {(() => {
+                  if (field.type === 'section' || field.type === 'submit') return false;
+                  // Determine the section bounds for this CTA (idx is last item before a boundary or end)
+                  let sectionStart = -1;
+                  for (let j = idx; j >= 0; j--) {
+                    if (fields[j].type === 'section') {
+                      sectionStart = j;
+                      break;
+                    }
+                  }
+                  let sectionEnd = fields.length - 1;
+                  for (let k = idx + 1; k < fields.length; k++) {
+                    const t = fields[k].type;
+                    if (t === 'section' || t === 'submit') {
+                      sectionEnd = k - 1;
+                      break;
+                    }
+                  }
+                  const isBoundaryAfter =
+                    idx === fields.length - 1 ||
+                    (fields[idx + 1] && (fields[idx + 1].type === 'section' || fields[idx + 1].type === 'submit'));
+                  const focusedInSameSection =
+                    focusedFieldIndex != null &&
+                    focusedFieldIndex >= sectionStart + 1 &&
+                    focusedFieldIndex <= sectionEnd;
+
+                  if (!isBoundaryAfter || focusedInSameSection) return false;
+
+                  return (
+                    <div className="mt-4">
+                      <button
+                        type="button"
+                        onClick={() => setChooserAfter(idx)}
+                        className="inline-flex items-center gap-2 rounded-md border border-teal-300 bg-white px-3 py-2 text-sm font-medium text-teal-700 hover:bg-teal-50"
+                      >
+                        <PlusCircle className="h-4 w-4" />
+                        Add new question
+                      </button>
+                      {chooserAfter === idx && (
+                        <div ref={paletteRef} data-type-palette="true" className="mt-2">
+                          <TypePalette
+                            onPick={(t) => {
+                              if (t === 'section') {
+                                (onAddSection as any)({ afterIndex: idx });
+                              } else {
+                                (onAddField as any)({ afterIndex: idx, type: t });
+                              }
+                              setChooserAfter(null);
+                            }}
+                            onClose={() => setChooserAfter(null)}
+                          />
+                        </div>
                       )}
                     </div>
-                  )}
+                  );
+                })()}
               </React.Fragment>
             );
           })}
         </div>
       </DndContext>
 
-      {/* Add Question / Section */}
-      <div className="mt-6 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={onAddField}
-          className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-medium text-indigo-700 ring-1 ring-indigo-200 transition hover:bg-indigo-50"
-        >
-          <PlusCircle className="h-5 w-5" />
-          Add Question
-        </button>
-        <button
-          type="button"
-          onClick={() => onAddSection?.()}
-          className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-medium text-violet-700 ring-1 ring-violet-200 transition hover:bg-violet-50"
-          title="Insert a new section heading"
-        >
-          <Heading2 className="h-5 w-5" />
-          Add Section
-        </button>
-      </div>
+      {/* Removed global Add Question/Section to match requested UX */}
     </section>
   );
 };
