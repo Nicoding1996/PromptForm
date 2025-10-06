@@ -4,13 +4,13 @@ import CommandBar from '../CommandBar';
 import FormRenderer from '../FormRenderer';
 import type { FormData, FormField, ResultPage } from '../FormRenderer';
 import ResultCard from './ResultCard';
-import CommandPalette from './CommandPalette';
+import SuggestionChips from './SuggestionChips';
 import { useAuth } from '../../context/AuthContext';
 import LoginButton from '../LoginButton';
 import { getFormById, saveFormForUser, listResponsesForForm, type StoredResponse } from '../../services/forms';
 import IndividualResponsesView from '../responses/IndividualResponsesView';
 import SummaryView from '../responses/SummaryView';
-import { Save, ExternalLink, LayoutDashboard, Loader2, Sparkles } from 'lucide-react';
+import { Save, ExternalLink, LayoutDashboard, Loader2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 type UnifiedEditorProps = {
@@ -42,7 +42,6 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
   const [assistingIndex, setAssistingIndex] = useState<number | null>(null);
 
   // AI Refactor Engine state
-  const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [refactorLoading, setRefactorLoading] = useState(false);
   const [refactorError, setRefactorError] = useState<string | null>(null);
 
@@ -884,7 +883,6 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
 
       setFormJson(data as FormData);
       setLastSavedId(null);
-      setShowCommandPalette(false);
     } catch (e: any) {
       setRefactorError(e?.message || 'Network error while contacting backend.');
     } finally {
@@ -940,7 +938,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
           </div>
 
           <div className="flex items-center gap-2">
-            {user && formJson && (
+            {user && formJson && formId && (
               <button
                 type="button"
                 onClick={handleSaveForm}
@@ -979,16 +977,6 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
               </span>
             </Link>
 
-            <button
-              type="button"
-              className="btn-ghost"
-              onClick={() => setShowCommandPalette(true)}
-              title="AI Actions"
-            >
-              <span className="inline-flex items-center gap-1">
-                <Sparkles className="h-4 w-4 text-indigo-600" /> AI Actions
-              </span>
-            </button>
 
             <LoginButton />
           </div>
@@ -1012,20 +1000,22 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
             >
               Questions
             </button>
-            <button
-              id="tab-responses"
-              role="tab"
-              aria-controls="panel-responses"
-              type="button"
-              onClick={() => setActiveTab('responses')}
-              className={
-                'rounded-md px-3 py-1.5 text-sm font-medium ' +
-                (activeTab === 'responses' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
-              }
-              aria-selected={activeTab === 'responses'}
-            >
-              Responses
-            </button>
+            {formId && (
+              <button
+                id="tab-responses"
+                role="tab"
+                aria-controls="panel-responses"
+                type="button"
+                onClick={() => setActiveTab('responses')}
+                className={
+                  'rounded-md px-3 py-1.5 text-sm font-medium ' +
+                  (activeTab === 'responses' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
+                }
+                aria-selected={activeTab === 'responses'}
+              >
+                Responses
+              </button>
+            )}
           </div>
 
           {activeTab === 'questions' ? (
@@ -1048,6 +1038,19 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                   }
                 }}
               />
+              {formId && (
+                <div className="px-2 sm:px-0 mt-2 -mb-1">
+                  <SuggestionChips
+                    onSelect={(cmd) => handleRefactorRequest(cmd)}
+                    disabled={refactorLoading || isLoading}
+                  />
+                  {refactorError && (
+                    <p className="mt-2 rounded-md border-l-4 border-red-400 bg-red-50 p-2 text-xs text-red-700">
+                      {refactorError}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {error && (
                 <p role="status" className="rounded-md border-l-4 border-red-400 bg-red-50 p-3 text-sm text-red-700">
@@ -1251,16 +1254,6 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
         </div>
       </main>
 
-      <CommandPalette
-        open={showCommandPalette}
-        onClose={() => {
-          setShowCommandPalette(false);
-          setRefactorError(null);
-        }}
-        onSubmit={handleRefactorRequest}
-        isLoading={refactorLoading}
-        error={refactorError}
-      />
     </div>
   );
 };
