@@ -21,13 +21,13 @@ const SuggestionChips: React.FC<SuggestionChipsProps> = ({
   className = '',
 }) => {
   return (
-    <div className={`w-full ${className}`}>
+    <div className={`w-full ${className}`} role="group" aria-label="AI edit suggestions">
       <div className="flex flex-wrap items-center gap-2">
         {suggestions.map((s, i) => (
           <button
             key={`${i}-${s}`}
             type="button"
-            className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm hover:border-indigo-300 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-8 items-center rounded-full border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 shadow-sm transition-colors hover:border-indigo-300 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:cursor-not-allowed disabled:opacity-60"
             onClick={() => onSelect(s)}
             disabled={disabled}
             title={s}

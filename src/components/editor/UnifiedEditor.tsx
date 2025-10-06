@@ -1039,7 +1039,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                 }}
               />
               {formId && (
-                <div className="px-2 sm:px-0 mt-2 -mb-1">
+                <div className="pl-12 pr-12 mt-2 mb-3">
                   <SuggestionChips
                     onSelect={(cmd) => handleRefactorRequest(cmd)}
                     disabled={refactorLoading || isLoading}

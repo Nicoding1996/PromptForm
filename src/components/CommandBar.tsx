@@ -80,7 +80,7 @@ const CommandBar: React.FC<CommandBarProps> = ({
       onDrop={handleDrop}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
-      className={`relative w-full rounded-2xl bg-white shadow-sm ring-1 ring-gray-200 transition ${
+      className={`relative w-full rounded-full bg-white shadow-sm ring-1 ring-gray-200 transition min-h-[48px] focus-within:ring-2 focus-within:ring-indigo-300 ${
         isDragging ? 'ring-2 ring-indigo-400 bg-indigo-50/30' : ''
       }`}
     >
@@ -92,7 +92,7 @@ const CommandBar: React.FC<CommandBarProps> = ({
         onClick={handleFilePickClick}
         disabled={isLoading}
         hidden={!isCreation}
-        className="absolute left-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-700 shadow-sm hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-60"
+        className="absolute left-3 top-1/2 -translate-y-1/2 transform inline-flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-700 shadow-sm hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-60"
       >
         <Paperclip className="h-4 w-4" />
       </button>
@@ -104,20 +104,20 @@ const CommandBar: React.FC<CommandBarProps> = ({
         title={isCreation ? 'Generate' : 'Apply edit'}
         onClick={onSend}
         disabled={!canSend}
-        className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-indigo-600 text-white shadow-sm hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+        className="absolute right-3 top-1/2 -translate-y-1/2 transform inline-flex h-8 w-8 items-center justify-center rounded-full bg-indigo-600 text-white shadow-sm hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
       </button>
 
       {/* Textarea */}
-      <div className={isCreation ? 'px-12 py-3' : 'px-10 py-2'}>
+      <div className={isCreation ? 'px-12 py-3' : 'px-12 py-2'}>
         <textarea
           ref={taRef}
           value={prompt}
           onChange={(e) => onPromptChange(e.target.value)}
           onInput={resize}
           placeholder={isCreation ? 'Describe the form you want to create...' : 'Ask PromptForm to edit your form...'}
-          className={`w-full resize-none rounded-xl border-0 bg-transparent p-0 ${isCreation ? 'text-base' : 'text-sm'} text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-0`}
+          className={`w-full resize-none border-0 bg-transparent p-0 ${isCreation ? 'text-base' : 'text-sm'} leading-6 text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-0`}
           rows={1}
           spellCheck={true}
         />
