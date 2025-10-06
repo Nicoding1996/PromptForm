@@ -414,7 +414,13 @@ export const AdvancedEditor: React.FC<{
                     type="button"
                     aria-label="Mark as correct"
                     title={isCorrect ? 'Correct answer' : 'Mark as correct'}
-                    onClick={() => onUpdateFieldCorrectAnswer?.(index, opt)}
+                    onClick={() => {
+                      if (field.type === 'checkbox') {
+                        (onUpdateFieldCorrectAnswer as any)?.(index, opt, { toggle: true });
+                      } else {
+                        onUpdateFieldCorrectAnswer?.(index, opt as any);
+                      }
+                    }}
                     className={
                       'inline-flex h-7 w-7 items-center justify-center rounded-md ring-1 ' +
                       (isCorrect ? 'text-green-700 ring-green-300 bg-green-100' : 'text-gray-500 ring-gray-200 hover:bg-gray-50')
@@ -447,25 +453,13 @@ export const AdvancedEditor: React.FC<{
           {/* Quiz controls */}
           {quizMode && (
             <div className="mt-3 flex flex-wrap items-center gap-3">
-              {field.type === 'checkbox' ? (
-                <div className="text-xs text-gray-600">
-                  Correct answers:{' '}
-                  <span className="font-medium">
-                    {Array.isArray(field.correctAnswer)
-                      ? (field.correctAnswer as string[]).join(', ') || '—'
-                      : typeof field.correctAnswer === 'string' && field.correctAnswer.length
-                      ? field.correctAnswer
-                      : '—'}
-                  </span>
-                  <span className="ml-2 italic text-gray-500">(Use the green check buttons to toggle)</span>
-                </div>
-              ) : (
+              {field.type !== 'checkbox' ? (
                 <>
                   <label className="text-xs font-medium text-gray-600">Correct answer</label>
                   <select
                     className="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm"
                     value={options.find((o) => normalize(o) === normalize(field.correctAnswer)) || ''}
-                    onChange={(e) => onUpdateFieldCorrectAnswer?.(index, e.target.value)}
+                    onChange={(e) => onUpdateFieldCorrectAnswer?.(index, e.target.value as any)}
                   >
                     <option value="">-- none --</option>
                     {options.map((opt, i) => (
@@ -475,8 +469,11 @@ export const AdvancedEditor: React.FC<{
                     ))}
                   </select>
                 </>
+              ) : (
+                <span className="text-xs text-gray-600">
+                  Multiple correct allowed: click the green check icons to toggle.
+                </span>
               )}
-
               <label className="ml-2 text-xs font-medium text-gray-600">Points</label>
               <input
                 type="number"
@@ -667,12 +664,37 @@ const TypePalette: React.FC<{
   onClose: () => void;
 }> = ({ onPick, onClose }) => {
   return (
-    <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+    <div
+      className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3"
+      onMouseDown={(e) => {
+        // Keep focus and inline CTA stable while interacting with the palette
+        e.stopPropagation();
+      }}
+      onMouseUp={(e) => {
+        e.stopPropagation();
+      }}
+      onPointerDown={(e) => {
+        e.stopPropagation();
+      }}
+      onPointerUp={(e) => {
+        e.stopPropagation();
+      }}
+    >
       {TYPE_TILES.map(({ key, label, Icon }) => (
         <button
           key={key}
           type="button"
-          onClick={() => onPick(key)}
+          onMouseDown={(e) => {
+            // Prevent focus/unfocus side-effects and insert immediately
+            e.preventDefault();
+            e.stopPropagation();
+            onPick(key);
+          }}
+          onClick={(e) => {
+            // Fallback for keyboard/assistive tech
+            e.stopPropagation();
+            onPick(key);
+          }}
           className="flex items-center gap-2 rounded-md border border-teal-300 bg-white px-3 py-2 text-left text-sm font-medium text-teal-900 shadow-sm transition hover:bg-teal-50"
         >
           <Icon className="h-4 w-4" />
@@ -681,7 +703,15 @@ const TypePalette: React.FC<{
       ))}
       <button
         type="button"
-        onClick={onClose}
+        onMouseDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onClose();
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose();
+        }}
         className="col-span-full justify-self-start text-sm text-gray-600 hover:underline"
       >
         Close
@@ -847,6 +877,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                   <div className="mt-2">
                     <button
                       type="button"
+                      onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
                       onClick={() => setChooserAfter(idx)}
                       className="inline-flex items-center gap-2 rounded-md border border-teal-300 bg-white px-3 py-2 text-sm font-medium text-teal-700 hover:bg-teal-50"
                     >
@@ -854,13 +885,22 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                       Add new question
                     </button>
                     {chooserAfter === idx && (
-                      <div ref={paletteRef} data-type-palette="true" className="mt-2">
+                      <div
+                        ref={paletteRef}
+                        data-type-palette="true"
+                        className="mt-2"
+                        onMouseDown={(e) => {
+                          // Do not let document mousedown handlers clear focus while using the palette
+                          e.stopPropagation();
+                        }}
+                      >
                         <TypePalette
                           onPick={(t) => {
+                            const anchorName = fields[idx]?.name;
                             if (t === 'section') {
-                              (onAddSection as any)({ afterIndex: idx });
+                              (onAddSection as any)({ afterIndex: idx, afterName: anchorName });
                             } else {
-                              (onAddField as any)({ afterIndex: idx, type: t });
+                              (onAddField as any)({ afterIndex: idx, afterName: anchorName, type: t });
                             }
                             setChooserAfter(null);
                           }}
@@ -904,6 +944,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                     <div className="mt-4">
                       <button
                         type="button"
+                        onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
                         onClick={() => setChooserAfter(idx)}
                         className="inline-flex items-center gap-2 rounded-md border border-teal-300 bg-white px-3 py-2 text-sm font-medium text-teal-700 hover:bg-teal-50"
                       >
@@ -911,13 +952,21 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                         Add new question
                       </button>
                       {chooserAfter === idx && (
-                        <div ref={paletteRef} data-type-palette="true" className="mt-2">
+                        <div
+                          ref={paletteRef}
+                          data-type-palette="true"
+                          className="mt-2"
+                          onMouseDown={(e) => {
+                            e.stopPropagation();
+                          }}
+                        >
                           <TypePalette
                             onPick={(t) => {
+                              const anchorName = fields[idx]?.name;
                               if (t === 'section') {
-                                (onAddSection as any)({ afterIndex: idx });
+                                (onAddSection as any)({ afterIndex: idx, afterName: anchorName });
                               } else {
-                                (onAddField as any)({ afterIndex: idx, type: t });
+                                (onAddField as any)({ afterIndex: idx, afterName: anchorName, type: t });
                               }
                               setChooserAfter(null);
                             }}
