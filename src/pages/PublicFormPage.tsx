@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useLocation } from 'react-router-dom';
 import { getFormById } from '../services/forms';
 import PublicFormRenderer from '../components/PublicFormRenderer';
 
 const PublicFormPage: React.FC = () => {
   const { formId } = useParams<{ formId: string }>();
+  const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,7 +77,11 @@ const PublicFormPage: React.FC = () => {
             <p className="text-sm text-red-700">Error: {error}</p>
           </section>
         ) : (
-          <PublicFormRenderer formData={formJson} formId={formId!} />
+          <PublicFormRenderer
+            formData={formJson}
+            formId={formId!}
+            preview={new URLSearchParams(location.search).get('preview') === 'true'}
+          />
         )}
       </main>
     </div>

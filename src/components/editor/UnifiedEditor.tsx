@@ -10,7 +10,7 @@ import LoginButton from '../LoginButton';
 import { getFormById, saveFormForUser, listResponsesForForm, type StoredResponse } from '../../services/forms';
 import IndividualResponsesView from '../responses/IndividualResponsesView';
 import SummaryView from '../responses/SummaryView';
-import { Save, ExternalLink, LayoutDashboard, Loader2, Share2 } from 'lucide-react';
+import { Save, ExternalLink, LayoutDashboard, Loader2, Share2, Eye } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -1001,16 +1001,30 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
             )}
 
             {(formId || lastSavedId) && (
-              <button
-                type="button"
-                onClick={handleSharePublicLink}
-                className="btn-ghost"
-                title="Copy public link"
-              >
-                <span className="inline-flex items-center gap-1">
-                  <Share2 className="h-4 w-4" /> Share
-                </span>
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={handleSharePublicLink}
+                  className="btn-ghost"
+                  title="Copy public link"
+                >
+                  <span className="inline-flex items-center gap-1">
+                    <Share2 className="h-4 w-4" /> Share
+                  </span>
+                </button>
+
+                <Link
+                  to={`/form/${formId || lastSavedId}?preview=true`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-ghost"
+                  title="Open public preview in a new tab"
+                >
+                  <span className="inline-flex items-center gap-1">
+                    <Eye className="h-4 w-4" /> Preview
+                  </span>
+                </Link>
+              </>
             )}
 
             <Link to="/dashboard" className="btn-ghost" title="Back to My Forms">

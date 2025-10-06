@@ -14,6 +14,7 @@ const setsEqual = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a
 type Props = {
   formData: FormData | null;
   formId: string;
+  preview?: boolean;
 };
 
 // Live range control with reactive value display
@@ -47,7 +48,7 @@ const LiveRange: React.FC<{
     </div>
   );
 };
-const PublicFormRenderer: React.FC<Props> = ({ formData, formId }) => {
+const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false }) => {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -181,7 +182,7 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId }) => {
       } catch {}
     }
 
-    if (!formRef.current?.reportValidity()) return;
+    if (!preview && !formRef.current?.reportValidity()) return;
 
     // Read answers before changing section
     const pagePayload = collectCurrentSectionAnswers();
@@ -248,7 +249,7 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId }) => {
     }
 
     setError(null);
-    if (!formRef.current?.reportValidity()) return;
+    if (!preview && !formRef.current?.reportValidity()) return;
     setSubmitting(true);
     try {
       // Merge final page answers
@@ -737,9 +738,10 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId }) => {
             <button
               ref={submitBtnRef}
               type="submit"
-              disabled={submitting || navBlockActive}
-              style={{ pointerEvents: navBlockActive ? 'none' as const : undefined }}
+              disabled={submitting || navBlockActive || preview}
+              style={{ pointerEvents: navBlockActive ? 'none' : undefined }}
               className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-500 focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+              title={preview ? 'Submission is disabled in preview mode' : ''}
             >
               {submitting ? 'Submitting...' : submitLabel}
             </button>
