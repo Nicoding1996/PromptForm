@@ -985,22 +985,22 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
         {saveError && <div className="text-xs text-red-600">{saveError}</div>}
 
         <div className="card p-2">
-          <div className="mb-4 flex items-center gap-2" role="tablist" aria-label="Editor tabs">
-            <button
-              id="tab-questions"
-              role="tab"
-              aria-controls="panel-questions"
-              type="button"
-              onClick={() => setActiveTab('questions')}
-              className={
-                'rounded-md px-3 py-1.5 text-sm font-medium ' +
-                (activeTab === 'questions' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
-              }
-              aria-selected={activeTab === 'questions'}
-            >
-              Questions
-            </button>
-            {formId && (
+          {formId && (
+            <div className="mb-4 flex items-center gap-2" role="tablist" aria-label="Editor tabs">
+              <button
+                id="tab-questions"
+                role="tab"
+                aria-controls="panel-questions"
+                type="button"
+                onClick={() => setActiveTab('questions')}
+                className={
+                  'rounded-md px-3 py-1.5 text-sm font-medium ' +
+                  (activeTab === 'questions' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
+                }
+                aria-selected={activeTab === 'questions'}
+              >
+                Questions
+              </button>
               <button
                 id="tab-responses"
                 role="tab"
@@ -1015,8 +1015,8 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
               >
                 Responses
               </button>
-            )}
-          </div>
+            </div>
+          )}
 
           {activeTab === 'questions' ? (
             <div id="panel-questions" role="tabpanel" aria-labelledby="tab-questions" className="space-y-6" tabIndex={0}>
@@ -1058,22 +1058,24 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                 </p>
               )}
 
-              <div className="flex items-center justify-between rounded-md bg-indigo-50/40 p-3 ring-1 ring-indigo-100">
-                <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={quizMode}
-                    onChange={(e) => handleSetQuizMode(e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                  />
-                  Enable scoring and outcomes
-                </label>
-                {quizMode && (
-                  <span className="text-xs text-gray-500">
-                    Mark correct answers and assign points in each choice question. Define outcomes below.
-                  </span>
-                )}
-              </div>
+              {formId && (
+                <div className="flex items-center justify-between rounded-md bg-indigo-50/40 p-3 ring-1 ring-indigo-100">
+                  <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={quizMode}
+                      onChange={(e) => handleSetQuizMode(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    Enable scoring and outcomes
+                  </label>
+                  {quizMode && (
+                    <span className="text-xs text-gray-500">
+                      Mark correct answers and assign points in each choice question. Define outcomes below.
+                    </span>
+                  )}
+                </div>
+              )}
 
               {quizMode && (
                 <section className="rounded-md border border-indigo-100 bg-indigo-50/20 p-3">
