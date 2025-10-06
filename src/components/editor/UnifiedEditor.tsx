@@ -4,12 +4,13 @@ import CommandBar from '../CommandBar';
 import FormRenderer from '../FormRenderer';
 import type { FormData, FormField, ResultPage } from '../FormRenderer';
 import ResultCard from './ResultCard';
+import CommandPalette from './CommandPalette';
 import { useAuth } from '../../context/AuthContext';
 import LoginButton from '../LoginButton';
 import { getFormById, saveFormForUser, listResponsesForForm, type StoredResponse } from '../../services/forms';
 import IndividualResponsesView from '../responses/IndividualResponsesView';
 import SummaryView from '../responses/SummaryView';
-import { Save, ExternalLink, LayoutDashboard, Loader2 } from 'lucide-react';
+import { Save, ExternalLink, LayoutDashboard, Loader2, Sparkles } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 type UnifiedEditorProps = {
@@ -38,6 +39,11 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
   const [lastSavedId, setLastSavedId] = useState<string | null>(null);
   // AI assist in-flight indicator (index of field being generated)
   const [assistingIndex, setAssistingIndex] = useState<number | null>(null);
+
+  // AI Refactor Engine state
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [refactorLoading, setRefactorLoading] = useState(false);
+  const [refactorError, setRefactorError] = useState<string | null>(null);
 
   // Responses state
   const [responses, setResponses] = useState<StoredResponse[]>([]);
@@ -822,6 +828,54 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
     }
   };
 
+  // AI Refactor Engine: apply a user command across the entire form
+  const handleRefactorRequest = async (command: string) => {
+    setRefactorError(null);
+    if (!formJson) {
+      setRefactorError('No form to refactor. Generate or open a form first.');
+      return;
+    }
+    setRefactorLoading(true);
+    try {
+      const resp = await fetch('http://localhost:3001/refactor-form', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ formJson, command }),
+      });
+
+      let data: unknown = null;
+      try {
+        data = await resp.json();
+      } catch {}
+
+      if (!resp.ok) {
+        const message = (() => {
+          if (data && typeof data === 'object') {
+            const d = data as Record<string, unknown>;
+            if (typeof d.error === 'string') return d.error;
+            if (typeof d.message === 'string') return d.message;
+          }
+          return `Refactor failed (${resp.status})`;
+        })();
+        setRefactorError(message);
+        return;
+      }
+
+      if (!data || typeof data !== 'object') {
+        setRefactorError('Refactor returned invalid data.');
+        return;
+      }
+
+      setFormJson(data as FormData);
+      setLastSavedId(null);
+      setShowCommandPalette(false);
+    } catch (e: any) {
+      setRefactorError(e?.message || 'Network error while contacting backend.');
+    } finally {
+      setRefactorLoading(false);
+    }
+  };
+
   // Convert selected image file to Base64 (without data: prefix) and mime type
   const fileToBase64 = (file: File): Promise<{ base64: string; mimeType: string }> =>
     new Promise((resolve, reject) => {
@@ -908,6 +962,17 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                 <LayoutDashboard className="h-4 w-4" /> Dashboard
               </span>
             </Link>
+
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => setShowCommandPalette(true)}
+              title="AI Actions"
+            >
+              <span className="inline-flex items-center gap-1">
+                <Sparkles className="h-4 w-4 text-indigo-600" /> AI Actions
+              </span>
+            </button>
 
             <LoginButton />
           </div>
@@ -1159,6 +1224,17 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
           )}
         </div>
       </main>
+
+      <CommandPalette
+        open={showCommandPalette}
+        onClose={() => {
+          setShowCommandPalette(false);
+          setRefactorError(null);
+        }}
+        onSubmit={handleRefactorRequest}
+        isLoading={refactorLoading}
+        error={refactorError}
+      />
     </div>
   );
 };

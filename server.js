@@ -843,6 +843,122 @@ Important instructions:
  }
 });
 
+/**
+ * AI Refactor Engine endpoint
+ * POST /refactor-form
+ * Body:
+ *  - formJson: current complete form JSON object
+ *  - command: string instruction describing the refactor to apply
+ * Returns: Refactored form JSON (application/json)
+ */
+app.post('/refactor-form', async (req, res) => {
+  try {
+    const { formJson, command } = req.body ?? {};
+
+    if (!formJson || typeof formJson !== 'object') {
+      return res.status(400).json({ error: 'Invalid "formJson" object in request body.' });
+    }
+    if (typeof command !== 'string' || !command.trim()) {
+      return res.status(400).json({ error: 'Invalid "command" string in request body.' });
+    }
+
+    // Compact/condense form JSON for prompt if very large
+    const formStr = JSON.stringify(formJson, null, 2);
+    const formBlock = formStr.length > ANALYZE_JSON_CHAR_LIMIT ? condenseText(formStr, ANALYZE_JSON_CHAR_LIMIT) : formStr;
+
+    const model = genAI.getGenerativeModel({
+      model: GEMINI_MODEL,
+      generationConfig: { responseMimeType: 'application/json' },
+    });
+
+    const masterPrompt = `
+You are an Expert Form Editor.
+
+You will be given a complete form as a JSON object and a command from the user.
+Your sole task is to apply the user's command to the entire form and return the new, complete, and still valid JSON object.
+Do not add any conversational text or markdown.
+
+CRITICAL REQUIREMENTS:
+- Preserve a valid schema compatible with this structure:
+  {
+    "title": "string",
+    "description": "string",
+    "isQuiz": boolean,
+    "fields": [
+      {
+        "label": "string",
+        "type": "text | email | password | textarea | radio | checkbox | select | date | time | file | range | radioGrid | section | submit",
+        "name": "snake_case_identifier",
+        "options": ["..."],                       // only for radio, checkbox, select
+        "rows": ["..."],                          // only for radioGrid
+        "columns": [{ "label": "A", "points": 1 }], // only for radioGrid
+        "correctAnswer": "..." | ["..."],         // only if isQuiz and option-based field
+        "points": 1                               // only if isQuiz
+      }
+    ],
+    "resultPages": [
+      { "title": "string", "description": "string", "scoreRange": { "from": 0, "to": 0 } }
+    ]
+  }
+- Exactly one "submit" field must exist and be last in order.
+- For "radio" | "checkbox" | "select": include "options"; omit for other types (including radioGrid).
+- radioGrid must use "rows" (string[]) and "columns" ({ "label": string, "points": number }[]).
+- If you add or rename fields, ensure unique, URL-safe snake_case "name" values.
+- Maintain logical consistency; do not degrade the form's functionality.
+- Output ONLY the raw JSON object.
+
+User command:
+"${String(command).trim()}"
+
+Current form JSON:
+"""${formBlock}"""
+`;
+
+    const result = await model.generateContent(masterPrompt);
+    const response = await result.response;
+
+    // Safety handling
+    const promptFeedback = response?.promptFeedback;
+    if (promptFeedback?.blockReason) {
+      console.warn('[SAFETY] Refactor prompt blocked:', promptFeedback.blockReason, promptFeedback);
+      return res.status(400).json({
+        error: 'Refactor rejected for safety reasons.',
+        message: 'Your request was blocked by the safety system. Please adjust inputs and try again.',
+        reason: promptFeedback.blockReason,
+      });
+    }
+
+    // Ensure non-empty text response and parse JSON robustly
+    const text = (response?.text?.() ?? '').trim();
+    if (!text) {
+      console.error('[MODEL ERROR] Empty refactor response from model.');
+      return res.status(502).json({
+        error: 'Upstream model returned an empty refactor.',
+        message: 'The AI did not return any content. Please try again.',
+      });
+    }
+
+    let jsonResponse;
+    try {
+      jsonResponse = JSON.parse(text);
+    } catch {
+      const start = text.indexOf('{');
+      const end = text.lastIndexOf('}');
+      if (start !== -1 && end !== -1 && end > start) {
+        const slice = text.slice(start, end + 1);
+        jsonResponse = JSON.parse(slice);
+      } else {
+        throw new Error('Model response was not valid JSON.');
+      }
+    }
+
+    return res.json(jsonResponse);
+  } catch (error) {
+    console.error('[refactor-form] error:', error);
+    return res.status(500).json({ error: 'Internal server error.', details: error.message });
+  }
+});
+
 app.listen(port, () => {
  console.log(`[startup] Server listening on port ${port}`);
 });
