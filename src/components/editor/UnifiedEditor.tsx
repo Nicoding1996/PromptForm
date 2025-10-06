@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import CommandBar from '../CommandBar';
 import FormRenderer from '../FormRenderer';
 import type { FormData, FormField, ResultPage } from '../FormRenderer';
@@ -34,6 +34,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
 
   // Auth + Save state
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [lastSavedId, setLastSavedId] = useState<string | null>(null);
@@ -819,6 +820,21 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
       } else {
         setFormJson(data as FormData);
         setLastSavedId(null);
+
+        // Seamless Creation-to-Edit Flow:
+        // If we're on the homepage (no formId yet) and the user is logged in,
+        // auto-save the newly generated form and navigate to /form/:id/edit.
+        if (!formId && user) {
+          try {
+            const newId = await saveFormForUser(user.uid, data as FormData);
+            setLastSavedId(newId);
+            toast.success('Form created. Opening editor...');
+            navigate(`/form/${newId}/edit`);
+          } catch (e: any) {
+            const msg = e?.message || 'Auto-save failed. Please save manually.';
+            toast.error(msg);
+          }
+        }
       }
     } catch (err) {
       setError('Network error while contacting backend.');
@@ -1019,8 +1035,18 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                 onPromptChange={setPromptText}
                 file={selectedFile}
                 onFileChange={setSelectedFile}
-                isLoading={isLoading}
-                onSend={handleGenerate}
+                isLoading={isLoading || refactorLoading}
+                mode={formId ? 'editing' : 'creation'}
+                onSend={() => {
+                  if (formId) {
+                    const cmd = promptText.trim();
+                    if (cmd) {
+                      handleRefactorRequest(cmd);
+                    }
+                  } else {
+                    handleGenerate();
+                  }
+                }}
               />
 
               {error && (

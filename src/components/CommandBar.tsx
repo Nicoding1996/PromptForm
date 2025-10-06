@@ -8,6 +8,7 @@ interface CommandBarProps {
   onFileChange: (file: File | null) => void;
   isLoading?: boolean;
   onSend: () => void;
+  mode?: 'creation' | 'editing';
 }
 
 const CommandBar: React.FC<CommandBarProps> = ({
@@ -17,10 +18,12 @@ const CommandBar: React.FC<CommandBarProps> = ({
   onFileChange,
   isLoading = false,
   onSend,
+  mode = 'creation',
 }) => {
   const taRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const isCreation = mode !== 'editing';
 
   // Auto-resize textarea based on content
   const resize = () => {
@@ -70,7 +73,7 @@ const CommandBar: React.FC<CommandBarProps> = ({
     setIsDragging(false);
   };
 
-  const canSend = !isLoading && (prompt.trim().length > 0 || !!file);
+  const canSend = !isLoading && (isCreation ? (prompt.trim().length > 0 || !!file) : prompt.trim().length > 0);
 
   return (
     <div
@@ -88,6 +91,7 @@ const CommandBar: React.FC<CommandBarProps> = ({
         title="Attach a file"
         onClick={handleFilePickClick}
         disabled={isLoading}
+        hidden={!isCreation}
         className="absolute left-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-700 shadow-sm hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-60"
       >
         <Paperclip className="h-4 w-4" />
@@ -96,8 +100,8 @@ const CommandBar: React.FC<CommandBarProps> = ({
       {/* Right (Send) button */}
       <button
         type="button"
-        aria-label="Generate"
-        title="Generate"
+        aria-label={isCreation ? 'Generate' : 'Apply edit'}
+        title={isCreation ? 'Generate' : 'Apply edit'}
         onClick={onSend}
         disabled={!canSend}
         className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-indigo-600 text-white shadow-sm hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
@@ -106,21 +110,21 @@ const CommandBar: React.FC<CommandBarProps> = ({
       </button>
 
       {/* Textarea */}
-      <div className="px-12 py-3">
+      <div className={isCreation ? 'px-12 py-3' : 'px-10 py-2'}>
         <textarea
           ref={taRef}
           value={prompt}
           onChange={(e) => onPromptChange(e.target.value)}
           onInput={resize}
-          placeholder="Describe the form you want to create..."
-          className="w-full resize-none rounded-xl border-0 bg-transparent p-0 text-base text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-0"
+          placeholder={isCreation ? 'Describe the form you want to create...' : 'Ask PromptForm to edit your form...'}
+          className={`w-full resize-none rounded-xl border-0 bg-transparent p-0 ${isCreation ? 'text-base' : 'text-sm'} text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-0`}
           rows={1}
           spellCheck={true}
         />
       </div>
 
       {/* File 'pill' */}
-      <div className="px-12 pb-3">
+      <div className="px-12 pb-3" hidden={!isCreation}>
         {file ? (
           <span className="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700 ring-1 ring-gray-200">
             <span className="truncate max-w-[240px]">{file.name}</span>
@@ -146,6 +150,7 @@ const CommandBar: React.FC<CommandBarProps> = ({
         accept="image/*, .txt, .pdf, .docx"
         className="hidden"
         onChange={handleFileInput}
+        disabled={!isCreation}
       />
     </div>
   );
