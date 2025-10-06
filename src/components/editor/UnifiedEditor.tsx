@@ -10,8 +10,9 @@ import LoginButton from '../LoginButton';
 import { getFormById, saveFormForUser, listResponsesForForm, type StoredResponse } from '../../services/forms';
 import IndividualResponsesView from '../responses/IndividualResponsesView';
 import SummaryView from '../responses/SummaryView';
-import { Save, ExternalLink, LayoutDashboard, Loader2 } from 'lucide-react';
+import { Save, ExternalLink, LayoutDashboard, Loader2, Share2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { AnimatePresence, motion } from 'framer-motion';
 
 type UnifiedEditorProps = {
   formId?: string;
@@ -44,6 +45,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
   // AI Refactor Engine state
   const [refactorLoading, setRefactorLoading] = useState(false);
   const [refactorError, setRefactorError] = useState<string | null>(null);
+  const [isRefactoring, setIsRefactoring] = useState(false);
 
   // Responses state
   const [responses, setResponses] = useState<StoredResponse[]>([]);
@@ -850,6 +852,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
       setRefactorError('No form to refactor. Generate or open a form first.');
       return;
     }
+    setIsRefactoring(true);
     setRefactorLoading(true);
     try {
       const resp = await fetch('http://localhost:3001/refactor-form', {
@@ -887,6 +890,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
       setRefactorError(e?.message || 'Network error while contacting backend.');
     } finally {
       setRefactorLoading(false);
+      setIsRefactoring(false);
     }
   };
 
@@ -924,6 +928,31 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
       toast.error(msg);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSharePublicLink = async () => {
+    const id = formId || lastSavedId;
+    if (!id) {
+      toast.error('Save the form first to get a shareable link.');
+      return;
+    }
+    const url = `${window.location.origin}/form/${id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success('Public link copied to clipboard!');
+    } catch {
+      try {
+        const dummy = document.createElement('input');
+        dummy.value = url;
+        document.body.appendChild(dummy);
+        dummy.select();
+        document.execCommand('copy');
+        document.body.removeChild(dummy);
+        toast.success('Public link copied to clipboard!');
+      } catch {
+        toast.error('Copy failed. You can share: ' + url);
+      }
     }
   };
 
@@ -969,6 +998,19 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                   <ExternalLink className="h-4 w-4" /> View
                 </span>
               </Link>
+            )}
+
+            {(formId || lastSavedId) && (
+              <button
+                type="button"
+                onClick={handleSharePublicLink}
+                className="btn-ghost"
+                title="Copy public link"
+              >
+                <span className="inline-flex items-center gap-1">
+                  <Share2 className="h-4 w-4" /> Share
+                </span>
+              </button>
             )}
 
             <Link to="/dashboard" className="btn-ghost" title="Back to My Forms">
@@ -1124,41 +1166,58 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                 </section>
               ) : (
                 formJson && (
-                  <FormRenderer
-                    formData={formJson}
-                    onUpdateFieldLabel={handleUpdateFieldLabel}
-                    onDeleteField={handleDeleteField}
-                    onReorderFields={handleReorderFields}
-                    onAddField={handleAddField as any}
-                    onAddSection={handleAddSection as any}
-                    onAiAssistQuestion={handleAiAssistQuestion}
-                    assistingIndex={assistingIndex}
-                    onUpdateFormTitle={handleUpdateFormTitle}
-                    onUpdateFormDescription={handleUpdateFormDescription}
-                    // Advanced editor props
-                    focusedFieldIndex={focusedFieldIndex}
-                    setFocusedFieldIndex={setFocus}
-                    onUpdateFieldOption={handleUpdateFieldOption}
-                    onAddFieldOption={handleAddFieldOption}
-                    onRemoveFieldOption={handleRemoveFieldOption}
-                    onChangeFieldType={handleChangeFieldType}
-                    onDuplicateField={handleDuplicateField}
-                    onToggleRequiredField={handleToggleRequiredField}
-                    // Quiz
-                    quizMode={quizMode}
-                    onUpdateFieldCorrectAnswer={handleUpdateFieldCorrectAnswer as any}
-                    onUpdateFieldPoints={handleUpdateFieldPoints}
-                    // Grid + range
-                    onUpdateGridRow={handleUpdateGridRow}
-                    onUpdateGridColumn={handleUpdateGridColumn}
-                    onAddGridRow={handleAddGridRow}
-                    onAddGridColumn={handleAddGridColumn}
-                    onRemoveGridRow={handleRemoveGridRow}
-                    onRemoveGridColumn={handleRemoveGridColumn}
-                    onUpdateGridColumnPoints={handleUpdateGridColumnPoints}
-                    onUpdateRangeBounds={handleUpdateRangeBounds}
-                    onUpdateSectionSubtitle={handleUpdateSectionSubtitle}
-                  />
+                  <div className="relative">
+                    <FormRenderer
+                      formData={formJson}
+                      onUpdateFieldLabel={handleUpdateFieldLabel}
+                      onDeleteField={handleDeleteField}
+                      onReorderFields={handleReorderFields}
+                      onAddField={handleAddField as any}
+                      onAddSection={handleAddSection as any}
+                      onAiAssistQuestion={handleAiAssistQuestion}
+                      assistingIndex={assistingIndex}
+                      onUpdateFormTitle={handleUpdateFormTitle}
+                      onUpdateFormDescription={handleUpdateFormDescription}
+                      // Advanced editor props
+                      focusedFieldIndex={focusedFieldIndex}
+                      setFocusedFieldIndex={setFocus}
+                      onUpdateFieldOption={handleUpdateFieldOption}
+                      onAddFieldOption={handleAddFieldOption}
+                      onRemoveFieldOption={handleRemoveFieldOption}
+                      onChangeFieldType={handleChangeFieldType}
+                      onDuplicateField={handleDuplicateField}
+                      onToggleRequiredField={handleToggleRequiredField}
+                      // Quiz
+                      quizMode={quizMode}
+                      onUpdateFieldCorrectAnswer={handleUpdateFieldCorrectAnswer as any}
+                      onUpdateFieldPoints={handleUpdateFieldPoints}
+                      // Grid + range
+                      onUpdateGridRow={handleUpdateGridRow}
+                      onUpdateGridColumn={handleUpdateGridColumn}
+                      onAddGridRow={handleAddGridRow}
+                      onAddGridColumn={handleAddGridColumn}
+                      onRemoveGridRow={handleRemoveGridRow}
+                      onRemoveGridColumn={handleRemoveGridColumn}
+                      onUpdateGridColumnPoints={handleUpdateGridColumnPoints}
+                      onUpdateRangeBounds={handleUpdateRangeBounds}
+                      onUpdateSectionSubtitle={handleUpdateSectionSubtitle}
+                    />
+
+                    <AnimatePresence>
+                      {isRefactoring && (
+                        <motion.div
+                          key="refactor-overlay"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 backdrop-blur-[1px]"
+                        >
+                          <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 )
               )}
             </div>
