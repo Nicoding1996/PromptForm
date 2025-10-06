@@ -1,5 +1,10 @@
 import React, { useEffect, useRef } from 'react';
 import { toast } from 'react-hot-toast';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+
+// TS note: react-markdown type defs can be strict across versions; use a local alias to avoid JSX prop typing issues.
+const Markdown: any = ReactMarkdown;
 
 type Props = {
   text: string;
@@ -42,10 +47,28 @@ const ReportModal: React.FC<Props> = ({ text, onClose, title = 'AI-Powered Summa
           </button>
         </div>
 
-        <div className="max-h-[70vh] overflow-auto px-5 py-4">
-          <div className="whitespace-pre-wrap text-sm text-gray-900">
+        <div className="max-h-[70vh] overflow-auto px-6 py-5 text-[15px] leading-7 text-gray-800">
+          <Markdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              h1: (props: any) => <h1 className="text-xl font-bold text-gray-900 mb-3" {...props} />,
+              h2: (props: any) => <h2 className="mt-4 mb-2 text-lg font-semibold text-gray-900" {...props} />,
+              h3: (props: any) => <h3 className="mt-3 mb-2 text-base font-semibold text-gray-900" {...props} />,
+              p: (props: any) => <p className="mb-3" {...props} />,
+              ul: (props: any) => <ul className="mb-3 list-disc pl-5 space-y-1" {...props} />,
+              ol: (props: any) => <ol className="mb-3 list-decimal pl-5 space-y-1" {...props} />,
+              li: (props: any) => <li className="marker:text-gray-400" {...props} />,
+              strong: (props: any) => <strong className="font-semibold text-gray-900" {...props} />,
+              em: (props: any) => <em className="italic" {...props} />,
+              a: (props: any) => <a className="text-indigo-600 underline" target="_blank" rel="noopener noreferrer" {...props} />,
+              hr: (props: any) => <hr className="my-4 border-gray-200" {...props} />,
+              blockquote: (props: any) => (
+                <blockquote className="mb-3 border-l-4 border-gray-300 pl-3 italic text-gray-700" {...props} />
+              ),
+            }}
+          >
             {text}
-          </div>
+          </Markdown>
         </div>
 
         <div className="flex justify-end gap-2 border-t border-gray-200 px-5 py-3">
