@@ -363,6 +363,12 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
         setLastMaxScore(null);
       }
 
+      // In preview mode, simulate success without sending anything to the server.
+      if (preview) {
+        setSubmitted(true);
+        return;
+      }
+
       const resp = await fetch(`${actionBase}/submit-response/${formId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -647,6 +653,16 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
 
   // Submitted view (outcomes or simple score)
   if (submitted) {
+    if (preview) {
+      return (
+        <section className="mt-8 card p-6">
+          <div className="text-center">
+            <h2 className="text-lg font-semibold text-gray-900">Preview submission simulated</h2>
+            <p className="mt-1 text-sm text-gray-600">This is a preview only. No data was saved.</p>
+          </div>
+        </section>
+      );
+    }
     const pages = (formData as any)?.resultPages as Array<any> | undefined;
     const hasOutcomes = Array.isArray(pages) && pages.length > 0;
 
@@ -689,66 +705,82 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
           )}
         </div>
       </section>
-    );
+      );
   }
 
   // Wizard UI
   return (
-    <section className="mt-8 card p-6">
-      <div className="mb-6">
-        <h2 className="block text-xl font-semibold text-gray-900">{formData.title}</h2>
-        {formData.description && <p className="mt-1 text-sm text-gray-600">{formData.description}</p>}
-      </div>
-
-      {error && (
-        <div className="mb-4 rounded-md border-l-4 border-red-400 bg-red-50 p-3 text-sm text-red-700">{error}</div>
-      )}
-
-      <div className="mb-3">
-        <h3 className="text-base font-semibold text-gray-900">
-          {currentSection?.title || `Section ${currentSectionIndex + 1}`}
-        </h3>
-        <p className="text-xs text-gray-500">
-          Page {currentSectionIndex + 1} of {totalSections}
-        </p>
-      </div>
-
-      <form ref={formRef} onSubmit={onSubmit} onKeyDown={onFormKeyDown} className="space-y-4">
-        {(currentSection?.fields ?? []).map((f, idx) => renderField(f, idx))}
-
-        <div className="mt-6 flex items-center justify-between gap-2">
-          <button
-            type="button"
-            onClick={handlePrev}
-            disabled={currentSectionIndex === 0}
-            className="rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 disabled:opacity-50"
+    <>
+      {preview && (
+        <div className="mb-4 rounded-md bg-yellow-50 border border-yellow-200 p-3 text-sm text-yellow-900 flex items-center justify-between">
+          <div>
+            <strong className="font-semibold">Preview mode</strong>
+            <span className="ml-2 text-gray-700">You are viewing a non-interactive preview. Submissions are disabled.</span>
+          </div>
+          <a
+            href={window.location.pathname}
+            className="rounded-md bg-white px-3 py-1 text-sm font-medium text-indigo-700 ring-1 ring-indigo-100 hover:bg-indigo-50"
           >
-            Previous
-          </button>
+            Exit Preview
+          </a>
+        </div>
+      )}
+      <section className="mt-8 card p-6">
+        <div className="mb-6">
+          <h2 className="block text-xl font-semibold text-gray-900">{formData.title}</h2>
+          {formData.description && <p className="mt-1 text-sm text-gray-600">{formData.description}</p>}
+        </div>
 
-          {currentSectionIndex < totalSections - 1 ? (
+        {error && (
+          <div className="mb-4 rounded-md border-l-4 border-red-400 bg-red-50 p-3 text-sm text-red-700">{error}</div>
+        )}
+
+        <div className="mb-3">
+          <h3 className="text-base font-semibold text-gray-900">
+            {currentSection?.title || `Section ${currentSectionIndex + 1}`}
+          </h3>
+          <p className="text-xs text-gray-500">
+            Page {currentSectionIndex + 1} of {totalSections}
+          </p>
+        </div>
+
+        <form ref={formRef} onSubmit={onSubmit} onKeyDown={onFormKeyDown} className="space-y-4">
+          {(currentSection?.fields ?? []).map((f, idx) => renderField(f, idx))}
+
+          <div className="mt-6 flex items-center justify-between gap-2">
             <button
               type="button"
-              onClick={(e) => handleNext(e)}
-              className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
+              onClick={handlePrev}
+              disabled={currentSectionIndex === 0}
+              className="rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 disabled:opacity-50"
             >
-              Next
+              Previous
             </button>
-          ) : (
-            <button
-              ref={submitBtnRef}
-              type="submit"
-              disabled={submitting || navBlockActive || preview}
-              style={{ pointerEvents: navBlockActive ? 'none' : undefined }}
-              className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-500 focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-              title={preview ? 'Submission is disabled in preview mode' : ''}
-            >
-              {submitting ? 'Submitting...' : submitLabel}
-            </button>
-          )}
-        </div>
-      </form>
-    </section>
+
+            {currentSectionIndex < totalSections - 1 ? (
+              <button
+                type="button"
+                onClick={(e) => handleNext(e)}
+                className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
+              >
+                Next
+              </button>
+            ) : (
+              <button
+                ref={submitBtnRef}
+                type="submit"
+                disabled={submitting || navBlockActive}
+                style={{ pointerEvents: navBlockActive ? 'none' : undefined }}
+                className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-500 focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                title={preview ? 'This submit is simulated in preview mode' : ''}
+              >
+                {submitting ? 'Submitting...' : submitLabel}
+              </button>
+            )}
+          </div>
+        </form>
+      </section>
+    </>
   );
 };
 
