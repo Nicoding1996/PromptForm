@@ -79,6 +79,20 @@ const CommandBar: React.FC<CommandBarProps> = ({
 
   const canSend = !isLoading && (isCreation ? (prompt.trim().length > 0 || !!file) : prompt.trim().length > 0);
 
+  const handleKeyDown: React.KeyboardEventHandler<HTMLTextAreaElement> = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      // Avoid sending while IME composition is active (e.g., Japanese IME)
+      const ne = e.nativeEvent as any;
+      if (ne?.isComposing === true || ne?.keyCode === 229) return;
+      if (canSend) {
+        e.preventDefault();
+        onSend();
+      }
+      // If cannot send, fall through and allow newline
+    }
+    // Shift+Enter -> default newline
+  };
+
   return (
     <div
       onDrop={handleDrop}
@@ -124,6 +138,7 @@ const CommandBar: React.FC<CommandBarProps> = ({
           value={prompt}
           onChange={(e) => onPromptChange(e.target.value)}
           onInput={resize}
+          onKeyDown={handleKeyDown}
           placeholder={isCreation ? 'e.g., A customer satisfaction survey for my coffee shop' : 'Ask PromptForm to edit your form...'}
           className={`w-full resize-none border-0 bg-transparent p-0 pr-16 ${isCreation ? 'text-base min-h-[56px] max-h-56' : 'text-sm min-h-[40px] max-h-[40vh]'} leading-6 text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-0 break-words overflow-y-auto`}
           rows={1}
