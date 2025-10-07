@@ -30,9 +30,12 @@ const CommandBar: React.FC<CommandBarProps> = ({
   const resize = () => {
     const el = taRef.current;
     if (!el) return;
-    // Allow natural vertical growth: reset to auto then expand to full scroll height.
+    // Respect CSS max-height so the textarea grows until its cap, then scrolls internally.
     el.style.height = 'auto';
-    el.style.height = `${el.scrollHeight}px`;
+    const computed = window.getComputedStyle(el);
+    const maxH = parseFloat(computed.maxHeight || '0');
+    const next = maxH > 0 ? Math.min(el.scrollHeight, maxH) : el.scrollHeight;
+    el.style.height = `${next}px`;
   };
 
   useEffect(() => {
@@ -81,7 +84,7 @@ const CommandBar: React.FC<CommandBarProps> = ({
       onDrop={handleDrop}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
-      className={`relative w-full rounded-full bg-white shadow-sm ring-1 ring-neutral-200 transition ${isCreation ? 'min-h-[64px] focus-within:ring-2 focus-within:ring-primary-400' : 'min-h-[48px] focus-within:ring-2 focus-within:ring-indigo-300'} ${
+      className={`relative w-full ${isCreation ? 'rounded-3xl max-h-72' : 'rounded-full'} bg-white shadow-sm ring-1 ring-neutral-200 transition ${isCreation ? 'min-h-[64px] focus-within:ring-2 focus-within:ring-primary-400' : 'min-h-[48px] focus-within:ring-2 focus-within:ring-indigo-300'} ${
         isDragging ? (isCreation ? 'ring-2 ring-primary-400 bg-primary-50/30' : 'ring-2 ring-indigo-400 bg-indigo-50/30') : ''
       }`}
     >
@@ -93,7 +96,7 @@ const CommandBar: React.FC<CommandBarProps> = ({
         onClick={handleFilePickClick}
         disabled={isLoading}
         hidden={!isCreation}
-        className={`absolute left-3 ${isCreation ? 'bottom-2' : 'top-1/2 -translate-y-1/2'} transform inline-flex ${isCreation ? 'h-7 w-7' : 'h-8 w-8'} items-center justify-center rounded-full bg-gray-100 text-gray-700 shadow-sm hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-60`}
+        className={`absolute left-3 ${isCreation ? 'bottom-3' : 'top-1/2 -translate-y-1/2'} transform inline-flex ${isCreation ? 'h-7 w-7' : 'h-8 w-8'} items-center justify-center rounded-full bg-gray-100 text-gray-700 shadow-sm hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-60`}
       >
         <Paperclip className="h-4 w-4" />
       </button>
@@ -105,7 +108,7 @@ const CommandBar: React.FC<CommandBarProps> = ({
         title={isCreation ? 'Generate' : 'Apply edit'}
         onClick={onSend}
         disabled={!canSend}
-        className={`absolute right-3 top-1/2 -translate-y-1/2 transform inline-flex items-center justify-center rounded-full text-white disabled:cursor-not-allowed disabled:opacity-60 ${
+        className={`absolute right-3 ${isCreation ? 'bottom-3' : 'top-1/2 -translate-y-1/2'} transform inline-flex items-center justify-center rounded-full text-white disabled:cursor-not-allowed disabled:opacity-60 ${
           isCreation ? 'h-11 w-11 bg-primary-600 hover:bg-primary-700 shadow-md' : 'h-8 w-8 bg-indigo-600 hover:bg-indigo-500 shadow-sm'
         }`}
         animate={isCreation && !isLoading ? { scale: [1, 1.05, 1] } : undefined}
@@ -115,21 +118,21 @@ const CommandBar: React.FC<CommandBarProps> = ({
       </motion.button>
 
       {/* Textarea */}
-      <div className={isCreation ? 'px-12 pt-3 pb-7' : 'px-12 py-2'}>
+      <div className={isCreation ? 'px-12 pt-4 pb-14' : 'px-12 py-2'}>
         <textarea
           ref={taRef}
           value={prompt}
           onChange={(e) => onPromptChange(e.target.value)}
           onInput={resize}
           placeholder={isCreation ? 'e.g., A customer satisfaction survey for my coffee shop' : 'Ask PromptForm to edit your form...'}
-          className={`w-full resize-none border-0 bg-transparent p-0 pr-16 ${isCreation ? 'text-base min-h-[48px] max-h-[50vh]' : 'text-sm min-h-[40px] max-h-[40vh]'} leading-6 text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-0 break-words overflow-y-auto`}
+          className={`w-full resize-none border-0 bg-transparent p-0 pr-16 ${isCreation ? 'text-base min-h-[56px] max-h-56' : 'text-sm min-h-[40px] max-h-[40vh]'} leading-6 text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-0 break-words overflow-y-auto`}
           rows={1}
           spellCheck={true}
         />
       </div>
 
       {isCreation && !file && (
-        <div className="absolute left-12 bottom-2 text-sm text-neutral-400 select-none pointer-events-none">
+        <div className="absolute left-12 bottom-3 text-sm text-neutral-400 select-none pointer-events-none">
           Attach an image, TXT, PDF, or DOCX (optional).
         </div>
       )}
