@@ -181,7 +181,7 @@ const IndividualResponsesView: React.FC<Props> = ({ form, responses, columns = [
   };
 
   return (
-    <section className="rounded-xl bg-white p-0 shadow-sm ring-1 ring-gray-200 overflow-hidden">
+    <div className="overflow-hidden">
       <div className="flex" style={{ height }}>
         {/* Left Sidebar: Submission list */}
         <aside className="w-64 border-r border-gray-200 overflow-y-auto">
@@ -276,7 +276,7 @@ const IndividualResponsesView: React.FC<Props> = ({ form, responses, columns = [
           })()}
         </main>
       </div>
-    </section>
+    </div>
   );
 };
 

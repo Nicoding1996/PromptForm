@@ -14,10 +14,12 @@ import {
   YAxis,
   CartesianGrid,
 } from 'recharts';
-import ReportModal from '../common/ReportModal';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import Papa from 'papaparse';
-import { Download, FileText, Loader2 } from 'lucide-react';
+import { Download, Loader2 } from 'lucide-react';
 import colors from 'tailwindcss/colors';
+import Card from '../ui/Card';
 type Props = {
   form: FormData | null;
   responses: StoredResponse[];
@@ -38,19 +40,36 @@ const THEME = {
   teal: colors.teal,
 };
 
-// Recharts color palette sourced from Tailwind theme colors for visual consistency
-const COLORS = [
-  THEME.primary[500],
-  THEME.success[500],
-  THEME.warning[500],
-  THEME.danger[500],
-  THEME.cyan[500],
-  THEME.purple[500],
-  THEME.lime[500],
-  THEME.orange[500],
-  THEME.rose[600],
-  THEME.teal[500],
+// Branded palettes
+const CATEGORICAL = [
+  THEME.primary[500], // Indigo 500
+  THEME.neutral[500], // Slate 500
+  THEME.primary[300], // Indigo 300
+  THEME.neutral[300], // Slate 300
 ];
+
+// Sequential palette mapped to Poor -> Fair -> Good -> Excellent
+const SEQ_ORDER = ['poor', 'fair', 'good', 'excellent'] as const;
+const SEQUENTIAL = [
+  THEME.neutral[300], // Poor
+  THEME.primary[200], // Fair
+  THEME.primary[400], // Good
+  THEME.primary[600], // Excellent
+];
+
+function normalizeLabel(x: string | undefined | null) {
+  return String(x ?? '').trim().toLowerCase();
+}
+
+function looksLikeSequential(options?: string[]) {
+  if (!options || options.length < 3) return false;
+  return options.every((o) => (SEQ_ORDER as readonly string[]).includes(normalizeLabel(o)));
+}
+
+function sequentialColorForLabel(name: string) {
+  const idx = (SEQ_ORDER as readonly string[]).indexOf(normalizeLabel(name));
+  return idx >= 0 ? SEQUENTIAL[idx] : CATEGORICAL[0];
+}
 
 /**
  * Get value(s) for a question from a response payload.
@@ -173,7 +192,6 @@ const SummaryView: React.FC<Props> = ({ form, responses, height = '70vh' }) => {
   const [isReportLoading, setIsReportLoading] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
   const [reportText, setReportText] = useState('');
-  const [showReport, setShowReport] = useState(false);
 
   // Call backend to generate AI analysis (Markdown)
   const handleGenerateReport = async () => {
@@ -201,7 +219,6 @@ const SummaryView: React.FC<Props> = ({ form, responses, height = '70vh' }) => {
       }
 
       setReportText(text);
-      setShowReport(true);
     } catch (e: any) {
       setReportError(e?.message || 'Failed to generate report.');
     } finally {
@@ -323,7 +340,7 @@ const SummaryView: React.FC<Props> = ({ form, responses, height = '70vh' }) => {
   };
 
   return (
-    <section className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-200 overflow-auto" style={{ maxHeight: height }}>
+    <div className="overflow-auto" style={{ maxHeight: height }}>
       <div className="mb-4 flex items-center justify-between">
         <button
           type="button"
@@ -341,7 +358,7 @@ const SummaryView: React.FC<Props> = ({ form, responses, height = '70vh' }) => {
           type="button"
           onClick={handleGenerateReport}
           disabled={isReportLoading || !form || responses.length === 0}
-          className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
+          className="rounded-md bg-primary-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-500 disabled:opacity-60"
           title="Analyze responses and generate a professional Markdown report"
         >
           {isReportLoading ? (
@@ -350,7 +367,7 @@ const SummaryView: React.FC<Props> = ({ form, responses, height = '70vh' }) => {
             </span>
           ) : (
             <span className="inline-flex items-center gap-1">
-              <FileText className="h-4 w-4" /> Generate Report
+              ✨ Analyze Responses
             </span>
           )}
         </button>
@@ -380,32 +397,42 @@ const SummaryView: React.FC<Props> = ({ form, responses, height = '70vh' }) => {
               const smallSet = (field.options?.length ?? data.length) <= 6;
 
               return (
-                <article key={key} className="rounded-lg border border-gray-200 p-4">
+                <Card key={key} className="p-4">
                   <h4 className="mb-3 text-sm font-semibold text-gray-900">{label}</h4>
                   <div className="h-56">
                     <ResponsiveContainer width="100%" height="100%">
                       {smallSet ? (
                         <PieChart>
                           <Pie data={data} dataKey="value" nameKey="name" outerRadius={80}>
-                            {data.map((entry, index) => (
-                              <Cell key={`cell-${entry.name}-${index}`} fill={COLORS[index % COLORS.length]} />
-                            ))}
+                            {data.map((entry, index) => {
+                              const name = String((entry as any).name ?? '');
+                              const isSeq = looksLikeSequential(field.options as any);
+                              const fill = isSeq ? sequentialColorForLabel(name) : CATEGORICAL[index % CATEGORICAL.length];
+                              return <Cell key={`cell-${name}-${index}`} fill={fill} />;
+                            })}
                           </Pie>
                           <Tooltip />
                           <Legend />
                         </PieChart>
                       ) : (
-                        <BarChart data={data}>
+                        <BarChart data={data} margin={{ top: 8, right: 8, left: 8, bottom: 28 }}>
                           <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="name" />
+                          <XAxis dataKey="name" interval={0} tickMargin={8} />
                           <YAxis allowDecimals={false} />
                           <Tooltip />
-                          <Bar dataKey="value" fill={COLORS[0]} />
+                          <Bar dataKey="value">
+                            {data.map((entry, idx) => {
+                              const name = String((entry as any).name ?? '');
+                              const isSeq = looksLikeSequential(field.options as any);
+                              const fill = isSeq ? sequentialColorForLabel(name) : CATEGORICAL[idx % CATEGORICAL.length];
+                              return <Cell key={`bar-${name}-${idx}`} fill={fill} />;
+                            })}
+                          </Bar>
                         </BarChart>
                       )}
                     </ResponsiveContainer>
                   </div>
-                </article>
+                </Card>
               );
             }
 
@@ -413,45 +440,53 @@ const SummaryView: React.FC<Props> = ({ form, responses, height = '70vh' }) => {
               const values = responses.map((r) => extractValue(field, r));
               const data = buildCounts(field.options, values, true);
               return (
-                <article key={key} className="rounded-lg border border-gray-200 p-4">
+                <Card key={key} className="p-4">
                   <h4 className="mb-3 text-sm font-semibold text-gray-900">{label}</h4>
                   <div className="h-56">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={data}>
+                      <BarChart data={data} margin={{ top: 8, right: 8, left: 8, bottom: 28 }}>
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" />
+                        <XAxis dataKey="name" interval={0} tickMargin={8} />
                         <YAxis allowDecimals={false} />
                         <Tooltip />
-                        <Bar dataKey="value" fill={COLORS[1]} />
+                        <Bar dataKey="value">
+                          {data.map((entry, idx) => (
+                            <Cell key={`chk-${String((entry as any).name ?? '')}-${idx}`} fill={CATEGORICAL[idx % CATEGORICAL.length]} />
+                          ))}
+                        </Bar>
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
-                </article>
+                </Card>
               );
             }
 
             if (field.type === 'radioGrid') {
               const perRow = buildRadioGridCounts(field, responses);
               return (
-                <article key={key} className="rounded-lg border border-gray-200 p-4">
+                <Card key={key} className="p-4">
                   <h4 className="mb-3 text-sm font-semibold text-gray-900">{label}</h4>
                   <div className="space-y-6">
                     {perRow.map((row, idx) => (
                       <div key={`${key}-row-${idx}`} className="h-56">
                         <div className="mb-2 text-xs font-medium text-gray-600">{row.row}</div>
                         <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={row.data}>
+                          <BarChart data={row.data} margin={{ top: 8, right: 8, left: 8, bottom: 28 }}>
                             <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="name" />
+                            <XAxis dataKey="name" interval={0} tickMargin={8} />
                             <YAxis allowDecimals={false} />
                             <Tooltip />
-                            <Bar dataKey="value" fill={COLORS[idx % COLORS.length]} />
+                            <Bar dataKey="value">
+                              {row.data.map((entry, j) => (
+                                <Cell key={`grid-${String((entry as any).name ?? '')}-${j}`} fill={CATEGORICAL[j % CATEGORICAL.length]} />
+                              ))}
+                            </Bar>
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
                     ))}
                   </div>
-                </article>
+                </Card>
               );
             }
 
@@ -467,7 +502,7 @@ const SummaryView: React.FC<Props> = ({ form, responses, height = '70vh' }) => {
               const min = (field as any).min ?? 0;
               const max = (field as any).max ?? 10;
               return (
-                <article key={key} className="rounded-lg border border-gray-200 p-4">
+                <Card key={key} className="p-4">
                   <h4 className="mb-1 text-sm font-semibold text-gray-900">{label}</h4>
                   <div className="text-xs text-gray-500 mb-2">Scale: {min} – {max}</div>
                   <div className="text-3xl font-bold text-primary-700">
@@ -476,7 +511,7 @@ const SummaryView: React.FC<Props> = ({ form, responses, height = '70vh' }) => {
                   <div className="text-xs text-gray-500 mt-1">
                     {numbers.length} responses
                   </div>
-                </article>
+                </Card>
               );
             }
 
@@ -487,7 +522,7 @@ const SummaryView: React.FC<Props> = ({ form, responses, height = '70vh' }) => {
                 .filter((x) => x != null && String(x).length > 0)
                 .slice(0, 100);
               return (
-                <article key={key} className="rounded-lg border border-gray-200 p-4">
+                <Card key={key} className="p-4">
                   <h4 className="mb-3 text-sm font-semibold text-gray-900">{label}</h4>
                   {items.length === 0 ? (
                     <div className="text-sm text-gray-500">No responses</div>
@@ -502,7 +537,7 @@ const SummaryView: React.FC<Props> = ({ form, responses, height = '70vh' }) => {
                       </ul>
                     </div>
                   )}
-                </article>
+                </Card>
               );
             }
 
@@ -512,7 +547,7 @@ const SummaryView: React.FC<Props> = ({ form, responses, height = '70vh' }) => {
               .filter((x) => x != null && String(x).length > 0)
               .slice(0, 100);
             return (
-              <article key={key} className="rounded-lg border border-gray-200 p-4">
+              <Card key={key} className="p-4">
                 <h4 className="mb-3 text-sm font-semibold text-gray-900">{label}</h4>
                 {items.length === 0 ? (
                   <div className="text-sm text-gray-500">No responses</div>
@@ -527,16 +562,21 @@ const SummaryView: React.FC<Props> = ({ form, responses, height = '70vh' }) => {
                     </ul>
                   </div>
                 )}
-              </article>
+              </Card>
             );
           })}
         </div>
       )}
 
-      {showReport && (
-        <ReportModal text={reportText} onClose={() => setShowReport(false)} />
+      {reportText && (
+        <Card className="mt-4 p-4">
+          <h3 className="mb-2 text-base font-semibold text-neutral-900">AI-Powered Summary</h3>
+          <div className="prose prose-sm max-w-none text-neutral-800">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{reportText}</ReactMarkdown>
+          </div>
+        </Card>
       )}
-    </section>
+    </div>
   );
 };
 

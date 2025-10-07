@@ -96,8 +96,8 @@ const ResponsesPage: React.FC = () => {
                 type="button"
                 onClick={() => setActiveTab('summary')}
                 className={
-                  'rounded-md px-3 py-1.5 text-sm font-medium ' +
-                  (activeTab === 'summary' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
+                  'rounded-md px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary-500/50 ' +
+                  (activeTab === 'summary' ? 'bg-primary-600 text-white shadow-sm' : 'text-neutral-700 hover:bg-neutral-50')
                 }
                 aria-selected={activeTab === 'summary'}
               >
@@ -110,8 +110,8 @@ const ResponsesPage: React.FC = () => {
                 type="button"
                 onClick={() => setActiveTab('question')}
                 className={
-                  'rounded-md px-3 py-1.5 text-sm font-medium ' +
-                  (activeTab === 'question' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
+                  'rounded-md px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary-500/50 ' +
+                  (activeTab === 'question' ? 'bg-primary-600 text-white shadow-sm' : 'text-neutral-700 hover:bg-neutral-50')
                 }
                 aria-selected={activeTab === 'question'}
               >
@@ -124,8 +124,8 @@ const ResponsesPage: React.FC = () => {
                 type="button"
                 onClick={() => setActiveTab('individual')}
                 className={
-                  'rounded-md px-3 py-1.5 text-sm font-medium ' +
-                  (activeTab === 'individual' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
+                  'rounded-md px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary-500/50 ' +
+                  (activeTab === 'individual' ? 'bg-primary-600 text-white shadow-sm' : 'text-neutral-700 hover:bg-neutral-50')
                 }
                 aria-selected={activeTab === 'individual'}
               >
