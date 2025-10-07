@@ -1002,7 +1002,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
     { icon: MessageSquare, label: 'Contact Us', prompt: 'A concise contact form with Name, Email (required), Subject, and Message (textarea).' },
     { icon: HelpCircle, label: 'Quiz', prompt: 'Create a 5-question multiple-choice quiz about a topic with scoring enabled.' },
     { icon: ClipboardList, label: 'Assessment', prompt: 'An assessment form with several rating-scale questions and optional long-answer sections.' },
-    { icon: HelpCircle, label: 'Enneagram/Personality Test', prompt: 'A personality test (Enneagram-style) that maps results to outcomes with descriptions.' },
+    { icon: HelpCircle, label: 'Personality Test', prompt: 'A personality test (Enneagram-style) that maps results to outcomes with descriptions.' },
   ];
 
   const handleTemplateClick = (p: string) => {
