@@ -2,15 +2,20 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getFormById, listResponsesForForm, type StoredResponse } from '../services/forms';
 import type { FormData, FormField } from '../components/FormRenderer';
+import Card from '../components/ui/Card';
+import SummaryView from '../components/responses/SummaryView';
+import IndividualResponsesView from '../components/responses/IndividualResponsesView';
+
+type TabKey = 'summary' | 'question' | 'individual';
 
 const ResponsesPage: React.FC = () => {
   const { formId } = useParams<{ formId: string }>();
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<FormData | null>(null);
   const [responses, setResponses] = useState<StoredResponse[]>([]);
-  // Which submission is currently selected in the new sidebar
-  const [selectedResponseIndex, setSelectedResponseIndex] = useState(0);
+  const [activeTab, setActiveTab] = useState<TabKey>('summary');
 
   // Columns are derived from form fields (excluding submit)
   const columns = useMemo(() => {
@@ -30,10 +35,7 @@ const ResponsesPage: React.FC = () => {
       setLoading(true);
       setError(null);
       try {
-        const [formRow, respRows] = await Promise.all([
-          getFormById(formId),
-          listResponsesForForm(formId),
-        ]);
+        const [formRow, respRows] = await Promise.all([getFormById(formId), listResponsesForForm(formId)]);
         if (!alive) return;
         setForm(formRow?.form ?? null);
         setResponses(respRows);
@@ -50,121 +52,113 @@ const ResponsesPage: React.FC = () => {
     };
   }, [formId]);
 
-
   return (
-    <div className="min-h-screen bg-slate-100">
+    <div className="min-h-screen bg-neutral-50">
       <main className="app-container">
         <header className="mb-6 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-slate-900">Responses</h1>
+          <h1 className="text-2xl font-bold text-neutral-900">Responses</h1>
           <div className="flex items-center gap-2">
-            <Link to="/dashboard" className="btn-ghost">
-              Back to Dashboard
-            </Link>
+            <Link to="/dashboard" className="btn-ghost">Back to Dashboard</Link>
             {formId && (
-              <Link to={`/form/${formId}`} className="btn-ghost">
-                View Public Form
-              </Link>
+              <Link to={`/form/${formId}`} className="btn-ghost">View Public Form</Link>
             )}
           </div>
         </header>
 
         {loading ? (
-          <section className="card p-6">
+          <Card className="p-6">
             <div className="animate-pulse space-y-3">
               <div className="h-6 w-1/3 rounded bg-gray-200" />
               <div className="h-5 w-2/3 rounded bg-gray-200" />
               <div className="h-5 w-1/2 rounded bg-gray-200" />
             </div>
-          </section>
+          </Card>
         ) : error ? (
-          <section className="card p-6">
+          <Card className="p-6">
             <p className="text-sm text-red-700">Error: {error}</p>
-          </section>
+          </Card>
         ) : !form ? (
-          <section className="card p-6">
-            <p className="text-sm text-slate-700">Form not found.</p>
-          </section>
+          <Card className="p-6">
+            <p className="text-sm text-neutral-700">Form not found.</p>
+          </Card>
         ) : responses.length === 0 ? (
-          <section className="card p-6">
-            <p className="text-sm text-slate-700">No responses yet.</p>
-          </section>
+          <Card className="p-6">
+            <p className="text-sm text-neutral-700">No responses yet.</p>
+          </Card>
         ) : (
-          <section className="card p-0 overflow-hidden">
-            <div className="flex h-[70vh]">
-              {/* Left Sidebar: Submission list */}
-              <aside className="w-64 border-r border-gray-200 overflow-y-auto">
-                <ul className="divide-y divide-gray-100">
-                  {responses.map((r, idx) => {
-                    const active = idx === selectedResponseIndex;
-                    const ts = r.createdAt?.toDate
-                      ? r.createdAt.toDate().toLocaleString()
-                      : 'Unknown date';
-                    return (
-                      <li key={r.id}>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedResponseIndex(idx)}
-                          className={
-                            'w-full text-left px-3 py-3 transition ' +
-                            (active ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-gray-50')
-                          }
-                          title={`Open submission #${idx + 1}`}
-                        >
-                          <div className="text-sm font-medium">{`Submission #${idx + 1}`}</div>
-                          <div className="text-xs text-gray-500">{ts}</div>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </aside>
-
-              {/* Main Content: Selected response details */}
-              <main className="flex-1 overflow-y-auto p-6">
-                {(() => {
-                  const r = responses[selectedResponseIndex];
-                  if (!r) {
-                    return <p className="text-sm text-gray-500">Select a submission to view details.</p>;
-                  }
-
-                  // Prefer ordered form fields; if missing, fall back to raw payload entries
-                  const pairs =
-                    columns.length > 0
-                      ? columns.map((c) => ({
-                          label: c.label,
-                          value: r.payload?.[c.key],
-                        }))
-                      : Object.entries(r.payload || {}).map(([k, v]) => ({ label: k, value: v }));
-
-                  const format = (v: any) =>
-                    Array.isArray(v)
-                      ? v.join(', ')
-                      : typeof v === 'object' && v !== null
-                      ? JSON.stringify(v)
-                      : String(v ?? '');
-
-                  return (
-                    <div className="space-y-4">
-                      <div className="mb-2">
-                        <div className="text-sm text-gray-500">
-                          {r.createdAt?.toDate ? r.createdAt.toDate().toLocaleString() : ''}
-                        </div>
-                      </div>
-
-                      {pairs.map((p, i) => (
-                        <div key={i} className="pb-4 border-b border-gray-100">
-                          <strong className="block text-sm text-gray-700">{p.label}</strong>
-                          <p className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">
-                            {format(p.value)}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })()}
-              </main>
+          <Card className="p-0 overflow-hidden">
+            {/* Tabs */}
+            <div className="flex items-center gap-2 border-b border-neutral-200 p-3" role="tablist" aria-label="Responses tabs">
+              <button
+                id="rs-tab-summary"
+                role="tab"
+                aria-controls="rs-panel-summary"
+                type="button"
+                onClick={() => setActiveTab('summary')}
+                className={
+                  'rounded-md px-3 py-1.5 text-sm font-medium ' +
+                  (activeTab === 'summary' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
+                }
+                aria-selected={activeTab === 'summary'}
+              >
+                Summary
+              </button>
+              <button
+                id="rs-tab-question"
+                role="tab"
+                aria-controls="rs-panel-question"
+                type="button"
+                onClick={() => setActiveTab('question')}
+                className={
+                  'rounded-md px-3 py-1.5 text-sm font-medium ' +
+                  (activeTab === 'question' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
+                }
+                aria-selected={activeTab === 'question'}
+              >
+                Question
+              </button>
+              <button
+                id="rs-tab-individual"
+                role="tab"
+                aria-controls="rs-panel-individual"
+                type="button"
+                onClick={() => setActiveTab('individual')}
+                className={
+                  'rounded-md px-3 py-1.5 text-sm font-medium ' +
+                  (activeTab === 'individual' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
+                }
+                aria-selected={activeTab === 'individual'}
+              >
+                Individual
+              </button>
             </div>
-          </section>
+
+            {/* Panels */}
+            {activeTab === 'summary' && (
+              <div id="rs-panel-summary" role="tabpanel" aria-labelledby="rs-tab-summary" className="p-4" tabIndex={0}>
+                <SummaryView form={form} responses={responses} height="70vh" />
+              </div>
+            )}
+
+            {activeTab === 'question' && (
+              <div
+                id="rs-panel-question"
+                role="tabpanel"
+                aria-labelledby="rs-tab-question"
+                className="rounded-lg border border-dashed border-gray-300 m-4 p-6 text-sm text-gray-700"
+                tabIndex={0}
+              >
+                <h2 className="text-base font-semibold text-gray-900">Question View (Coming Soon)</h2>
+                <p className="mt-1 text-gray-600">Per-question breakdown will appear here.</p>
+              </div>
+            )}
+
+            {activeTab === 'individual' && (
+              <div id="rs-panel-individual" role="tabpanel" aria-labelledby="rs-tab-individual" className="p-4" tabIndex={0}>
+                <IndividualResponsesView form={form} responses={responses} columns={columns as any} height="70vh" />
+              </div>
+            )}
+          </Card>
         )}
       </main>
     </div>

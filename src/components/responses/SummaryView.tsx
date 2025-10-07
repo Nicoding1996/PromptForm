@@ -17,23 +17,39 @@ import {
 import ReportModal from '../common/ReportModal';
 import Papa from 'papaparse';
 import { Download, FileText, Loader2 } from 'lucide-react';
+import colors from 'tailwindcss/colors';
 type Props = {
   form: FormData | null;
   responses: StoredResponse[];
   height?: string; // overall viewport height for the container area (e.g., '70vh')
 };
 
+const THEME = {
+  primary: colors.indigo,
+  neutral: colors.slate,
+  success: colors.green,
+  danger: colors.red,
+  warning: colors.amber,
+  cyan: colors.cyan,
+  purple: colors.violet,
+  lime: colors.lime,
+  orange: colors.orange,
+  rose: colors.rose,
+  teal: colors.teal,
+};
+
+// Recharts color palette sourced from Tailwind theme colors for visual consistency
 const COLORS = [
-  '#6366F1', // indigo-500
-  '#22C55E', // green-500
-  '#F59E0B', // amber-500
-  '#EF4444', // red-500
-  '#06B6D4', // cyan-500
-  '#A855F7', // purple-500
-  '#84CC16', // lime-500
-  '#F97316', // orange-500
-  '#E11D48', // rose-600
-  '#14B8A6', // teal-500
+  THEME.primary[500],
+  THEME.success[500],
+  THEME.warning[500],
+  THEME.danger[500],
+  THEME.cyan[500],
+  THEME.purple[500],
+  THEME.lime[500],
+  THEME.orange[500],
+  THEME.rose[600],
+  THEME.teal[500],
 ];
 
 /**
@@ -454,7 +470,7 @@ const SummaryView: React.FC<Props> = ({ form, responses, height = '70vh' }) => {
                 <article key={key} className="rounded-lg border border-gray-200 p-4">
                   <h4 className="mb-1 text-sm font-semibold text-gray-900">{label}</h4>
                   <div className="text-xs text-gray-500 mb-2">Scale: {min} – {max}</div>
-                  <div className="text-3xl font-bold text-indigo-700">
+                  <div className="text-3xl font-bold text-primary-700">
                     {avg == null ? '—' : avg.toFixed(2)}
                   </div>
                   <div className="text-xs text-gray-500 mt-1">

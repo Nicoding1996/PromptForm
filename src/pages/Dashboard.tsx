@@ -153,7 +153,7 @@ const Dashboard: React.FC = () => {
             <p className="text-sm text-slate-700">No forms saved yet.</p>
           ) : (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {forms.map((f) => (
                   <FormCard
                     key={f.id}

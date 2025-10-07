@@ -30,9 +30,9 @@ const CommandBar: React.FC<CommandBarProps> = ({
   const resize = () => {
     const el = taRef.current;
     if (!el) return;
-    el.style.height = '0px';
-    const next = Math.min(el.scrollHeight, 240); // clamp to keep compact
-    el.style.height = `${next}px`;
+    // Allow natural vertical growth: reset to auto then expand to full scroll height.
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
   };
 
   useEffect(() => {
@@ -122,7 +122,7 @@ const CommandBar: React.FC<CommandBarProps> = ({
           onChange={(e) => onPromptChange(e.target.value)}
           onInput={resize}
           placeholder={isCreation ? 'e.g., A customer satisfaction survey for my coffee shop' : 'Ask PromptForm to edit your form...'}
-          className={`w-full resize-none border-0 bg-transparent p-0 ${isCreation ? 'text-base' : 'text-sm'} leading-6 text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-0`}
+          className={`w-full resize-none border-0 bg-transparent p-0 pr-16 ${isCreation ? 'text-base min-h-[48px] max-h-[50vh]' : 'text-sm min-h-[40px] max-h-[40vh]'} leading-6 text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-0 break-words overflow-y-auto`}
           rows={1}
           spellCheck={true}
         />

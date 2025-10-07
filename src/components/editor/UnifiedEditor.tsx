@@ -10,7 +10,7 @@ import LoginButton from '../LoginButton';
 import { getFormById, saveFormForUser, listResponsesForForm, type StoredResponse } from '../../services/forms';
 import IndividualResponsesView from '../responses/IndividualResponsesView';
 import SummaryView from '../responses/SummaryView';
-import { Save, ExternalLink, Loader2, Share2, Eye, ClipboardList, UserPlus, MessageSquare, HelpCircle, Sparkles, PlusCircle } from 'lucide-react';
+import { Save, ExternalLink, Loader2, Share2, Eye, ClipboardList, UserPlus, MessageSquare, HelpCircle, Sparkles } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { AnimatePresence, motion } from 'framer-motion';
 import Button from '../ui/Button';
@@ -63,6 +63,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
     return ai === '1' || ai === 'true';
   }, [location.search]);
   const [aiBarVisible, setAiBarVisible] = useState<boolean>(defaultAiVisible);
+  const [aiInitDone, setAiInitDone] = useState(false);
 
   // Load existing form when formId is provided
   useEffect(() => {
@@ -81,6 +82,25 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
       alive = false;
     };
   }, [formId]);
+
+  // Initialize AI bar visibility based on query param and whether the form was AI-generated
+  useEffect(() => {
+    if (aiInitDone) return;
+    const q = new URLSearchParams(location.search);
+    const aiParam = q.get('ai');
+    if (aiParam === '0' || aiParam === 'false') {
+      setAiBarVisible(false);
+      setAiInitDone(true);
+      return;
+    }
+    if ((formJson as any)?.meta?.aiGenerated) {
+      setAiBarVisible(true);
+      setAiInitDone(true);
+      return;
+    }
+    // Default: leave as-is from defaultAiVisible memo
+    setAiInitDone(true);
+  }, [formJson, location.search, aiInitDone]);
 
   // Load responses when entering Responses tab
   useEffect(() => {
@@ -831,7 +851,9 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
         setError(message);
         setFormJson(null);
       } else {
-        setFormJson(data as FormData);
+        // Mark AI-first generated forms for default visibility in future sessions
+        const withMeta = { ...(data as any), meta: { ...((data as any)?.meta), aiGenerated: true } } as FormData;
+        setFormJson(withMeta as FormData);
         setLastSavedId(null);
 
         // Seamless Creation-to-Edit Flow:
@@ -839,7 +861,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
         // auto-save the newly generated form and navigate to /form/:id/edit.
         if (!formId && user) {
           try {
-            const newId = await saveFormForUser(user.uid, data as FormData);
+            const newId = await saveFormForUser(user.uid, withMeta as FormData);
             setLastSavedId(newId);
             toast.success('Form created. Opening editor...');
             navigate(`/form/${newId}/edit?ai=1`);
@@ -1070,7 +1092,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
               title={aiBarVisible ? 'Hide AI bar' : 'Show AI bar'}
               aria-pressed={aiBarVisible}
             >
-              <Sparkles className="h-4 w-4 text-indigo-600" />
+              <Sparkles className="h-4 w-4 text-primary-600" />
             </button>
             <Link to="/dashboard" className="text-sm text-neutral-700 underline-offset-4 hover:underline" title="Back to My Forms">
               Dashboard
@@ -1088,7 +1110,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
               <h1 className="text-4xl font-bold text-neutral-800">Create a new form in seconds</h1>
               <p className="mt-2 text-lg text-neutral-600">Describe the form you need, or start with a template. Our AI will handle the rest.</p>
 
-              <div className="mt-10 w-full md:w-4/5 mx-auto">
+              <div className="mt-8 w-full md:w-4/5 mx-auto">
                 <CommandBar
                   prompt={promptText}
                   onPromptChange={setPromptText}
@@ -1145,7 +1167,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                     onClick={() => setActiveTab('questions')}
                     className={
                       'rounded-md px-3 py-1.5 text-sm font-medium ' +
-                      (activeTab === 'questions' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
+                      (activeTab === 'questions' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
                     }
                     aria-selected={activeTab === 'questions'}
                   >
@@ -1159,7 +1181,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                     onClick={() => setActiveTab('responses')}
                     className={
                       'rounded-md px-3 py-1.5 text-sm font-medium ' +
-                      (activeTab === 'responses' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
+                      (activeTab === 'responses' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
                     }
                     aria-selected={activeTab === 'responses'}
                   >
@@ -1220,18 +1242,6 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                     </p>
                   )}
 
-                  {formJson && ((formJson.fields?.length ?? 0) === 0) && (
-                    <div className="pl-12 pr-12">
-                      <Button
-                        variant="primary"
-                        icon={PlusCircle}
-                        onClick={() => handleAddField({})}
-                        type="button"
-                      >
-                        Add your first question
-                      </Button>
-                    </div>
-                  )}
 
                   {formId && (
                     <div className="flex items-center justify-between rounded-md bg-indigo-50/40 p-3 ring-1 ring-indigo-100">
@@ -1365,7 +1375,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                       onClick={() => setResponsesSubTab('summary')}
                       className={
                         'rounded-md px-3 py-1.5 text-sm font-medium ' +
-                        (responsesSubTab === 'summary' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
+                        (responsesSubTab === 'summary' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
                       }
                       aria-selected={responsesSubTab === 'summary'}
                     >
@@ -1379,7 +1389,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                       onClick={() => setResponsesSubTab('question')}
                       className={
                         'rounded-md px-3 py-1.5 text-sm font-medium ' +
-                        (responsesSubTab === 'question' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
+                        (responsesSubTab === 'question' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
                       }
                       aria-selected={responsesSubTab === 'question'}
                     >
@@ -1393,7 +1403,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                       onClick={() => setResponsesSubTab('individual')}
                       className={
                         'rounded-md px-3 py-1.5 text-sm font-medium ' +
-                        (responsesSubTab === 'individual' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
+                        (responsesSubTab === 'individual' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
                       }
                       aria-selected={responsesSubTab === 'individual'}
                     >

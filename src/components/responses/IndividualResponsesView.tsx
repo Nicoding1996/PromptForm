@@ -195,7 +195,7 @@ const IndividualResponsesView: React.FC<Props> = ({ form, responses, columns = [
                     type="button"
                     onClick={() => setSelectedResponseIndex(idx)}
                     className={
-                      'w-full text-left px-3 py-3 transition ' + (active ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-gray-50')
+                      'w-full text-left px-3 py-3 transition ' + (active ? 'bg-primary-100 text-primary-700' : 'hover:bg-gray-50')
                     }
                     title={`Open submission #${idx + 1}`}
                   >

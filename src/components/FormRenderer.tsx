@@ -20,6 +20,7 @@ import {
   CircleDot,
 } from 'lucide-react';
 import QuestionCard from './editor/QuestionCard';
+import Button from './ui/Button';
 
 
 
@@ -813,6 +814,14 @@ const FormRenderer: React.FC<FormRendererProps> = ({
         )}
       </div>
 
+      {fields.length === 0 && (
+        <div className="mb-4 rounded-lg border border-dashed border-neutral-300 p-6 text-center">
+          <Button type="button" variant="primary" icon={PlusCircle} onClick={() => onAddField()}>
+            Add your first question
+          </Button>
+        </div>
+      )}
+
       <DndContext onDragEnd={handleDragEnd}>
         <div className="space-y-2">
           {fields.map((field, idx) => {
@@ -875,15 +884,15 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                 {/* Inline "Add question here" CTA under the focused question */}
                 {focusedFieldIndex === idx && field.type !== 'submit' && (
                   <div className="mt-2">
-                    <button
+                    <Button
                       type="button"
                       onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
                       onClick={() => setChooserAfter(idx)}
-                      className="inline-flex items-center gap-2 rounded-md border border-teal-300 bg-white px-3 py-2 text-sm font-medium text-teal-700 hover:bg-teal-50"
+                      variant="primary"
+                      icon={PlusCircle}
                     >
-                      <PlusCircle className="h-4 w-4" />
                       Add new question
-                    </button>
+                    </Button>
                     {chooserAfter === idx && (
                       <div
                         ref={paletteRef}
@@ -942,15 +951,15 @@ const FormRenderer: React.FC<FormRendererProps> = ({
 
                   return (
                     <div className="mt-4">
-                      <button
+                      <Button
                         type="button"
                         onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
                         onClick={() => setChooserAfter(idx)}
-                        className="inline-flex items-center gap-2 rounded-md border border-teal-300 bg-white px-3 py-2 text-sm font-medium text-teal-700 hover:bg-teal-50"
+                        variant="primary"
+                        icon={PlusCircle}
                       >
-                        <PlusCircle className="h-4 w-4" />
                         Add new question
-                      </button>
+                      </Button>
                       {chooserAfter === idx && (
                         <div
                           ref={paletteRef}
