@@ -10,9 +10,11 @@ import LoginButton from '../LoginButton';
 import { getFormById, saveFormForUser, listResponsesForForm, type StoredResponse } from '../../services/forms';
 import IndividualResponsesView from '../responses/IndividualResponsesView';
 import SummaryView from '../responses/SummaryView';
-import { Save, ExternalLink, LayoutDashboard, Loader2, Share2, Eye } from 'lucide-react';
+import { Save, ExternalLink, Loader2, Share2, Eye, ClipboardList, UserPlus, MessageSquare, HelpCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { AnimatePresence, motion } from 'framer-motion';
+import Button from '../ui/Button';
+import Card from '../ui/Card';
 
 type UnifiedEditorProps = {
   formId?: string;
@@ -762,9 +764,10 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
   };
 
   // Generate via backend services (AI)
-  const handleGenerate = async () => {
+  const handleGenerate = async (promptOverride?: string) => {
     setError(null);
-    if (!promptText.trim() && !selectedFile) {
+    const effectivePrompt = (promptOverride ?? promptText).trim();
+    if (!effectivePrompt && !selectedFile) {
       setError('Please enter a prompt or attach a file.');
       return;
     }
@@ -782,13 +785,13 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
             body: JSON.stringify({
               image: base64,
               mimeType,
-              context: promptText.trim() || undefined,
+              context: effectivePrompt || undefined,
             }),
           });
         } else {
           const form = new FormData();
           form.append('file', selectedFile, selectedFile.name);
-          if (promptText.trim()) form.append('prompt', promptText.trim());
+          if (effectivePrompt) form.append('prompt', effectivePrompt);
           resp = await fetch('http://localhost:3001/generate-form-from-document', {
             method: 'POST',
             body: form,
@@ -798,7 +801,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
         resp = await fetch('http://localhost:3001/generate-form', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: promptText }),
+          body: JSON.stringify({ prompt: effectivePrompt }),
         });
       }
 
@@ -956,34 +959,58 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
     }
   };
 
+  // Quick start templates and helpers
+  const templates = [
+    { icon: ClipboardList, label: 'Customer Feedback', prompt: 'Create a customer feedback survey for a coffee shop. Include: Name (optional), Email (optional), a 1-5 satisfaction rating, visit frequency (multiple choice), and an open-ended comments field.' },
+    { icon: UserPlus, label: 'Event Registration', prompt: 'Create an event registration form with Name, Email, Phone, Ticket Type (General, VIP), Dietary Restrictions (checkboxes), and a consent checkbox for terms.' },
+    { icon: MessageSquare, label: 'Contact Us', prompt: 'Create a contact form with Name, Email (required), Subject, and Message (textarea).' },
+    { icon: HelpCircle, label: 'Quiz', prompt: 'Create a 5-question multiple-choice quiz about coffee brewing with scoring enabled.' },
+  ];
+
+  const handleTemplateClick = (p: string) => {
+    setSelectedFile(null);
+    setPromptText(p);
+    void handleGenerate(p);
+  };
+
+  const createBlankCanvas = async () => {
+    const blank: FormData = { title: 'Untitled Form', description: '', fields: [] as any };
+    setFormJson(blank);
+    if (!formId && user) {
+      try {
+        const newId = await saveFormForUser(user.uid, blank as any);
+        setLastSavedId(newId);
+        navigate(`/form/${newId}/edit`);
+      } catch {}
+    }
+  };
+
   // UI
   return (
-    <div className="min-h-screen bg-slate-100">
+    <div className="min-h-screen bg-neutral-50">
       <main id="form-editor-container" className="app-container flex flex-col gap-6">
         <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Form Editor</h1>
-            <p className="mt-1 text-sm text-slate-600">Build your form and manage responses in one place.</p>
+            {(formId || formJson) && (
+              <>
+                <h1 className="text-2xl font-bold tracking-tight text-slate-900">Form Editor</h1>
+                <p className="mt-1 text-sm text-slate-600">Build your form and manage responses in one place.</p>
+              </>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
             {user && formJson && formId && (
-              <button
+              <Button
                 type="button"
                 onClick={handleSaveForm}
                 disabled={saving || !!lastSavedId}
-                className="btn-brand"
+                variant="primary"
+                icon={saving ? undefined : Save}
                 title="Save this form"
               >
-                {lastSavedId ? (
-                  '✓ Saved!'
-                ) : (
-                  <span className="inline-flex items-center gap-1">
-                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                    <span>{saving ? 'Saving...' : 'Save'}</span>
-                  </span>
-                )}
-              </button>
+                {lastSavedId ? '✓ Saved!' : saving ? 'Saving...' : 'Save'}
+              </Button>
             )}
 
             {lastSavedId && (
@@ -1027,10 +1054,8 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
               </>
             )}
 
-            <Link to="/dashboard" className="btn-ghost" title="Back to My Forms">
-              <span className="inline-flex items-center gap-1">
-                <LayoutDashboard className="h-4 w-4" /> Dashboard
-              </span>
+            <Link to="/dashboard" className="text-sm text-neutral-700 underline-offset-4 hover:underline" title="Back to My Forms">
+              Dashboard
             </Link>
 
 
@@ -1038,295 +1063,347 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
           </div>
         </header>
 
-        {saveError && <div className="text-xs text-red-600">{saveError}</div>}
+        {/* Homepage hero vs editor */}
+        {!formId && !formJson ? (
+          <section className="mx-auto w-full max-w-4xl py-4">
+            <div className="flex flex-col items-center text-center">
+              <h1 className="text-4xl font-bold text-neutral-800">Create a new form in seconds</h1>
+              <p className="mt-2 text-lg text-neutral-600">Describe the form you need, or start with a template. Our AI will handle the rest.</p>
 
-        <div className="card p-2">
-          {formId && (
-            <div className="mb-4 flex items-center gap-2" role="tablist" aria-label="Editor tabs">
-              <button
-                id="tab-questions"
-                role="tab"
-                aria-controls="panel-questions"
-                type="button"
-                onClick={() => setActiveTab('questions')}
-                className={
-                  'rounded-md px-3 py-1.5 text-sm font-medium ' +
-                  (activeTab === 'questions' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
-                }
-                aria-selected={activeTab === 'questions'}
-              >
-                Questions
-              </button>
-              <button
-                id="tab-responses"
-                role="tab"
-                aria-controls="panel-responses"
-                type="button"
-                onClick={() => setActiveTab('responses')}
-                className={
-                  'rounded-md px-3 py-1.5 text-sm font-medium ' +
-                  (activeTab === 'responses' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
-                }
-                aria-selected={activeTab === 'responses'}
-              >
-                Responses
-              </button>
-            </div>
-          )}
-
-          {activeTab === 'questions' ? (
-            <div id="panel-questions" role="tabpanel" aria-labelledby="tab-questions" className="space-y-6" tabIndex={0}>
-              <CommandBar
-                prompt={promptText}
-                onPromptChange={setPromptText}
-                file={selectedFile}
-                onFileChange={setSelectedFile}
-                isLoading={isLoading || refactorLoading}
-                mode={formId ? 'editing' : 'creation'}
-                onSend={() => {
-                  if (formId) {
-                    const cmd = promptText.trim();
-                    if (cmd) {
-                      handleRefactorRequest(cmd);
-                    }
-                  } else {
+              <div className="mt-6 w-full md:w-4/5 mx-auto">
+                <CommandBar
+                  prompt={promptText}
+                  onPromptChange={setPromptText}
+                  file={selectedFile}
+                  onFileChange={setSelectedFile}
+                  isLoading={isLoading || refactorLoading}
+                  mode="creation"
+                  onSend={() => {
                     handleGenerate();
-                  }
-                }}
-              />
+                  }}
+                />
+              </div>
+
+              <div className="mt-8 w-full md:w-4/5 mx-auto text-left">
+                <h3 className="text-sm font-medium text-neutral-500">Or start with an idea</h3>
+                <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {templates.map((t, i) => (
+                    <Button
+                      key={i}
+                      variant="secondary"
+                      icon={t.icon as any}
+                      onClick={() => handleTemplateClick(t.prompt)}
+                      className="w-full justify-start"
+                      type="button"
+                    >
+                      {t.label}
+                    </Button>
+                  ))}
+                </div>
+
+                <p className="mt-4 text-sm text-neutral-500">
+                  or{' '}
+                  <button type="button" onClick={createBlankCanvas} className="underline-offset-4 hover:underline">
+                    <span className="text-primary-600 font-medium">start from a blank canvas</span>
+                  </button>
+                </p>
+              </div>
+            </div>
+          </section>
+        ) : (
+          <>
+            {saveError && <div className="text-xs text-red-600">{saveError}</div>}
+
+            <Card className="p-2">
               {formId && (
-                <div className="pl-12 pr-12 mt-2 mb-3">
-                  <SuggestionChips
-                    onSelect={(cmd) => handleRefactorRequest(cmd)}
-                    disabled={refactorLoading || isLoading}
+                <div className="mb-4 flex items-center gap-2" role="tablist" aria-label="Editor tabs">
+                  <button
+                    id="tab-questions"
+                    role="tab"
+                    aria-controls="panel-questions"
+                    type="button"
+                    onClick={() => setActiveTab('questions')}
+                    className={
+                      'rounded-md px-3 py-1.5 text-sm font-medium ' +
+                      (activeTab === 'questions' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
+                    }
+                    aria-selected={activeTab === 'questions'}
+                  >
+                    Questions
+                  </button>
+                  <button
+                    id="tab-responses"
+                    role="tab"
+                    aria-controls="panel-responses"
+                    type="button"
+                    onClick={() => setActiveTab('responses')}
+                    className={
+                      'rounded-md px-3 py-1.5 text-sm font-medium ' +
+                      (activeTab === 'responses' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
+                    }
+                    aria-selected={activeTab === 'responses'}
+                  >
+                    Responses
+                  </button>
+                </div>
+              )}
+
+              {activeTab === 'questions' ? (
+                <div id="panel-questions" role="tabpanel" aria-labelledby="tab-questions" className="space-y-8" tabIndex={0}>
+                  <CommandBar
+                    prompt={promptText}
+                    onPromptChange={setPromptText}
+                    file={selectedFile}
+                    onFileChange={setSelectedFile}
+                    isLoading={isLoading || refactorLoading}
+                    mode={formId ? 'editing' : 'creation'}
+                    onSend={() => {
+                      if (formId) {
+                        const cmd = promptText.trim();
+                        if (cmd) {
+                          handleRefactorRequest(cmd);
+                        }
+                      } else {
+                        handleGenerate();
+                      }
+                    }}
                   />
-                  {refactorError && (
-                    <p className="mt-2 rounded-md border-l-4 border-red-400 bg-red-50 p-2 text-xs text-red-700">
-                      {refactorError}
+
+                   {formId && (
+                    <div className="pl-12 pr-12 mt-2 mb-3">
+                      <SuggestionChips
+                        onSelect={(cmd) => handleRefactorRequest(cmd)}
+                        disabled={refactorLoading || isLoading}
+                      />
+                      {refactorError && (
+                        <p className="mt-2 rounded-md border-l-4 border-red-400 bg-red-50 p-2 text-xs text-red-700">
+                          {refactorError}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {error && (
+                    <p role="status" className="rounded-md border-l-4 border-red-400 bg-red-50 p-3 text-sm text-red-700">
+                      {error}
                     </p>
                   )}
-                </div>
-              )}
 
-              {error && (
-                <p role="status" className="rounded-md border-l-4 border-red-400 bg-red-50 p-3 text-sm text-red-700">
-                  {error}
-                </p>
-              )}
+                  {formId && (
+                    <div className="flex items-center justify-between rounded-md bg-indigo-50/40 p-3 ring-1 ring-indigo-100">
+                      <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={quizMode}
+                          onChange={(e) => handleSetQuizMode(e.target.checked)}
+                          className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        Enable scoring and outcomes
+                      </label>
+                      {quizMode && (
+                        <span className="text-xs text-gray-500">
+                          Mark correct answers and assign points in each choice question. Define outcomes below.
+                        </span>
+                      )}
+                    </div>
+                  )}
 
-              {formId && (
-                <div className="flex items-center justify-between rounded-md bg-indigo-50/40 p-3 ring-1 ring-indigo-100">
-                  <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={quizMode}
-                      onChange={(e) => handleSetQuizMode(e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                    />
-                    Enable scoring and outcomes
-                  </label>
                   {quizMode && (
-                    <span className="text-xs text-gray-500">
-                      Mark correct answers and assign points in each choice question. Define outcomes below.
-                    </span>
+                    <section className="rounded-md border border-indigo-100 bg-indigo-50/20 p-3">
+                      <div className="mb-2 flex items-center justify-between">
+                        <h3 className="text-sm font-semibold text-gray-900">Outcomes</h3>
+                        <button
+                          type="button"
+                          onClick={handleAddResultPage}
+                          className="rounded-md bg-white px-2 py-1 text-xs font-medium text-indigo-700 ring-1 ring-indigo-200 hover:bg-indigo-50"
+                        >
+                          + Add an Outcome
+                        </button>
+                      </div>
+
+                      <p className="mb-3 text-xs text-gray-600">
+                        Outcomes map total quiz score ranges to a result page (e.g., personality type). You can define a title,
+                        description, and a score range for each outcome.
+                      </p>
+
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {(formJson as any)?.resultPages?.length ? (
+                          (formJson as any).resultPages.map((page: ResultPage, i: number) => (
+                            <ResultCard
+                              key={`result-page-${i}`}
+                              index={i}
+                              page={page}
+                              onChange={handleUpdateResultPage}
+                              onDelete={handleDeleteResultPage}
+                            />
+                          ))
+                        ) : (
+                          <div className="text-xs text-gray-500">No outcomes yet. Click "Add an Outcome" to create one.</div>
+                        )}
+                      </div>
+                    </section>
+                  )}
+
+                  {isLoading ? (
+                    <section aria-label="Loading form" className="card">
+                      <div className="card-body animate-pulse space-y-4">
+                        <div className="h-6 w-1/3 rounded bg-gray-200" />
+                        <div className="h-10 w-full rounded bg-gray-200" />
+                        <div className="h-24 w-full rounded bg-gray-200" />
+                        <div className="h-10 w-1/4 rounded bg-gray-200" />
+                      </div>
+                    </section>
+                  ) : (
+                    formJson && (
+                      <div className="relative">
+                        <FormRenderer
+                          formData={formJson}
+                          onUpdateFieldLabel={handleUpdateFieldLabel}
+                          onDeleteField={handleDeleteField}
+                          onReorderFields={handleReorderFields}
+                          onAddField={handleAddField as any}
+                          onAddSection={handleAddSection as any}
+                          onAiAssistQuestion={handleAiAssistQuestion}
+                          assistingIndex={assistingIndex}
+                          onUpdateFormTitle={handleUpdateFormTitle}
+                          onUpdateFormDescription={handleUpdateFormDescription}
+                          // Advanced editor props
+                          focusedFieldIndex={focusedFieldIndex}
+                          setFocusedFieldIndex={setFocus}
+                          onUpdateFieldOption={handleUpdateFieldOption}
+                          onAddFieldOption={handleAddFieldOption}
+                          onRemoveFieldOption={handleRemoveFieldOption}
+                          onChangeFieldType={handleChangeFieldType}
+                          onDuplicateField={handleDuplicateField}
+                          onToggleRequiredField={handleToggleRequiredField}
+                          // Quiz
+                          quizMode={quizMode}
+                          onUpdateFieldCorrectAnswer={handleUpdateFieldCorrectAnswer as any}
+                          onUpdateFieldPoints={handleUpdateFieldPoints}
+                          // Grid + range
+                          onUpdateGridRow={handleUpdateGridRow}
+                          onUpdateGridColumn={handleUpdateGridColumn}
+                          onAddGridRow={handleAddGridRow}
+                          onAddGridColumn={handleAddGridColumn}
+                          onRemoveGridRow={handleRemoveGridRow}
+                          onRemoveGridColumn={handleRemoveGridColumn}
+                          onUpdateGridColumnPoints={handleUpdateGridColumnPoints}
+                          onUpdateRangeBounds={handleUpdateRangeBounds}
+                          onUpdateSectionSubtitle={handleUpdateSectionSubtitle}
+                        />
+
+                        <AnimatePresence>
+                          {isRefactoring && (
+                            <motion.div
+                              key="refactor-overlay"
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              transition={{ duration: 0.2 }}
+                              className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 backdrop-blur-[1px]"
+                            >
+                              <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    )
                   )}
                 </div>
-              )}
-
-              {quizMode && (
-                <section className="rounded-md border border-indigo-100 bg-indigo-50/20 p-3">
-                  <div className="mb-2 flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-gray-900">Outcomes</h3>
+              ) : (
+                <div id="panel-responses" role="tabpanel" aria-labelledby="tab-responses" className="card p-4" tabIndex={0}>
+                  <div className="mb-4 flex items-center gap-2" role="tablist" aria-label="Responses subtabs">
                     <button
+                      id="rs-tab-summary"
+                      role="tab"
+                      aria-controls="rs-panel-summary"
                       type="button"
-                      onClick={handleAddResultPage}
-                      className="rounded-md bg-white px-2 py-1 text-xs font-medium text-indigo-700 ring-1 ring-indigo-200 hover:bg-indigo-50"
+                      onClick={() => setResponsesSubTab('summary')}
+                      className={
+                        'rounded-md px-3 py-1.5 text-sm font-medium ' +
+                        (responsesSubTab === 'summary' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
+                      }
+                      aria-selected={responsesSubTab === 'summary'}
                     >
-                      + Add an Outcome
+                      Summary
+                    </button>
+                    <button
+                      id="rs-tab-question"
+                      role="tab"
+                      aria-controls="rs-panel-question"
+                      type="button"
+                      onClick={() => setResponsesSubTab('question')}
+                      className={
+                        'rounded-md px-3 py-1.5 text-sm font-medium ' +
+                        (responsesSubTab === 'question' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
+                      }
+                      aria-selected={responsesSubTab === 'question'}
+                    >
+                      Question
+                    </button>
+                    <button
+                      id="rs-tab-individual"
+                      role="tab"
+                      aria-controls="rs-panel-individual"
+                      type="button"
+                      onClick={() => setResponsesSubTab('individual')}
+                      className={
+                        'rounded-md px-3 py-1.5 text-sm font-medium ' +
+                        (responsesSubTab === 'individual' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
+                      }
+                      aria-selected={responsesSubTab === 'individual'}
+                    >
+                      Individual
                     </button>
                   </div>
 
-                  <p className="mb-3 text-xs text-gray-600">
-                    Outcomes map total quiz score ranges to a result page (e.g., personality type). You can define a title,
-                    description, and a score range for each outcome.
-                  </p>
+                  {responsesSubTab === 'summary' && (
+                    <div id="rs-panel-summary" role="tabpanel" aria-labelledby="rs-tab-summary" tabIndex={0}>
+                      <SummaryView form={formJson} responses={responses} height="70vh" />
+                    </div>
+                  )}
 
-                  <div className="grid gap-3 md:grid-cols-2">
-                    {(formJson as any)?.resultPages?.length ? (
-                      (formJson as any).resultPages.map((page: ResultPage, i: number) => (
-                        <ResultCard
-                          key={`result-page-${i}`}
-                          index={i}
-                          page={page}
-                          onChange={handleUpdateResultPage}
-                          onDelete={handleDeleteResultPage}
-                        />
-                      ))
-                    ) : (
-                      <div className="text-xs text-gray-500">No outcomes yet. Click "Add an Outcome" to create one.</div>
-                    )}
-                  </div>
-                </section>
-              )}
+                  {responsesSubTab === 'question' && (
+                    <div
+                      id="rs-panel-question"
+                      role="tabpanel"
+                      aria-labelledby="rs-tab-question"
+                      className="rounded-lg border border-dashed border-gray-300 p-6 text-sm text-gray-700"
+                      tabIndex={0}
+                    >
+                      <h2 className="text-base font-semibold text-gray-900">Question View (Coming Soon)</h2>
+                      <p className="mt-1 text-gray-600">Per-question breakdown will appear here.</p>
+                    </div>
+                  )}
 
-              {isLoading ? (
-                <section aria-label="Loading form" className="card">
-                  <div className="card-body animate-pulse space-y-4">
-                    <div className="h-6 w-1/3 rounded bg-gray-200" />
-                    <div className="h-10 w-full rounded bg-gray-200" />
-                    <div className="h-24 w-full rounded bg-gray-200" />
-                    <div className="h-10 w-1/4 rounded bg-gray-200" />
-                  </div>
-                </section>
-              ) : (
-                formJson && (
-                  <div className="relative">
-                    <FormRenderer
-                      formData={formJson}
-                      onUpdateFieldLabel={handleUpdateFieldLabel}
-                      onDeleteField={handleDeleteField}
-                      onReorderFields={handleReorderFields}
-                      onAddField={handleAddField as any}
-                      onAddSection={handleAddSection as any}
-                      onAiAssistQuestion={handleAiAssistQuestion}
-                      assistingIndex={assistingIndex}
-                      onUpdateFormTitle={handleUpdateFormTitle}
-                      onUpdateFormDescription={handleUpdateFormDescription}
-                      // Advanced editor props
-                      focusedFieldIndex={focusedFieldIndex}
-                      setFocusedFieldIndex={setFocus}
-                      onUpdateFieldOption={handleUpdateFieldOption}
-                      onAddFieldOption={handleAddFieldOption}
-                      onRemoveFieldOption={handleRemoveFieldOption}
-                      onChangeFieldType={handleChangeFieldType}
-                      onDuplicateField={handleDuplicateField}
-                      onToggleRequiredField={handleToggleRequiredField}
-                      // Quiz
-                      quizMode={quizMode}
-                      onUpdateFieldCorrectAnswer={handleUpdateFieldCorrectAnswer as any}
-                      onUpdateFieldPoints={handleUpdateFieldPoints}
-                      // Grid + range
-                      onUpdateGridRow={handleUpdateGridRow}
-                      onUpdateGridColumn={handleUpdateGridColumn}
-                      onAddGridRow={handleAddGridRow}
-                      onAddGridColumn={handleAddGridColumn}
-                      onRemoveGridRow={handleRemoveGridRow}
-                      onRemoveGridColumn={handleRemoveGridColumn}
-                      onUpdateGridColumnPoints={handleUpdateGridColumnPoints}
-                      onUpdateRangeBounds={handleUpdateRangeBounds}
-                      onUpdateSectionSubtitle={handleUpdateSectionSubtitle}
-                    />
-
-                    <AnimatePresence>
-                      {isRefactoring && (
-                        <motion.div
-                          key="refactor-overlay"
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          transition={{ duration: 0.2 }}
-                          className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 backdrop-blur-[1px]"
-                        >
-                          <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-                        </motion.div>
+                  {responsesSubTab === 'individual' && (
+                    <div id="rs-panel-individual" role="tabpanel" aria-labelledby="rs-tab-individual" tabIndex={0}>
+                      {!formId ? (
+                        <section className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
+                          <p className="text-sm text-gray-700">Save this form first to view individual responses.</p>
+                        </section>
+                      ) : respLoading ? (
+                        <section className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
+                          <div className="animate-pulse space-y-3">
+                            <div className="h-6 w-1/3 rounded bg-gray-200" />
+                            <div className="h-5 w-2/3 rounded bg-gray-200" />
+                            <div className="h-5 w-1/2 rounded bg-gray-200" />
+                          </div>
+                        </section>
+                      ) : respError ? (
+                        <section className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
+                          <p className="text-sm text-red-700">Error: {respError}</p>
+                        </section>
+                      ) : (
+                        <IndividualResponsesView form={formJson} responses={responses} columns={responseColumns as any} height="70vh" />
                       )}
-                    </AnimatePresence>
-                  </div>
-                )
-              )}
-            </div>
-          ) : (
-            <div id="panel-responses" role="tabpanel" aria-labelledby="tab-responses" className="card p-4" tabIndex={0}>
-              <div className="mb-4 flex items-center gap-2" role="tablist" aria-label="Responses subtabs">
-                <button
-                  id="rs-tab-summary"
-                  role="tab"
-                  aria-controls="rs-panel-summary"
-                  type="button"
-                  onClick={() => setResponsesSubTab('summary')}
-                  className={
-                    'rounded-md px-3 py-1.5 text-sm font-medium ' +
-                    (responsesSubTab === 'summary' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
-                  }
-                  aria-selected={responsesSubTab === 'summary'}
-                >
-                  Summary
-                </button>
-                <button
-                  id="rs-tab-question"
-                  role="tab"
-                  aria-controls="rs-panel-question"
-                  type="button"
-                  onClick={() => setResponsesSubTab('question')}
-                  className={
-                    'rounded-md px-3 py-1.5 text-sm font-medium ' +
-                    (responsesSubTab === 'question' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
-                  }
-                  aria-selected={responsesSubTab === 'question'}
-                >
-                  Question
-                </button>
-                <button
-                  id="rs-tab-individual"
-                  role="tab"
-                  aria-controls="rs-panel-individual"
-                  type="button"
-                  onClick={() => setResponsesSubTab('individual')}
-                  className={
-                    'rounded-md px-3 py-1.5 text-sm font-medium ' +
-                    (responsesSubTab === 'individual' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
-                  }
-                  aria-selected={responsesSubTab === 'individual'}
-                >
-                  Individual
-                </button>
-              </div>
-
-              {responsesSubTab === 'summary' && (
-                <div id="rs-panel-summary" role="tabpanel" aria-labelledby="rs-tab-summary" tabIndex={0}>
-                  <SummaryView form={formJson} responses={responses} height="70vh" />
-                </div>
-              )}
-
-              {responsesSubTab === 'question' && (
-                <div
-                  id="rs-panel-question"
-                  role="tabpanel"
-                  aria-labelledby="rs-tab-question"
-                  className="rounded-lg border border-dashed border-gray-300 p-6 text-sm text-gray-700"
-                  tabIndex={0}
-                >
-                  <h2 className="text-base font-semibold text-gray-900">Question View (Coming Soon)</h2>
-                  <p className="mt-1 text-gray-600">Per-question breakdown will appear here.</p>
-                </div>
-              )}
-
-              {responsesSubTab === 'individual' && (
-                <div id="rs-panel-individual" role="tabpanel" aria-labelledby="rs-tab-individual" tabIndex={0}>
-                  {!formId ? (
-                    <section className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-                      <p className="text-sm text-gray-700">Save this form first to view individual responses.</p>
-                    </section>
-                  ) : respLoading ? (
-                    <section className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-                      <div className="animate-pulse space-y-3">
-                        <div className="h-6 w-1/3 rounded bg-gray-200" />
-                        <div className="h-5 w-2/3 rounded bg-gray-200" />
-                        <div className="h-5 w-1/2 rounded bg-gray-200" />
-                      </div>
-                    </section>
-                  ) : respError ? (
-                    <section className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-                      <p className="text-sm text-red-700">Error: {respError}</p>
-                    </section>
-                  ) : (
-                    <IndividualResponsesView form={formJson} responses={responses} columns={responseColumns as any} height="70vh" />
+                    </div>
                   )}
                 </div>
               )}
-            </div>
-          )}
-        </div>
+            </Card>
+          </>
+        )}
       </main>
 
     </div>

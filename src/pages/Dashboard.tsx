@@ -93,10 +93,10 @@ const Dashboard: React.FC = () => {
 
   if (initializing) {
     return (
-      <div className="min-h-screen bg-slate-100">
+      <div className="min-h-screen bg-neutral-50">
         <main className="app-container">
           <header className="mb-6 flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-slate-900">My Forms</h1>
+            <h1 className="text-2xl font-bold text-neutral-900">My Forms</h1>
             <LoginButton />
           </header>
           <div className="card p-6">
@@ -113,10 +113,10 @@ const Dashboard: React.FC = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-slate-100">
+      <div className="min-h-screen bg-neutral-50">
         <main className="app-container">
           <header className="mb-6 flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-slate-900">My Forms</h1>
+            <h1 className="text-2xl font-bold text-neutral-900">My Forms</h1>
             <LoginButton />
           </header>
           <div className="card p-6">
@@ -130,10 +130,10 @@ const Dashboard: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100">
+    <div className="min-h-screen bg-neutral-50">
       <main className="app-container">
         <header className="mb-6 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-slate-900">My Forms</h1>
+          <h1 className="text-2xl font-bold text-neutral-900">My Forms</h1>
           <div className="flex items-center gap-3">
             <Link to="/" className="btn-ghost">
               Home
@@ -153,7 +153,7 @@ const Dashboard: React.FC = () => {
             <p className="text-sm text-slate-700">No forms saved yet.</p>
           ) : (
             <>
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {forms.map((f) => (
                   <FormCard
                     key={f.id}

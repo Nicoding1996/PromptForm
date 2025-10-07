@@ -1,5 +1,6 @@
 import React from 'react';
 import { Trash2, GripVertical } from 'lucide-react';
+import Button from '../ui/Button';
 import type { FormField } from '../FormRenderer';
 import {
   AdvancedEditor,
@@ -10,8 +11,8 @@ import {
 } from '../FormRenderer';
 
 const baseInputClass =
-  'block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500';
-const baseLabelClass = 'text-sm font-medium text-gray-700';
+  'block w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent';
+const baseLabelClass = 'text-sm font-medium text-neutral-700';
 const normalize = (v: any) => String(v ?? '').trim().toLowerCase();
 
 type Props = {
@@ -81,14 +82,14 @@ const QuestionCard: React.FC<Props> = (props) => {
   const content = (() => {
     if (field.type === 'section') {
       return (
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-2">
           <EditableLabel
             label={field.label}
             htmlFor={field.name}
-            className="text-lg font-semibold text-gray-900"
+            className="text-lg font-semibold text-neutral-800"
             onCommit={(newLabel: string) => props.onUpdateFieldLabel(index, newLabel)}
           />
-          <div className="h-px bg-gray-200 mt-1" />
+          <hr className="border-neutral-200" />
         </div>
       );
     }
@@ -114,7 +115,7 @@ const QuestionCard: React.FC<Props> = (props) => {
               defaultValue={Math.floor(
                 (((field as any).min ?? 0) + ((field as any).max ?? 10)) / 2
               )}
-              className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-200 accent-indigo-600"
+              className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-neutral-200 accent-primary-600"
             />
           ) : (
             <input
@@ -169,7 +170,7 @@ const QuestionCard: React.FC<Props> = (props) => {
                     id={optId}
                     name={field.name}
                     value={opt}
-                    className="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    className="h-4 w-4 border-neutral-300 text-primary-600 focus:ring-primary-500"
                   />
                   <label className="text-sm text-gray-700" htmlFor={optId}>
                     {opt}
@@ -226,7 +227,7 @@ const QuestionCard: React.FC<Props> = (props) => {
             type="checkbox"
             id={field.name}
             name={field.name}
-            className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+            className="h-4 w-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
           />
           <span>{labelNode}</span>
         </label>
@@ -271,13 +272,13 @@ const QuestionCard: React.FC<Props> = (props) => {
             <table className="min-w-full border-collapse">
               <thead>
                 <tr>
-                  <th className="p-2 text-left text-xs font-semibold text-gray-600"></th>
+                  <th className="p-2 text-left text-xs font-semibold text-neutral-600"></th>
                   {cols.map((col, cIdx) => {
                     const label = typeof col === 'string' ? col : col?.label ?? '';
                     return (
                       <th
                         key={`${field.name}-col-${cIdx}`}
-                        className="p-2 text-xs font-semibold text-gray-600"
+                        className="p-2 text-xs font-semibold text-neutral-600"
                       >
                         {label}
                       </th>
@@ -291,11 +292,11 @@ const QuestionCard: React.FC<Props> = (props) => {
                   return (
                     <tr
                       key={`${field.name}-row-${rIdx}`}
-                      className="border-t border-gray-200"
+                      className="border-t border-neutral-200"
                     >
                       <th
                         scope="row"
-                        className="p-2 text-left text-sm font-medium text-gray-700"
+                        className="p-2 text-left text-sm font-medium text-neutral-700"
                       >
                         {row}
                       </th>
@@ -310,7 +311,7 @@ const QuestionCard: React.FC<Props> = (props) => {
                               id={id}
                               name={rowName}
                               value={String(cIdx)}
-                              className="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                              className="h-4 w-4 border-neutral-300 text-primary-600 focus:ring-primary-500"
                               aria-label={`${row} - ${colLabel}`}
                             />
                           </td>
@@ -329,12 +330,9 @@ const QuestionCard: React.FC<Props> = (props) => {
     if (field.type === 'submit') {
       return (
         <div className="pt-2">
-          <button
-            type="submit"
-            className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-500 focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-          >
+          <Button type="submit" variant="primary">
             {field.label}
-          </button>
+          </Button>
         </div>
       );
     }

@@ -3,6 +3,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import type { StoredForm } from '../../services/forms';
 import PublicFormRenderer from '../PublicFormRenderer';
 import { FileText, MoreVertical, Share2, Trash2, ExternalLink, TextCursorInput } from 'lucide-react';
+import { motion } from 'framer-motion';
+import Card from '../ui/Card';
+import Button from '../ui/Button';
 
 type Props = {
   form: StoredForm;
@@ -77,8 +80,9 @@ const FormCard: React.FC<Props> = ({ form, onShare, onDelete, onRename }) => {
   }, [menuOpen]);
 
   return (
-    <div
-      className="group relative rounded-lg border border-gray-200 bg-white shadow-sm transition hover:shadow-md cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-600"
+    <motion.div
+      whileHover={{ y: -5, boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)' }}
+      className="group relative cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-500"
       role="button"
       tabIndex={0}
       onClick={() => navigate(`/form/${form.id}/edit`)}
@@ -89,6 +93,7 @@ const FormCard: React.FC<Props> = ({ form, onShare, onDelete, onRename }) => {
         }
       }}
     >
+      <Card className="overflow-hidden">
       {/* Visual preview */}
       <div className="relative h-48 w-full overflow-hidden bg-slate-50">
         {/* Scale wrapper: width 400% + scale .25 to create a miniature */}
@@ -111,42 +116,44 @@ const FormCard: React.FC<Props> = ({ form, onShare, onDelete, onRename }) => {
       <div className="p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <div className="truncate text-sm font-medium text-slate-900">
+            <div className="truncate text-lg font-semibold text-neutral-800">
               {form.title || 'Untitled form'}
             </div>
-            <div className="mt-2 flex items-center gap-2 text-xs text-slate-600">
-              <FileText className="h-4 w-4 text-violet-600" />
+            <div className="mt-2 flex items-center gap-2 text-sm text-neutral-500">
+              <FileText className="h-4 w-4 text-neutral-500" />
               <span className="truncate">{openedText}</span>
             </div>
           </div>
 
           <div className="relative">
-            <button
-              ref={btnRef}
-              type="button"
-              aria-haspopup="menu"
-              aria-expanded={menuOpen}
-              aria-label="More actions"
-              onClick={(e) => {
-                e.stopPropagation();
-                const el = btnRef.current;
-                if (el) {
-                  const rect = el.getBoundingClientRect();
-                  const menuWidth = 192; // w-48
-                  let left = rect.right - menuWidth;
-                  left = Math.max(8, Math.min(left, window.innerWidth - menuWidth - 8));
-                  const belowTop = rect.bottom + 6;
-                  const estHeight = 180;
-                  const openUp = belowTop + estHeight > window.innerHeight;
-                  const top = openUp ? Math.max(8, rect.top - 6 - estHeight) : belowTop;
-                  setMenuPos({ top, left, openUp });
-                }
-                setMenuOpen((v) => !v);
-              }}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-gray-100"
-            >
-              <MoreVertical className="h-5 w-5 text-slate-700" />
-            </button>
+            <span ref={btnRef}>
+              <Button
+                type="button"
+                variant="secondary"
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
+                aria-label="More actions"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const el = btnRef.current;
+                  if (el) {
+                    const rect = el.getBoundingClientRect();
+                    const menuWidth = 192; // w-48
+                    let left = rect.right - menuWidth;
+                    left = Math.max(8, Math.min(left, window.innerWidth - menuWidth - 8));
+                    const belowTop = rect.bottom + 6;
+                    const estHeight = 180;
+                    const openUp = belowTop + estHeight > window.innerHeight;
+                    const top = openUp ? Math.max(8, rect.top - 6 - estHeight) : belowTop;
+                    setMenuPos({ top, left, openUp });
+                  }
+                  setMenuOpen((v) => !v);
+                }}
+                className="h-8 w-8 p-0"
+              >
+                <MoreVertical className="h-5 w-5 text-neutral-700" />
+              </Button>
+            </span>
 
             {menuOpen && (
               <div
@@ -156,31 +163,33 @@ const FormCard: React.FC<Props> = ({ form, onShare, onDelete, onRename }) => {
                 className="fixed z-[9999] w-48 overflow-visible rounded-md border border-gray-200 bg-white py-1 text-sm shadow-lg"
                 style={{ top: menuPos.top, left: menuPos.left }}
               >
-                <button
+                <Button
                   type="button"
                   role="menuitem"
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-gray-50"
+                  variant="secondary"
+                  className="w-full justify-start"
                   onClick={(e) => {
                     e.stopPropagation();
                     setMenuOpen(false);
                     onRename(form.id, form.title || 'Untitled form');
                   }}
                 >
-                  <TextCursorInput className="h-4 w-4 text-slate-700" /> Rename
-                </button>
+                  <TextCursorInput className="h-4 w-4 text-neutral-700" /> Rename
+                </Button>
 
-                <button
+                <Button
                   type="button"
                   role="menuitem"
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-gray-50"
+                  variant="secondary"
+                  className="w-full justify-start"
                   onClick={(e) => {
                     e.stopPropagation();
                     setMenuOpen(false);
                     onShare(form.id);
                   }}
                 >
-                  <Share2 className="h-4 w-4 text-slate-700" /> Share
-                </button>
+                  <Share2 className="h-4 w-4 text-neutral-700" /> Share
+                </Button>
 
                 <Link
                   to={`/form/${form.id}/edit`}
@@ -196,24 +205,26 @@ const FormCard: React.FC<Props> = ({ form, onShare, onDelete, onRename }) => {
                   <ExternalLink className="h-4 w-4 text-slate-700" /> Open in new tab
                 </Link>
 
-                <button
+                <Button
                   type="button"
                   role="menuitem"
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-red-600 hover:bg-red-50"
+                  variant="secondary"
+                  className="w-full justify-start"
                   onClick={(e) => {
                     e.stopPropagation();
                     setMenuOpen(false);
                     onDelete(form.id);
                   }}
                 >
-                  <Trash2 className="h-4 w-4" /> Delete
-                </button>
+                  <Trash2 className="h-4 w-4 text-neutral-700" /> Delete
+                </Button>
               </div>
             )}
           </div>
         </div>
       </div>
-    </div>
+    </Card>
+  </motion.div>
   );
 };
 

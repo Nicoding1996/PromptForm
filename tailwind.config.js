@@ -1,4 +1,6 @@
 /** @type {import('tailwindcss').Config} */
+import colors from 'tailwindcss/colors'
+
 export default {
   // Tailwind v4 auto-detects usage; no `content` needed.
   theme: {
@@ -18,21 +20,13 @@ export default {
           'Segoe UI Emoji',
         ],
       },
-      // Brand palette: refined indigo + slate usage in app
+      // Design System palette mappings
       colors: {
-        brand: {
-          50:  '#EEF2FF',
-          100: '#E0E7FF',
-          200: '#C7D2FE',
-          300: '#A5B4FC',
-          400: '#818CF8',
-          500: '#6366F1',
-          600: '#4F46E5', // primary
-          700: '#4338CA',
-          800: '#3730A3',
-          900: '#312E81',
-          DEFAULT: '#4F46E5',
-        },
+        primary: colors.indigo,
+        neutral: colors.slate,
+        success: colors.green,
+        danger: colors.red,
+        warning: colors.amber,
       },
       container: {
         center: true,

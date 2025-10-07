@@ -80,8 +80,8 @@ const CommandBar: React.FC<CommandBarProps> = ({
       onDrop={handleDrop}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
-      className={`relative w-full rounded-full bg-white shadow-sm ring-1 ring-gray-200 transition min-h-[48px] focus-within:ring-2 focus-within:ring-indigo-300 ${
-        isDragging ? 'ring-2 ring-indigo-400 bg-indigo-50/30' : ''
+      className={`relative w-full rounded-full bg-white shadow-sm ring-1 ring-neutral-200 transition ${isCreation ? 'min-h-[56px] focus-within:ring-2 focus-within:ring-primary-400' : 'min-h-[48px] focus-within:ring-2 focus-within:ring-indigo-300'} ${
+        isDragging ? (isCreation ? 'ring-2 ring-primary-400 bg-primary-50/30' : 'ring-2 ring-indigo-400 bg-indigo-50/30') : ''
       }`}
     >
       {/* Left (+) button */}
@@ -104,9 +104,11 @@ const CommandBar: React.FC<CommandBarProps> = ({
         title={isCreation ? 'Generate' : 'Apply edit'}
         onClick={onSend}
         disabled={!canSend}
-        className="absolute right-3 top-1/2 -translate-y-1/2 transform inline-flex h-8 w-8 items-center justify-center rounded-full bg-indigo-600 text-white shadow-sm hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+        className={`absolute right-3 top-1/2 -translate-y-1/2 transform inline-flex items-center justify-center rounded-full text-white disabled:cursor-not-allowed disabled:opacity-60 ${
+          isCreation ? 'h-11 w-11 bg-primary-600 hover:bg-primary-700 shadow-md' : 'h-8 w-8 bg-indigo-600 hover:bg-indigo-500 shadow-sm'
+        }`}
       >
-        {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+        {isLoading ? <Loader2 className={isCreation ? 'h-5 w-5 animate-spin' : 'h-4 w-4 animate-spin'} /> : <Send className={isCreation ? 'h-5 w-5' : 'h-4 w-4'} />}
       </button>
 
       {/* Textarea */}
@@ -116,7 +118,7 @@ const CommandBar: React.FC<CommandBarProps> = ({
           value={prompt}
           onChange={(e) => onPromptChange(e.target.value)}
           onInput={resize}
-          placeholder={isCreation ? 'Describe the form you want to create...' : 'Ask PromptForm to edit your form...'}
+          placeholder={isCreation ? 'e.g., A customer satisfaction survey for my coffee shop' : 'Ask PromptForm to edit your form...'}
           className={`w-full resize-none border-0 bg-transparent p-0 ${isCreation ? 'text-base' : 'text-sm'} leading-6 text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-0`}
           rows={1}
           spellCheck={true}
