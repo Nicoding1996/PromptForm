@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import CommandBar from '../CommandBar';
 import FormRenderer from '../FormRenderer';
 import type { FormData, FormField, ResultPage } from '../FormRenderer';
@@ -10,7 +10,7 @@ import LoginButton from '../LoginButton';
 import { getFormById, saveFormForUser, listResponsesForForm, type StoredResponse } from '../../services/forms';
 import IndividualResponsesView from '../responses/IndividualResponsesView';
 import SummaryView from '../responses/SummaryView';
-import { Save, ExternalLink, Loader2, Share2, Eye, ClipboardList, UserPlus, MessageSquare, HelpCircle } from 'lucide-react';
+import { Save, ExternalLink, Loader2, Share2, Eye, ClipboardList, UserPlus, MessageSquare, HelpCircle, Sparkles, PlusCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { AnimatePresence, motion } from 'framer-motion';
 import Button from '../ui/Button';
@@ -54,6 +54,15 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
   const [respLoading, setRespLoading] = useState(false);
   const [respError, setRespError] = useState<string | null>(null);
   const [responsesSubTab, setResponsesSubTab] = useState<'summary' | 'question' | 'individual'>('individual');
+
+  // AI prompt visibility (toggle with Sparkles)
+  const location = useLocation();
+  const defaultAiVisible = useMemo(() => {
+    const q = new URLSearchParams(location.search);
+    const ai = q.get('ai');
+    return ai === '1' || ai === 'true';
+  }, [location.search]);
+  const [aiBarVisible, setAiBarVisible] = useState<boolean>(defaultAiVisible);
 
   // Load existing form when formId is provided
   useEffect(() => {
@@ -833,7 +842,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
             const newId = await saveFormForUser(user.uid, data as FormData);
             setLastSavedId(newId);
             toast.success('Form created. Opening editor...');
-            navigate(`/form/${newId}/edit`);
+            navigate(`/form/${newId}/edit?ai=1`);
           } catch (e: any) {
             const msg = e?.message || 'Auto-save failed. Please save manually.';
             toast.error(msg);
@@ -1054,6 +1063,15 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
               </>
             )}
 
+            <button
+              type="button"
+              onClick={() => setAiBarVisible((v) => !v)}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-white text-neutral-700 ring-1 ring-neutral-200 hover:bg-neutral-50"
+              title={aiBarVisible ? 'Hide AI bar' : 'Show AI bar'}
+              aria-pressed={aiBarVisible}
+            >
+              <Sparkles className="h-4 w-4 text-indigo-600" />
+            </button>
             <Link to="/dashboard" className="text-sm text-neutral-700 underline-offset-4 hover:underline" title="Back to My Forms">
               Dashboard
             </Link>
@@ -1070,7 +1088,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
               <h1 className="text-4xl font-bold text-neutral-800">Create a new form in seconds</h1>
               <p className="mt-2 text-lg text-neutral-600">Describe the form you need, or start with a template. Our AI will handle the rest.</p>
 
-              <div className="mt-6 w-full md:w-4/5 mx-auto">
+              <div className="mt-10 w-full md:w-4/5 mx-auto">
                 <CommandBar
                   prompt={promptText}
                   onPromptChange={setPromptText}
@@ -1087,21 +1105,23 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
               <div className="mt-8 w-full md:w-4/5 mx-auto text-left">
                 <h3 className="text-sm font-medium text-neutral-500">Or start with an idea</h3>
                 <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {templates.map((t, i) => (
-                    <Button
-                      key={i}
-                      variant="secondary"
-                      icon={t.icon as any}
-                      onClick={() => handleTemplateClick(t.prompt)}
-                      className="w-full justify-start"
-                      type="button"
-                    >
-                      {t.label}
-                    </Button>
-                  ))}
+                  {templates.map((t, i) => {
+                    const Icon = t.icon as any;
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => handleTemplateClick(t.prompt)}
+                        className="w-full rounded-lg bg-white border border-neutral-200 shadow-sm p-4 text-left inline-flex items-center gap-3 transition-all hover:shadow-md hover:-translate-y-1"
+                      >
+                        <Icon className="h-5 w-5 text-neutral-700" />
+                        <span className="text-sm font-medium text-neutral-800">{t.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
 
-                <p className="mt-4 text-sm text-neutral-500">
+                <p className="mt-8 text-sm text-neutral-500">
                   or{' '}
                   <button type="button" onClick={createBlankCanvas} className="underline-offset-4 hover:underline">
                     <span className="text-primary-600 font-medium">start from a blank canvas</span>
@@ -1150,43 +1170,67 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
 
               {activeTab === 'questions' ? (
                 <div id="panel-questions" role="tabpanel" aria-labelledby="tab-questions" className="space-y-8" tabIndex={0}>
-                  <CommandBar
-                    prompt={promptText}
-                    onPromptChange={setPromptText}
-                    file={selectedFile}
-                    onFileChange={setSelectedFile}
-                    isLoading={isLoading || refactorLoading}
-                    mode={formId ? 'editing' : 'creation'}
-                    onSend={() => {
-                      if (formId) {
-                        const cmd = promptText.trim();
-                        if (cmd) {
-                          handleRefactorRequest(cmd);
-                        }
-                      } else {
-                        handleGenerate();
-                      }
-                    }}
-                  />
+                  <AnimatePresence initial={false}>
+                    {aiBarVisible && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <CommandBar
+                          prompt={promptText}
+                          onPromptChange={setPromptText}
+                          file={selectedFile}
+                          onFileChange={setSelectedFile}
+                          isLoading={isLoading || refactorLoading}
+                          mode={formId ? 'editing' : 'creation'}
+                          onSend={() => {
+                            if (formId) {
+                              const cmd = promptText.trim();
+                              if (cmd) {
+                                handleRefactorRequest(cmd);
+                              }
+                            } else {
+                              handleGenerate();
+                            }
+                          }}
+                        />
 
-                   {formId && (
-                    <div className="pl-12 pr-12 mt-2 mb-3">
-                      <SuggestionChips
-                        onSelect={(cmd) => handleRefactorRequest(cmd)}
-                        disabled={refactorLoading || isLoading}
-                      />
-                      {refactorError && (
-                        <p className="mt-2 rounded-md border-l-4 border-red-400 bg-red-50 p-2 text-xs text-red-700">
-                          {refactorError}
-                        </p>
-                      )}
-                    </div>
-                  )}
+                        {formId && (
+                          <div className="pl-12 pr-12 mt-2 mb-3">
+                            <SuggestionChips
+                              onSelect={(cmd) => handleRefactorRequest(cmd)}
+                              disabled={refactorLoading || isLoading}
+                            />
+                            {refactorError && (
+                              <p className="mt-2 rounded-md border-l-4 border-red-400 bg-red-50 p-2 text-xs text-red-700">
+                                {refactorError}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
                   {error && (
                     <p role="status" className="rounded-md border-l-4 border-red-400 bg-red-50 p-3 text-sm text-red-700">
                       {error}
                     </p>
+                  )}
+
+                  {formJson && ((formJson.fields?.length ?? 0) === 0) && (
+                    <div className="pl-12 pr-12">
+                      <Button
+                        variant="primary"
+                        icon={PlusCircle}
+                        onClick={() => handleAddField({})}
+                        type="button"
+                      >
+                        Add your first question
+                      </Button>
+                    </div>
                   )}
 
                   {formId && (

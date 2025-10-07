@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Paperclip, Send, X, Loader2 } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 interface CommandBarProps {
   prompt: string;
@@ -80,7 +81,7 @@ const CommandBar: React.FC<CommandBarProps> = ({
       onDrop={handleDrop}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
-      className={`relative w-full rounded-full bg-white shadow-sm ring-1 ring-neutral-200 transition ${isCreation ? 'min-h-[56px] focus-within:ring-2 focus-within:ring-primary-400' : 'min-h-[48px] focus-within:ring-2 focus-within:ring-indigo-300'} ${
+      className={`relative w-full rounded-full bg-white shadow-sm ring-1 ring-neutral-200 transition ${isCreation ? 'min-h-[64px] focus-within:ring-2 focus-within:ring-primary-400' : 'min-h-[48px] focus-within:ring-2 focus-within:ring-indigo-300'} ${
         isDragging ? (isCreation ? 'ring-2 ring-primary-400 bg-primary-50/30' : 'ring-2 ring-indigo-400 bg-indigo-50/30') : ''
       }`}
     >
@@ -92,13 +93,13 @@ const CommandBar: React.FC<CommandBarProps> = ({
         onClick={handleFilePickClick}
         disabled={isLoading}
         hidden={!isCreation}
-        className="absolute left-3 top-1/2 -translate-y-1/2 transform inline-flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-700 shadow-sm hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-60"
+        className={`absolute left-3 ${isCreation ? 'bottom-2' : 'top-1/2 -translate-y-1/2'} transform inline-flex ${isCreation ? 'h-7 w-7' : 'h-8 w-8'} items-center justify-center rounded-full bg-gray-100 text-gray-700 shadow-sm hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-60`}
       >
         <Paperclip className="h-4 w-4" />
       </button>
 
       {/* Right (Send) button */}
-      <button
+      <motion.button
         type="button"
         aria-label={isCreation ? 'Generate' : 'Apply edit'}
         title={isCreation ? 'Generate' : 'Apply edit'}
@@ -107,12 +108,14 @@ const CommandBar: React.FC<CommandBarProps> = ({
         className={`absolute right-3 top-1/2 -translate-y-1/2 transform inline-flex items-center justify-center rounded-full text-white disabled:cursor-not-allowed disabled:opacity-60 ${
           isCreation ? 'h-11 w-11 bg-primary-600 hover:bg-primary-700 shadow-md' : 'h-8 w-8 bg-indigo-600 hover:bg-indigo-500 shadow-sm'
         }`}
+        animate={isCreation && !isLoading ? { scale: [1, 1.05, 1] } : undefined}
+        transition={isCreation && !isLoading ? { duration: 1.6, repeat: Infinity, ease: 'easeInOut' } : undefined}
       >
         {isLoading ? <Loader2 className={isCreation ? 'h-5 w-5 animate-spin' : 'h-4 w-4 animate-spin'} /> : <Send className={isCreation ? 'h-5 w-5' : 'h-4 w-4'} />}
-      </button>
+      </motion.button>
 
       {/* Textarea */}
-      <div className={isCreation ? 'px-12 py-3' : 'px-12 py-2'}>
+      <div className={isCreation ? 'px-12 pt-3 pb-7' : 'px-12 py-2'}>
         <textarea
           ref={taRef}
           value={prompt}
@@ -125,8 +128,14 @@ const CommandBar: React.FC<CommandBarProps> = ({
         />
       </div>
 
+      {isCreation && !file && (
+        <div className="absolute left-12 bottom-2 text-sm text-neutral-400 select-none pointer-events-none">
+          Attach an image, TXT, PDF, or DOCX (optional).
+        </div>
+      )}
+
       {/* File 'pill' */}
-      <div className="px-12 pb-3" hidden={!isCreation}>
+      <div className="px-12 pb-3" hidden={!isCreation || !file}>
         {file ? (
           <span className="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700 ring-1 ring-gray-200">
             <span className="truncate max-w-[240px]">{file.name}</span>
@@ -140,9 +149,7 @@ const CommandBar: React.FC<CommandBarProps> = ({
               <X className="h-3.5 w-3.5" />
             </button>
           </span>
-        ) : (
-          <span className="text-xs text-gray-500">Attach an image, TXT, PDF, or DOCX (optional).</span>
-        )}
+        ) : null}
       </div>
 
       {/* Hidden file input */}
