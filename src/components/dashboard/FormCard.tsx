@@ -6,6 +6,7 @@ import { FileText, MoreVertical, Share2, Trash2, ExternalLink, TextCursorInput }
 import { motion } from 'framer-motion';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
+import { createPortal } from 'react-dom';
 
 type Props = {
   form: StoredForm;
@@ -79,6 +80,13 @@ const FormCard: React.FC<Props> = ({ form, onShare, onDelete, onRename }) => {
     };
   }, [menuOpen]);
 
+  // Ensure only one dropdown is open at a time across all cards
+  useEffect(() => {
+    const handler = () => setMenuOpen(false);
+    window.addEventListener('pf-close-menus', handler as any);
+    return () => window.removeEventListener('pf-close-menus', handler as any);
+  }, []);
+
   return (
     <motion.div
       whileHover={{ y: -5, boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)' }}
@@ -135,6 +143,8 @@ const FormCard: React.FC<Props> = ({ form, onShare, onDelete, onRename }) => {
                 aria-label="More actions"
                 onClick={(e) => {
                   e.stopPropagation();
+                  // Close any other open menus before toggling this one
+                  window.dispatchEvent(new Event('pf-close-menus'));
                   const el = btnRef.current;
                   if (el) {
                     const rect = el.getBoundingClientRect();
@@ -155,70 +165,75 @@ const FormCard: React.FC<Props> = ({ form, onShare, onDelete, onRename }) => {
               </Button>
             </span>
 
-            {menuOpen && (
-              <div
-                ref={menuRef}
-                role="menu"
-                onClick={(e) => e.stopPropagation()}
-                className="fixed z-[9999] w-48 overflow-visible rounded-md border border-gray-200 bg-white py-1 text-sm shadow-lg"
-                style={{ top: menuPos.top, left: menuPos.left }}
-              >
-                <Button
-                  type="button"
-                  role="menuitem"
-                  variant="secondary"
-                  className="w-full justify-start"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setMenuOpen(false);
-                    onRename(form.id, form.title || 'Untitled form');
-                  }}
+            {menuOpen && createPortal(
+              <>
+                {/* Click-catcher to prevent interaction with cards and to consistently close the menu */}
+                <div className="fixed inset-0 z-[9998] bg-transparent" onClick={() => setMenuOpen(false)} />
+                <div
+                  ref={menuRef}
+                  role="menu"
+                  onClick={(e) => e.stopPropagation()}
+                  className="fixed z-[10000] w-48 overflow-visible rounded-md border border-gray-200 bg-white py-1 text-sm shadow-lg"
+                  style={{ top: Math.round(menuPos.top), left: Math.round(menuPos.left) }}
                 >
-                  <TextCursorInput className="h-4 w-4 text-neutral-700" /> Rename
-                </Button>
+                  <Button
+                    type="button"
+                    role="menuitem"
+                    variant="secondary"
+                    className="w-full justify-start"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMenuOpen(false);
+                      onRename(form.id, form.title || 'Untitled form');
+                    }}
+                  >
+                    <TextCursorInput className="h-4 w-4 text-neutral-700" /> Rename
+                  </Button>
 
-                <Button
-                  type="button"
-                  role="menuitem"
-                  variant="secondary"
-                  className="w-full justify-start"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setMenuOpen(false);
-                    onShare(form.id);
-                  }}
-                >
-                  <Share2 className="h-4 w-4 text-neutral-700" /> Share
-                </Button>
+                  <Button
+                    type="button"
+                    role="menuitem"
+                    variant="secondary"
+                    className="w-full justify-start"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMenuOpen(false);
+                      onShare(form.id);
+                    }}
+                  >
+                    <Share2 className="h-4 w-4 text-neutral-700" /> Share
+                  </Button>
 
-                <Link
-                  to={`/form/${form.id}/edit`}
-                  role="menuitem"
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setMenuOpen(false);
-                  }}
-                >
-                  <ExternalLink className="h-4 w-4 text-slate-700" /> Open in new tab
-                </Link>
+                  <Link
+                    to={`/form/${form.id}/edit`}
+                    role="menuitem"
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMenuOpen(false);
+                    }}
+                  >
+                    <ExternalLink className="h-4 w-4 text-slate-700" /> Open in new tab
+                  </Link>
 
-                <Button
-                  type="button"
-                  role="menuitem"
-                  variant="secondary"
-                  className="w-full justify-start"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setMenuOpen(false);
-                    onDelete(form.id);
-                  }}
-                >
-                  <Trash2 className="h-4 w-4 text-neutral-700" /> Delete
-                </Button>
-              </div>
+                  <Button
+                    type="button"
+                    role="menuitem"
+                    variant="secondary"
+                    className="w-full justify-start"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMenuOpen(false);
+                      onDelete(form.id);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 text-neutral-700" /> Delete
+                  </Button>
+                </div>
+              </>,
+              document.body
             )}
           </div>
         </div>
