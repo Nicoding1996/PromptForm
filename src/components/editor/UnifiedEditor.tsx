@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import CommandBar from '../CommandBar';
 import FormRenderer from '../FormRenderer';
@@ -6,7 +6,7 @@ import type { FormData, FormField, ResultPage } from '../FormRenderer';
 import ResultCard from './ResultCard';
 import SuggestionChips from './SuggestionChips';
 import { useAuth } from '../../context/AuthContext';
-import LoginButton from '../LoginButton';
+import UserMenu from '../ui/UserMenu';
 import { getFormById, saveFormForUser, listResponsesForForm, type StoredResponse } from '../../services/forms';
 import IndividualResponsesView from '../responses/IndividualResponsesView';
 import SummaryView from '../responses/SummaryView';
@@ -30,6 +30,8 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  // API ref to focus the homepage prompt bar programmatically
+  const cmdApiRef = useRef<{ focus: () => void } | null>(null);
 
   // Focused question index for "Implicit Edit Mode"
   const [focusedFieldIndex, setFocusedFieldIndex] = useState<number | null>(null);
@@ -995,16 +997,19 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
 
   // Quick start templates and helpers
   const templates = [
-    { icon: ClipboardList, label: 'Customer Feedback', prompt: 'Create a customer feedback survey for a coffee shop. Include: Name (optional), Email (optional), a 1-5 satisfaction rating, visit frequency (multiple choice), and an open-ended comments field.' },
-    { icon: UserPlus, label: 'Event Registration', prompt: 'Create an event registration form with Name, Email, Phone, Ticket Type (General, VIP), Dietary Restrictions (checkboxes), and a consent checkbox for terms.' },
-    { icon: MessageSquare, label: 'Contact Us', prompt: 'Create a contact form with Name, Email (required), Subject, and Message (textarea).' },
-    { icon: HelpCircle, label: 'Quiz', prompt: 'Create a 5-question multiple-choice quiz about coffee brewing with scoring enabled.' },
+    { icon: ClipboardList, label: 'Customer Feedback', prompt: 'A comprehensive customer feedback form for a business. Include satisfaction rating (1–5), visit frequency, and open-ended comments.' },
+    { icon: UserPlus, label: 'Event Registration', prompt: 'An event registration form with Name, Email, Phone, Ticket Type, Dietary Restrictions, and Terms consent.' },
+    { icon: MessageSquare, label: 'Contact Us', prompt: 'A concise contact form with Name, Email (required), Subject, and Message (textarea).' },
+    { icon: HelpCircle, label: 'Quiz', prompt: 'Create a 5-question multiple-choice quiz about a topic with scoring enabled.' },
+    { icon: ClipboardList, label: 'Assessment', prompt: 'An assessment form with several rating-scale questions and optional long-answer sections.' },
+    { icon: HelpCircle, label: 'Enneagram/Personality Test', prompt: 'A personality test (Enneagram-style) that maps results to outcomes with descriptions.' },
   ];
 
   const handleTemplateClick = (p: string) => {
     setSelectedFile(null);
     setPromptText(p);
-    void handleGenerate(p);
+    // Focus the prompt bar so the user can continue typing immediately
+    cmdApiRef.current?.focus();
   };
 
   const createBlankCanvas = async () => {
@@ -1088,21 +1093,23 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
               </>
             )}
 
-            <button
-              type="button"
-              onClick={() => setAiBarVisible((v) => !v)}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-white text-neutral-700 ring-1 ring-neutral-200 hover:bg-neutral-50"
-              title={aiBarVisible ? 'Hide AI bar' : 'Show AI bar'}
-              aria-pressed={aiBarVisible}
-            >
-              <Sparkles className="h-4 w-4 text-primary-600" />
-            </button>
-            <Link to="/dashboard" className="text-sm text-neutral-700 underline-offset-4 hover:underline" title="Back to My Forms">
+            {(formId || formJson) && (
+              <button
+                type="button"
+                onClick={() => setAiBarVisible((v) => !v)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-white text-neutral-700 ring-1 ring-neutral-200 hover:bg-neutral-50"
+                title={aiBarVisible ? 'Hide AI bar' : 'Show AI bar'}
+                aria-pressed={aiBarVisible}
+              >
+                <Sparkles className="h-4 w-4 text-primary-600" />
+              </button>
+            )}
+            <Link to="/dashboard" className="text-sm font-medium text-neutral-700 hover:text-primary-600" title="Back to My Forms">
               Dashboard
             </Link>
 
 
-            <LoginButton />
+            <UserMenu />
           </div>
         </header>
 
@@ -1121,6 +1128,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                   onFileChange={setSelectedFile}
                   isLoading={isLoading || refactorLoading}
                   mode="creation"
+                  getApi={(api) => { cmdApiRef.current = api; }}
                   onSend={() => {
                     handleGenerate();
                   }}
@@ -1129,7 +1137,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
 
               <div className="mt-8 w-full md:w-4/5 mx-auto text-left">
                 <h3 className="text-sm font-medium text-neutral-500">Or start with an idea</h3>
-                <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   {templates.map((t, i) => {
                     const Icon = t.icon as any;
                     return (

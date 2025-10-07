@@ -10,6 +10,8 @@ interface CommandBarProps {
   isLoading?: boolean;
   onSend: () => void;
   mode?: 'creation' | 'editing';
+  // Optional: parent can receive an API to focus the textarea programmatically
+  getApi?: (api: { focus: () => void }) => void;
 }
 
 const CommandBar: React.FC<CommandBarProps> = ({
@@ -20,6 +22,7 @@ const CommandBar: React.FC<CommandBarProps> = ({
   isLoading = false,
   onSend,
   mode = 'creation',
+  getApi,
 }) => {
   const taRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -37,6 +40,12 @@ const CommandBar: React.FC<CommandBarProps> = ({
     const next = maxH > 0 ? Math.min(el.scrollHeight, maxH) : el.scrollHeight;
     el.style.height = `${next}px`;
   };
+
+  // Expose focus() to parent so templates can set prompt and focus immediately
+  useEffect(() => {
+    if (!taRef.current) return;
+    getApi?.({ focus: () => taRef.current?.focus() });
+  }, [getApi]);
 
   useEffect(() => {
     resize();

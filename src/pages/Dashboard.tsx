@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { listFormsForUser, type StoredForm, deleteForm, updateFormTitle } from '../services/forms';
-import LoginButton from '../components/LoginButton';
+import UserMenu from '../components/ui/UserMenu';
 import FormCard from '../components/dashboard/FormCard';
 import { Trash2, Share2, Copy, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
@@ -97,7 +97,7 @@ const Dashboard: React.FC = () => {
         <main className="app-container">
           <header className="mb-6 flex items-center justify-between">
             <h1 className="text-2xl font-bold text-neutral-900">My Forms</h1>
-            <LoginButton />
+            <UserMenu />
           </header>
           <div className="card p-6">
             <div className="animate-pulse space-y-3">
@@ -117,7 +117,7 @@ const Dashboard: React.FC = () => {
         <main className="app-container">
           <header className="mb-6 flex items-center justify-between">
             <h1 className="text-2xl font-bold text-neutral-900">My Forms</h1>
-            <LoginButton />
+            <UserMenu />
           </header>
           <div className="card p-6">
             <p className="text-sm text-slate-700">
@@ -135,10 +135,10 @@ const Dashboard: React.FC = () => {
         <header className="mb-6 flex items-center justify-between">
           <h1 className="text-2xl font-bold text-neutral-900">My Forms</h1>
           <div className="flex items-center gap-3">
-            <Link to="/" className="btn-ghost">
+            <Link to="/" className="text-sm font-medium text-neutral-700 hover:text-primary-600">
               Home
             </Link>
-            <LoginButton />
+            <UserMenu />
           </div>
         </header>
 
