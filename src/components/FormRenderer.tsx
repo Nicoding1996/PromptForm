@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { DndContext, useDraggable, useDroppable, type DragEndEvent } from '@dnd-kit/core';
+import { DndContext, useDraggable, useDroppable, type DragEndEvent, useSensor, useSensors, MouseSensor, TouchSensor } from '@dnd-kit/core';
 import {
   Trash2,
   Copy,
@@ -763,6 +763,12 @@ const FormRenderer: React.FC<FormRendererProps> = ({
   const nonSubmitFields = rawFields.filter((f) => f.type !== 'submit');
   const fields = [...nonSubmitFields, ...submitFields];
 
+  // Limit DnD to mouse/touch only so Space works inside text inputs
+  const sensors = useSensors(
+    useSensor(MouseSensor),
+    useSensor(TouchSensor)
+  );
+
   // Where to open the type chooser (after which index)
   const [chooserAfter, setChooserAfter] = useState<number | null>(null);
 
@@ -822,7 +828,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
         </div>
       )}
 
-      <DndContext onDragEnd={handleDragEnd}>
+      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
         <div className="space-y-2">
           {fields.map((field, idx) => {
             const isSection = field.type === 'section';

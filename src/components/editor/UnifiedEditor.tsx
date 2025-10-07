@@ -367,7 +367,8 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
       const opts = f.options ? [...f.options] : [];
       if (optionIndex < 0) return prev;
       while (opts.length <= optionIndex) opts.push(`Option ${opts.length + 1}`);
-      opts[optionIndex] = newText.trim();
+      // Preserve user-entered spaces while typing; trim only if desired when saving externally
+      opts[optionIndex] = newText;
       fields[fieldIndex] = { ...f, options: opts };
       return { ...prev, fields };
     });
@@ -480,7 +481,8 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
       if (!f || f.type !== 'radioGrid') return prev;
       const rows = f.rows ? [...f.rows] : [];
       while (rows.length <= rowIndex) rows.push(`Row ${rows.length + 1}`);
-      rows[rowIndex] = newText.trim();
+      // Keep spaces during editing for better UX
+      rows[rowIndex] = newText;
       fields[fieldIndex] = { ...f, rows };
       return { ...prev, fields };
     });
@@ -495,7 +497,8 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
       const columns = f.columns ? [...f.columns] : [];
       while (columns.length <= colIndex) columns.push(`Column ${columns.length + 1}`);
       const current = columns[colIndex];
-      const label = newText.trim();
+      // Do not trim while typing; allow users to place spaces intentionally
+      const label = newText;
       if (typeof current === 'string') {
         columns[colIndex] = { label, points: 1 };
       } else {
