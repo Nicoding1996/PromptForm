@@ -52,13 +52,13 @@ const PublicFormPage: React.FC = () => {
 
   return (
     <div
-      className="min-h-screen"
+      className="min-h-screen bg-neutral-50"
       style={{
         background: `linear-gradient(180deg, ${themeBackground || '#F8FAFF'} 0%, #FFFFFF 60%)`,
       }}
     >
-      <main className="mx-auto max-w-3xl px-4 py-10">
-        <header className="mb-6 flex items-center justify-between">
+      <main className="mx-auto max-w-3xl px-4 pt-0 pb-10">
+        <header className="sticky top-0 z-50 -mx-[calc(50vw-50%)] px-[calc(50vw-50%)] mb-6 flex items-center justify-between bg-white/85 backdrop-blur-sm">
           <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
           <div className="flex items-center gap-3">
             <Link

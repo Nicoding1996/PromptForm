@@ -13,7 +13,6 @@ import SummaryView from '../responses/SummaryView';
 import { Save, ExternalLink, Loader2, Share2, Eye, ClipboardList, UserPlus, MessageSquare, HelpCircle, Sparkles, Palette } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { AnimatePresence, motion } from 'framer-motion';
-import Button from '../ui/Button';
 import Card from '../ui/Card';
 import StylePanel from './StylePanel';
 
@@ -1106,14 +1105,13 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
   return (
     <div
       className="min-h-screen bg-neutral-50"
-      style={
-        themeBackground
-          ? { ...(brandStyleVars || {}), background: `linear-gradient(to bottom, ${themeBackground} 0%, #FFFFFF 65%)` }
-          : brandStyleVars
-      }
+      style={{
+        ...(brandStyleVars || {}),
+        background: `linear-gradient(to bottom, ${themeBackground || '#F8FAFF'} 0%, #FFFFFF 65%)`,
+      }}
     >
-      <main id="form-editor-container" className="app-container flex flex-col gap-6">
-        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <main id="form-editor-container" className="app-container pt-0 flex flex-col gap-6">
+        <header className="sticky top-0 z-50 -mx-[calc(50vw-50%)] px-[calc(50vw-50%)] flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between bg-white/85 backdrop-blur-sm">
           <div>
             {(formId || formJson) && (
               <>
@@ -1125,16 +1123,17 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
 
           <div className="flex items-center gap-2">
             {user && formJson && formId && (
-              <Button
+              <button
                 type="button"
                 onClick={handleSaveForm}
                 disabled={saving || !!lastSavedId}
-                variant="primary"
-                icon={saving ? undefined : Save}
+                className="btn-ghost"
                 title="Save this form"
               >
-                {lastSavedId ? '✓ Saved!' : saving ? 'Saving...' : 'Save'}
-              </Button>
+                <span className="inline-flex items-center gap-1">
+                  {!saving ? <Save className="h-4 w-4" /> : null} {lastSavedId ? '✓ Saved!' : saving ? 'Saving...' : 'Save'}
+                </span>
+              </button>
             )}
 
             {lastSavedId && (

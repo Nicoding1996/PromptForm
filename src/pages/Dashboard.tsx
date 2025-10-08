@@ -93,9 +93,9 @@ const Dashboard: React.FC = () => {
 
   if (initializing) {
     return (
-      <div className="min-h-screen bg-neutral-50">
-        <main className="app-container">
-          <header className="mb-6 flex items-center justify-between">
+      <div className="min-h-screen bg-gradient-to-b from-neutral-50 to-white">
+        <main className="app-container pt-0">
+          <header className="sticky top-0 z-50 -mx-[calc(50vw-50%)] px-[calc(50vw-50%)] mb-6 flex items-center justify-between bg-white/85 backdrop-blur-sm ">
             <h1 className="text-2xl font-bold text-neutral-900">My Forms</h1>
             <UserMenu />
           </header>
@@ -113,9 +113,9 @@ const Dashboard: React.FC = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-neutral-50">
-        <main className="app-container">
-          <header className="mb-6 flex items-center justify-between">
+      <div className="min-h-screen bg-gradient-to-b from-neutral-50 to-white">
+        <main className="app-container pt-0">
+          <header className="sticky top-0 z-50 -mx-[calc(50vw-50%)] px-[calc(50vw-50%)] mb-6 flex items-center justify-between bg-white/85 backdrop-blur-sm ">
             <h1 className="text-2xl font-bold text-neutral-900">My Forms</h1>
             <UserMenu />
           </header>
@@ -130,9 +130,9 @@ const Dashboard: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50">
-      <main className="app-container">
-        <header className="mb-6 flex items-center justify-between">
+    <div className="min-h-screen bg-gradient-to-b from-neutral-50 to-white">
+      <main className="app-container pt-0">
+        <header className="sticky top-0 z-50 -mx-[calc(50vw-50%)] px-[calc(50vw-50%)] mb-6 flex items-center justify-between bg-white/85 backdrop-blur-sm ">
           <h1 className="text-2xl font-bold text-neutral-900">My Forms</h1>
           <div className="flex items-center gap-3">
             <Link to="/" className="text-sm font-medium text-neutral-700 hover:text-primary-600">
