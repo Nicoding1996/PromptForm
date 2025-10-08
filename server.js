@@ -16,6 +16,8 @@ import {
   addDoc,
   serverTimestamp,
   doc,
+  getDoc,
+  updateDoc,
   deleteDoc,
 } from 'firebase/firestore';
 
@@ -765,7 +767,7 @@ app.delete('/forms/:formId', async (req, res) => {
 */
 app.post('/analyze-responses', async (req, res) => {
  try {
-   const { form, responses } = req.body ?? {};
+   const { form, responses, formId } = req.body ?? {};
 
    if (!form || typeof form !== 'object') {
      return res.status(400).json({ error: 'Invalid "form" object in request body.' });
@@ -833,6 +835,18 @@ Important instructions:
        error: 'Upstream model returned an empty analysis.',
        message: 'The AI did not return any content. Please try again.',
      });
+   }
+
+   // Persist AI summary to Firestore when formId is provided
+   if (formId && typeof formId === 'string') {
+     try {
+       await updateDoc(doc(db, 'forms', formId), {
+         aiSummary: text,
+         aiSummaryUpdatedAt: serverTimestamp(),
+       });
+     } catch (e) {
+       console.warn('[analyze-responses] Failed to persist aiSummary for form', formId, e);
+     }
    }
 
    // Return raw Markdown

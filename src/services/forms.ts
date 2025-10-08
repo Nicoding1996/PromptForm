@@ -21,6 +21,9 @@ export type StoredForm = {
   title: string;
   description?: string;
   form: FormData;
+  // Persisted AI summary (Markdown) and last updated timestamp
+  aiSummary?: string;
+  aiSummaryUpdatedAt?: Timestamp;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 };
@@ -97,6 +100,18 @@ export async function listResponsesForForm(formId: string): Promise<StoredRespon
 export async function updateFormTitle(id: string, title: string): Promise<void> {
   const ref = doc(db, FORMS_COL, id);
   await updateDoc(ref, { title, updatedAt: serverTimestamp() });
+}
+
+/**
+ * Persist the AI summary (Markdown) for a form document.
+ * This runs on the authenticated client so Firestore rules permit the write.
+ */
+export async function updateFormAiSummary(id: string, aiSummary: string): Promise<void> {
+  const ref = doc(db, FORMS_COL, id);
+  await updateDoc(ref, {
+    aiSummary,
+    aiSummaryUpdatedAt: serverTimestamp(),
+  });
 }
 
 export async function deleteForm(id: string): Promise<void> {

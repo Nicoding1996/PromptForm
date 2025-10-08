@@ -15,6 +15,7 @@ const ResponsesPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<FormData | null>(null);
   const [responses, setResponses] = useState<StoredResponse[]>([]);
+  const [aiSummary, setAiSummary] = useState<string>('');
   const [activeTab, setActiveTab] = useState<TabKey>('summary');
 
   // Columns are derived from form fields (excluding submit)
@@ -39,6 +40,7 @@ const ResponsesPage: React.FC = () => {
         if (!alive) return;
         setForm(formRow?.form ?? null);
         setResponses(respRows);
+        setAiSummary((formRow as any)?.aiSummary || '');
       } catch (e: any) {
         if (!alive) return;
         setError(e?.message || 'Failed to load responses.');
@@ -136,7 +138,7 @@ const ResponsesPage: React.FC = () => {
             {/* Panels */}
             {activeTab === 'summary' && (
               <div id="rs-panel-summary" role="tabpanel" aria-labelledby="rs-tab-summary" className="p-4" tabIndex={0}>
-                <SummaryView form={form} responses={responses} height="70vh" />
+                <SummaryView formId={formId} aiSummaryInitial={aiSummary} form={form} responses={responses} height="70vh" />
               </div>
             )}
 

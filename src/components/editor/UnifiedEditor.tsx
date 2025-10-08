@@ -57,6 +57,9 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
   const [respError, setRespError] = useState<string | null>(null);
   const [responsesSubTab, setResponsesSubTab] = useState<'summary' | 'question' | 'individual'>('individual');
 
+  // Persisted AI summary for this form (loaded from Firestore)
+  const [aiSummary, setAiSummary] = useState<string>('');
+
   // AI prompt visibility (toggle with Sparkles)
   const location = useLocation();
   const defaultAiVisible = useMemo(() => {
@@ -76,6 +79,8 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
         const row = await getFormById(formId);
         if (!alive) return;
         if (row?.form) setFormJson(row.form);
+        // Load any saved AI summary for inline display in SummaryView
+        setAiSummary((row as any)?.aiSummary || '');
       } catch {
         // ignore; keep empty builder if not found
       }
@@ -1424,7 +1429,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
 
                   {responsesSubTab === 'summary' && (
                     <div id="rs-panel-summary" role="tabpanel" aria-labelledby="rs-tab-summary" tabIndex={0}>
-                      <SummaryView form={formJson} responses={responses} height="70vh" />
+                      <SummaryView formId={formId} aiSummaryInitial={aiSummary} form={formJson} responses={responses} height="70vh" />
                     </div>
                   )}
 

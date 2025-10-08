@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import type { FormData, FormField } from '../FormRenderer';
 import type { StoredResponse } from '../../services/forms';
 import {
@@ -20,7 +20,12 @@ import Papa from 'papaparse';
 import { Download, Loader2 } from 'lucide-react';
 import colors from 'tailwindcss/colors';
 import Card from '../ui/Card';
+import ConfirmModal from '../common/ConfirmModal';
+import { toast } from 'react-hot-toast';
+import { updateFormAiSummary } from '../../services/forms';
 type Props = {
+  formId?: string;
+  aiSummaryInitial?: string;
   form: FormData | null;
   responses: StoredResponse[];
   height?: string; // overall viewport height for the container area (e.g., '70vh')
@@ -185,16 +190,32 @@ function calcAverage(nums: number[]) {
   return sum / n.length;
 }
 
-const SummaryView: React.FC<Props> = ({ form, responses, height = '70vh' }) => {
+const SummaryView: React.FC<Props> = ({ formId, aiSummaryInitial, form, responses, height = '70vh' }) => {
   const fields = useMemo(() => (form?.fields ?? []).filter((f) => f.type !== 'submit'), [form]);
 
   // AI Report state
   const [isReportLoading, setIsReportLoading] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
-  const [reportText, setReportText] = useState('');
+  const [reportText, setReportText] = useState(aiSummaryInitial || '');
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const summaryRef = useRef<HTMLDivElement | null>(null);
 
-  // Call backend to generate AI analysis (Markdown)
-  const handleGenerateReport = async () => {
+  // When a new/loaded report exists, scroll it into view for discovery
+  useEffect(() => {
+    if (reportText && summaryRef.current) {
+      summaryRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [reportText]);
+
+  // Sync local state with server-provided initial summary after async load
+  useEffect(() => {
+    if (aiSummaryInitial && aiSummaryInitial !== reportText) {
+      setReportText(aiSummaryInitial);
+    }
+  }, [aiSummaryInitial]);
+
+  // Generate and persist AI analysis (Markdown)
+  const generateAndSave = async () => {
     if (!form) {
       setReportError('No form to analyze.');
       return;
@@ -207,6 +228,7 @@ const SummaryView: React.FC<Props> = ({ form, responses, height = '70vh' }) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          formId,
           form,
           // Server expects an array of submission objects; send payloads only
           responses: (responses || []).map((r) => r.payload),
@@ -219,10 +241,31 @@ const SummaryView: React.FC<Props> = ({ form, responses, height = '70vh' }) => {
       }
 
       setReportText(text);
+
+      // Persist via authenticated client (avoids server-side permission issues)
+      if (formId) {
+        try {
+          await updateFormAiSummary(formId, text);
+          toast.success('AI summary saved');
+        } catch (persistErr: any) {
+          // Still show the summary; inform user persistence failed
+          console.warn('[SummaryView] Failed to persist AI summary:', persistErr);
+          toast.error('Generated summary could not be saved. It will disappear after refresh.');
+        }
+      }
     } catch (e: any) {
       setReportError(e?.message || 'Failed to generate report.');
     } finally {
       setIsReportLoading(false);
+    }
+  };
+
+  // Click handler with re-generation confirmation if a report already exists
+  const handleAnalyzeClick = () => {
+    if (reportText && reportText.trim().length > 0) {
+      setConfirmOpen(true);
+    } else {
+      void generateAndSave();
     }
   };
 
@@ -356,14 +399,14 @@ const SummaryView: React.FC<Props> = ({ form, responses, height = '70vh' }) => {
 
         <button
           type="button"
-          onClick={handleGenerateReport}
+          onClick={handleAnalyzeClick}
           disabled={isReportLoading || !form || responses.length === 0}
           className="rounded-md bg-primary-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-500 disabled:opacity-60"
           title="Analyze responses and generate a professional Markdown report"
         >
           {isReportLoading ? (
             <span className="inline-flex items-center gap-1">
-              <Loader2 className="h-4 w-4 animate-spin" /> Generating…
+              <Loader2 className="h-4 w-4 animate-spin" /> Analyzing…
             </span>
           ) : (
             <span className="inline-flex items-center gap-1">
@@ -569,13 +612,42 @@ const SummaryView: React.FC<Props> = ({ form, responses, height = '70vh' }) => {
       )}
 
       {reportText && (
-        <Card className="mt-4 p-4">
+        <Card className="mt-4 p-4" ref={summaryRef as any}>
           <h3 className="mb-2 text-base font-semibold text-neutral-900">AI-Powered Summary</h3>
           <div className="prose prose-sm max-w-none text-neutral-800">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{reportText}</ReactMarkdown>
           </div>
+          <div className="mt-4 flex justify-end">
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(reportText);
+                  toast.success('Report copied to clipboard');
+                } catch {
+                  toast.error('Copy failed');
+                }
+              }}
+              className="rounded-md bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 ring-1 ring-neutral-200 hover:bg-neutral-50"
+            >
+              Copy Report
+            </button>
+          </div>
         </Card>
       )}
+
+      <ConfirmModal
+        open={confirmOpen}
+        title="Replace existing summary?"
+        message="A summary already exists. Generating a new analysis will replace the current report."
+        confirmText="Replace"
+        cancelText="Cancel"
+        onConfirm={() => {
+          setConfirmOpen(false);
+          void generateAndSave();
+        }}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </div>
   );
 };
