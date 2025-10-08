@@ -159,7 +159,18 @@ const FloatingToolbar: React.FC<Props> = ({
         onClick={onAddField}
         title="Add question"
         aria-label="Add question"
-        className="inline-flex h-10 w-10 items-center justify-center rounded-md text-indigo-700 ring-1 ring-indigo-200 transition hover:bg-indigo-50"
+        className="inline-flex h-10 w-10 items-center justify-center rounded-md transition"
+        style={{
+          color: 'var(--pf-brand, #4F46E5)',
+          boxShadow: 'inset 0 0 0 1px var(--pf-brand, #4F46E5)',
+          backgroundColor: 'white',
+        }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'rgba(79,70,229,0.06)';
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'white';
+        }}
       >
         <PlusCircle className="h-5 w-5" />
       </button>
@@ -169,7 +180,18 @@ const FloatingToolbar: React.FC<Props> = ({
         onClick={() => onAddSection?.()}
         title="Add section"
         aria-label="Add section"
-        className="inline-flex h-10 w-10 items-center justify-center rounded-md text-violet-700 ring-1 ring-violet-200 transition hover:bg-violet-50"
+        className="inline-flex h-10 w-10 items-center justify-center rounded-md transition"
+        style={{
+          color: 'var(--pf-brand, #4F46E5)',
+          boxShadow: 'inset 0 0 0 1px var(--pf-brand, #4F46E5)',
+          backgroundColor: 'white',
+        }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'rgba(79,70,229,0.06)';
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'white';
+        }}
       >
         <Heading2 className="h-5 w-5" />
       </button>

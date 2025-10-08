@@ -65,7 +65,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
   const [styleOpen, setStyleOpen] = useState<boolean>(false);
   const [themeName, setThemeName] = useState<string | null>(null);
   const [themePrimary, setThemePrimary] = useState<string | null>(null);
-  const [, setThemeBackground] = useState<string | null>(null);
+  const [themeBackground, setThemeBackground] = useState<string | null>(null);
   // Bind theme to CSS variables for immediate UI reflection
   const brandStyleVars = useMemo(() => {
     return themePrimary
@@ -1076,7 +1076,14 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
 
   // UI
   return (
-    <div className="min-h-screen bg-neutral-50" style={brandStyleVars}>
+    <div
+      className="min-h-screen bg-neutral-50"
+      style={
+        themeBackground
+          ? { ...(brandStyleVars || {}), background: `linear-gradient(to bottom, ${themeBackground} 0%, #FFFFFF 65%)` }
+          : brandStyleVars
+      }
+    >
       <main id="form-editor-container" className="app-container flex flex-col gap-6">
         <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>

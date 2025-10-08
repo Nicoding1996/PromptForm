@@ -696,7 +696,8 @@ const TypePalette: React.FC<{
             e.stopPropagation();
             onPick(key);
           }}
-          className="flex items-center gap-2 rounded-md border border-teal-300 bg-white px-3 py-2 text-left text-sm font-medium text-teal-900 shadow-sm transition hover:bg-teal-50"
+          className="flex items-center gap-2 rounded-md border-2 bg-white px-3 py-2 text-left text-sm font-medium shadow-sm transition hover:bg-[var(--pf-brand,#4F46E5)] hover:text-white"
+          style={{ borderColor: 'var(--pf-brand, #4F46E5)', color: 'var(--pf-brand, #4F46E5)' }}
         >
           <Icon className="h-4 w-4" />
           {label}

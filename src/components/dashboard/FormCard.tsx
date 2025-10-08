@@ -107,7 +107,7 @@ const FormCard: React.FC<Props> = ({ form, onShare, onDelete, onRename }) => {
         }
       }}
     >
-      <Card className="overflow-hidden">
+      <Card className="overflow-hidden h-[300px] flex flex-col">
       {/* Theme-aware thumbnail */}
       <div
         className="h-40 w-full relative"
@@ -144,10 +144,19 @@ const FormCard: React.FC<Props> = ({ form, onShare, onDelete, onRename }) => {
       </div>
 
       {/* Footer */}
-      <div className="p-4">
+      <div className="p-4 flex-1 flex flex-col">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <div className="truncate text-lg font-semibold text-neutral-800">
+            <div
+              className="text-lg font-semibold text-neutral-800 leading-snug"
+              style={{
+                display: '-webkit-box',
+                WebkitLineClamp: 2 as any,
+                WebkitBoxOrient: 'vertical' as any,
+                overflow: 'hidden',
+                minHeight: '2.5rem', // reserve space for up to 2 lines for uniform card heights
+              }}
+            >
               {form.title || 'Untitled form'}
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-neutral-500">
