@@ -5,6 +5,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  getCountFromServer,
   orderBy,
   query,
   serverTimestamp,
@@ -26,6 +27,9 @@ export type StoredForm = {
   aiSummaryUpdatedAt?: Timestamp;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
+  // New fields for dashboard enhancements
+  lastOpenedAt?: Timestamp;
+  responseCount?: number;
 };
 
 const FORMS_COL = 'forms';
@@ -59,16 +63,47 @@ export async function saveFormForUser(userId: string, form: FormData, existingId
 
 export async function listFormsForUser(userId: string): Promise<StoredForm[]> {
   if (!userId) return [];
+  // Remove orderBy to avoid requiring a composite index; we sort client-side below.
   const q = query(
     collection(db, FORMS_COL),
-    where('userId', '==', userId),
-    orderBy('createdAt', 'desc')
+    where('userId', '==', userId)
   );
   const snap = await getDocs(q);
-  return snap.docs.map((d) => {
+
+  // Base docs
+  const base = snap.docs.map((d) => {
     const data = d.data() as Omit<StoredForm, 'id'>;
     return { id: d.id, ...data };
   });
+
+  // Efficiently attach response counts without downloading all responses
+  const withCounts = await Promise.all(
+    base.map(async (f) => {
+      try {
+        const agg = await getCountFromServer(collection(db, FORMS_COL, f.id, 'responses'));
+        return { ...f, responseCount: agg.data().count ?? 0 };
+      } catch {
+        return { ...f, responseCount: 0 };
+      }
+    })
+  );
+
+  // Smart sort: lastOpenedAt (if present) else updatedAt else createdAt
+  withCounts.sort((a, b) => {
+    const ta =
+      (a.lastOpenedAt?.toMillis?.() ??
+        a.updatedAt?.toMillis?.() ??
+        a.createdAt?.toMillis?.() ??
+        0);
+    const tb =
+      (b.lastOpenedAt?.toMillis?.() ??
+        b.updatedAt?.toMillis?.() ??
+        b.createdAt?.toMillis?.() ??
+        0);
+    return tb - ta;
+  });
+
+  return withCounts;
 }
 
 export async function getFormById(id: string): Promise<StoredForm | null> {
@@ -112,6 +147,14 @@ export async function updateFormAiSummary(id: string, aiSummary: string): Promis
     aiSummary,
     aiSummaryUpdatedAt: serverTimestamp(),
   });
+}
+
+/**
+ * Mark a form as opened to support "recently accessed" sorting.
+ */
+export async function markFormOpened(id: string): Promise<void> {
+  const ref = doc(db, FORMS_COL, id);
+  await updateDoc(ref, { lastOpenedAt: serverTimestamp() });
 }
 
 export async function deleteForm(id: string): Promise<void> {

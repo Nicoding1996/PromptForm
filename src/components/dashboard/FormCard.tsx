@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import type { StoredForm } from '../../services/forms';
-import PublicFormRenderer from '../PublicFormRenderer';
-import { FileText, MoreVertical, Share2, Trash2, ExternalLink, TextCursorInput } from 'lucide-react';
+import { markFormOpened, type StoredForm } from '../../services/forms';
+import { FileText, MoreVertical, Share2, Trash2, ExternalLink, TextCursorInput, MessageSquare } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
@@ -51,8 +50,8 @@ const FormCard: React.FC<Props> = ({ form, onShare, onDelete, onRename }) => {
   const navigate = useNavigate();
 
   const openedText = useMemo(
-    () => formatOpened(form.updatedAt ?? form.createdAt),
-    [form.updatedAt, form.createdAt]
+    () => formatOpened(form.lastOpenedAt ?? form.updatedAt ?? form.createdAt),
+    [form.lastOpenedAt, form.updatedAt, form.createdAt]
   );
 
   // Close on outside click
@@ -87,37 +86,36 @@ const FormCard: React.FC<Props> = ({ form, onShare, onDelete, onRename }) => {
     return () => window.removeEventListener('pf-close-menus', handler as any);
   }, []);
 
+  const menuItemClasses =
+    "flex items-center w-full px-4 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 transition-colors duration-150";
+
   return (
     <motion.div
       whileHover={{ y: -5, boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)' }}
       className="group relative cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-500"
       role="button"
       tabIndex={0}
-      onClick={() => navigate(`/form/${form.id}/edit`)}
+      onClick={() => {
+        markFormOpened(form.id).catch(() => {});
+        navigate(`/form/${form.id}/edit`);
+      }}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
+          markFormOpened(form.id).catch(() => {});
           navigate(`/form/${form.id}/edit`);
         }
       }}
     >
       <Card className="overflow-hidden">
-      {/* Visual preview */}
-      <div className="relative h-48 w-full overflow-hidden bg-slate-50">
-        {/* Scale wrapper: width 400% + scale .25 to create a miniature */}
-        <div
-          className="origin-top-left"
-          style={{
-            width: '400%',
-            transform: 'scale(0.25)',
-            pointerEvents: 'none',
-          }}
-        >
-          <PublicFormRenderer formData={form.form} formId={form.id} />
+      {/* Abstract preview */}
+      <div className="h-40 w-full bg-slate-50">
+        <div className="p-4 space-y-2">
+          <div className="h-2 w-1/2 rounded-full bg-slate-300"></div>
+          <div className="h-2 w-full rounded-full bg-slate-200"></div>
+          <div className="h-2 w-full rounded-full bg-slate-200"></div>
+          <div className="h-2 w-3/4 rounded-full bg-slate-200"></div>
         </div>
-
-        {/* subtle bottom divider to mimic Google Forms card split */}
-        <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-[1px] bg-gray-200" />
       </div>
 
       {/* Footer */}
@@ -127,9 +125,15 @@ const FormCard: React.FC<Props> = ({ form, onShare, onDelete, onRename }) => {
             <div className="truncate text-lg font-semibold text-neutral-800">
               {form.title || 'Untitled form'}
             </div>
-            <div className="mt-2 flex items-center gap-2 text-sm text-neutral-500">
-              <FileText className="h-4 w-4 text-neutral-500" />
-              <span className="truncate">{openedText}</span>
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-neutral-500">
+              <span className="inline-flex items-center gap-2 min-w-0">
+                <FileText className="h-4 w-4 text-neutral-500" />
+                <span className="truncate">{openedText}</span>
+              </span>
+              <span className="inline-flex items-center gap-2">
+                <MessageSquare className="h-4 w-4 text-neutral-500" />
+                <span>{typeof form.responseCount === 'number' && form.responseCount > 0 ? `${form.responseCount} Responses` : 'No responses yet'}</span>
+              </span>
             </div>
           </div>
 
@@ -148,11 +152,11 @@ const FormCard: React.FC<Props> = ({ form, onShare, onDelete, onRename }) => {
                   const el = btnRef.current;
                   if (el) {
                     const rect = el.getBoundingClientRect();
-                    const menuWidth = 192; // w-48
+                    const menuWidth = 224; // w-56
                     let left = rect.right - menuWidth;
                     left = Math.max(8, Math.min(left, window.innerWidth - menuWidth - 8));
                     const belowTop = rect.bottom + 6;
-                    const estHeight = 180;
+                    const estHeight = 200;
                     const openUp = belowTop + estHeight > window.innerHeight;
                     const top = openUp ? Math.max(8, rect.top - 6 - estHeight) : belowTop;
                     setMenuPos({ top, left, openUp });
@@ -173,64 +177,66 @@ const FormCard: React.FC<Props> = ({ form, onShare, onDelete, onRename }) => {
                   ref={menuRef}
                   role="menu"
                   onClick={(e) => e.stopPropagation()}
-                  className="fixed z-[10000] w-48 overflow-visible rounded-md border border-gray-200 bg-white py-1 text-sm shadow-lg"
+                  className="fixed z-[10000] w-56 overflow-hidden rounded-lg border border-neutral-200 bg-white text-sm shadow-md"
                   style={{ top: Math.round(menuPos.top), left: Math.round(menuPos.left) }}
                 >
-                  <Button
+                  <button
                     type="button"
                     role="menuitem"
-                    variant="secondary"
-                    className="w-full justify-start"
+                    className={menuItemClasses}
                     onClick={(e) => {
                       e.stopPropagation();
                       setMenuOpen(false);
                       onRename(form.id, form.title || 'Untitled form');
                     }}
                   >
-                    <TextCursorInput className="h-4 w-4 text-neutral-700" /> Rename
-                  </Button>
+                    <TextCursorInput className="h-4 w-4 text-neutral-700" />
+                    <span className="ml-2">Rename</span>
+                  </button>
 
-                  <Button
+                  <button
                     type="button"
                     role="menuitem"
-                    variant="secondary"
-                    className="w-full justify-start"
+                    className={menuItemClasses}
                     onClick={(e) => {
                       e.stopPropagation();
                       setMenuOpen(false);
                       onShare(form.id);
                     }}
                   >
-                    <Share2 className="h-4 w-4 text-neutral-700" /> Share
-                  </Button>
+                    <Share2 className="h-4 w-4 text-neutral-700" />
+                    <span className="ml-2">Share</span>
+                  </button>
 
                   <Link
                     to={`/form/${form.id}/edit`}
                     role="menuitem"
                     target="_blank"
                     rel="noreferrer noopener"
-                    className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50"
+                    className={menuItemClasses}
                     onClick={(e) => {
                       e.stopPropagation();
                       setMenuOpen(false);
+                      markFormOpened(form.id).catch(() => {});
                     }}
                   >
-                    <ExternalLink className="h-4 w-4 text-slate-700" /> Open in new tab
+                    <ExternalLink className="h-4 w-4 text-slate-700" />
+                    <span className="ml-2">Open in new tab</span>
                   </Link>
 
-                  <Button
+                  <button
                     type="button"
                     role="menuitem"
-                    variant="secondary"
-                    className="w-full justify-start"
+                    className={menuItemClasses}
                     onClick={(e) => {
                       e.stopPropagation();
                       setMenuOpen(false);
                       onDelete(form.id);
                     }}
                   >
-                    <Trash2 className="h-4 w-4 text-neutral-700" /> Delete
-                  </Button>
+                    <Trash2 className="h-4 w-4 text-neutral-700" />
+                    <span className="ml-2">Delete</span>
+                  </button>
                 </div>
               </>,
               document.body
