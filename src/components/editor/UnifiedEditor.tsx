@@ -64,6 +64,29 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
   // Style panel & theme state (Adaptive Theming)
   const [styleOpen, setStyleOpen] = useState<boolean>(false);
   const [themeName, setThemeName] = useState<string | null>(null);
+  const [themePrimary, setThemePrimary] = useState<string | null>(null);
+  const [, setThemeBackground] = useState<string | null>(null);
+  // Bind theme to CSS variables for immediate UI reflection
+  const brandStyleVars = useMemo(() => {
+    return themePrimary
+      ? ({
+          ['--pf-brand' as any]: themePrimary,
+          ['--pf-brand-hover' as any]: themePrimary,
+          // Make native controls (checkbox/radio/select) reflect brand immediately
+          accentColor: themePrimary,
+        } as React.CSSProperties)
+      : undefined;
+  }, [themePrimary]);
+
+  // Ensure immediate reflection across the entire app (including portals)
+  useEffect(() => {
+    if (themePrimary) {
+      try {
+        document.documentElement.style.setProperty('--pf-brand', themePrimary);
+        document.documentElement.style.setProperty('--pf-brand-hover', themePrimary);
+      } catch {}
+    }
+  }, [themePrimary]);
 
   // AI prompt visibility (toggle with Sparkles)
   const location = useLocation();
@@ -88,6 +111,8 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
         setAiSummary((row as any)?.aiSummary || '');
         // Initialize theme state from stored doc or embedded form meta
         setThemeName((row as any)?.theme_name ?? (row as any)?.form?.theme_name ?? null);
+        setThemePrimary((row as any)?.theme_primary_color ?? (row as any)?.form?.theme_primary_color ?? null);
+        setThemeBackground((row as any)?.theme_background_color ?? (row as any)?.form?.theme_background_color ?? null);
       } catch {
         // ignore; keep empty builder if not found
       }
@@ -138,7 +163,20 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
       alive = false;
     };
   }, [formId, activeTab]);
-
+  
+  // Callback to refresh form after theme update
+  const handleThemeUpdate = async () => {
+    if (!formId) return;
+    try {
+      const row = await getFormById(formId);
+      if (row?.form) setFormJson(row.form);
+      setAiSummary((row as any)?.aiSummary || '');
+      setThemeName((row as any)?.theme_name ?? (row as any)?.form?.theme_name ?? null);
+      setThemePrimary((row as any)?.theme_primary_color ?? (row as any)?.form?.theme_primary_color ?? null);
+      setThemeBackground((row as any)?.theme_background_color ?? (row as any)?.form?.theme_background_color ?? null);
+    } catch {}
+  };
+  
   // Click outside to unfocus (but ignore advanced editor and floating toolbar)
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -1038,7 +1076,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
 
   // UI
   return (
-    <div className="min-h-screen bg-neutral-50">
+    <div className="min-h-screen bg-neutral-50" style={brandStyleVars}>
       <main id="form-editor-container" className="app-container flex flex-col gap-6">
         <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -1215,8 +1253,9 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                     onClick={() => setActiveTab('questions')}
                     className={
                       'rounded-md px-3 py-1.5 text-sm font-medium ' +
-                      (activeTab === 'questions' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
+                      (activeTab === 'questions' ? 'text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
                     }
+                    style={activeTab === 'questions' ? { backgroundColor: 'var(--pf-brand, #4F46E5)' } : undefined}
                     aria-selected={activeTab === 'questions'}
                   >
                     Questions
@@ -1229,8 +1268,9 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                     onClick={() => setActiveTab('responses')}
                     className={
                       'rounded-md px-3 py-1.5 text-sm font-medium ' +
-                      (activeTab === 'responses' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
+                      (activeTab === 'responses' ? 'text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
                     }
+                    style={activeTab === 'responses' ? { backgroundColor: 'var(--pf-brand, #4F46E5)' } : undefined}
                     aria-selected={activeTab === 'responses'}
                   >
                     Responses
@@ -1423,8 +1463,9 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                       onClick={() => setResponsesSubTab('summary')}
                       className={
                         'rounded-md px-3 py-1.5 text-sm font-medium ' +
-                        (responsesSubTab === 'summary' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
+                        (responsesSubTab === 'summary' ? 'text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
                       }
+                      style={responsesSubTab === 'summary' ? { backgroundColor: 'var(--pf-brand, #4F46E5)' } : undefined}
                       aria-selected={responsesSubTab === 'summary'}
                     >
                       Summary
@@ -1437,8 +1478,9 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                       onClick={() => setResponsesSubTab('question')}
                       className={
                         'rounded-md px-3 py-1.5 text-sm font-medium ' +
-                        (responsesSubTab === 'question' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
+                        (responsesSubTab === 'question' ? 'text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
                       }
+                      style={responsesSubTab === 'question' ? { backgroundColor: 'var(--pf-brand, #4F46E5)' } : undefined}
                       aria-selected={responsesSubTab === 'question'}
                     >
                       Question
@@ -1451,8 +1493,9 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                       onClick={() => setResponsesSubTab('individual')}
                       className={
                         'rounded-md px-3 py-1.5 text-sm font-medium ' +
-                        (responsesSubTab === 'individual' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
+                        (responsesSubTab === 'individual' ? 'text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
                       }
+                      style={responsesSubTab === 'individual' ? { backgroundColor: 'var(--pf-brand, #4F46E5)' } : undefined}
                       aria-selected={responsesSubTab === 'individual'}
                     >
                       Individual
@@ -1519,12 +1562,15 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
             return;
           }
           try {
+            // Optimistically update local theme for immediate visual feedback
+            setThemeName(choice.name);
+            setThemePrimary(choice.primary);
+            setThemeBackground(choice.background);
             await updateFormTheme(formId, {
               theme_name: choice.name,
               theme_primary_color: choice.primary,
               theme_background_color: choice.background,
             });
-            setThemeName(choice.name);
             toast.success('Theme updated');
           } catch (e) {
             toast.error('Failed to update theme.');
@@ -1532,6 +1578,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
             setStyleOpen(false);
           }
         }}
+        onThemeUpdate={handleThemeUpdate}
       />
 
     </div>

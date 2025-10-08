@@ -20,10 +20,11 @@ type Props = {
   open: boolean;
   currentName?: ThemePreset['name'] | null;
   onClose: () => void;
-  onSelect: (choice: ThemePreset) => void;
+  onSelect: (choice: ThemePreset) => void | Promise<void>;
+  onThemeUpdate?: () => void;
 };
 
-const StylePanel: React.FC<Props> = ({ open, currentName, onClose, onSelect }) => {
+const StylePanel: React.FC<Props> = ({ open, currentName, onClose, onSelect, onThemeUpdate }) => {
   if (!open) return null;
 
   return (
@@ -71,7 +72,10 @@ const StylePanel: React.FC<Props> = ({ open, currentName, onClose, onSelect }) =
                 <button
                   key={t.name}
                   type="button"
-                  onClick={() => onSelect(t)}
+                  onClick={async () => {
+                    await onSelect(t);
+                    onThemeUpdate?.();
+                  }}
                   className={`group relative overflow-hidden rounded-lg border px-3 pb-3 pt-20 text-left shadow-sm transition
                     ${isActive ? 'border-indigo-400 ring-2 ring-indigo-200' : 'border-gray-200 hover:border-indigo-300'}
                   `}
