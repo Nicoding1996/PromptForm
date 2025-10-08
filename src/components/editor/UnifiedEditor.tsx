@@ -1101,6 +1101,15 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
     }
   };
 
+  // Scroll reveal for sticky header
+  const [isScrolled, setIsScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setIsScrolled(window.scrollY > 0);
+    onScroll(); // initialize on mount
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   // UI
   return (
     <div
@@ -1111,17 +1120,22 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
       }}
     >
       <main id="form-editor-container" className="app-container pt-0 flex flex-col gap-6">
-        <header className="sticky top-0 z-50 -mx-[calc(50vw-50%)] px-[calc(50vw-50%)] flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between bg-white/85 backdrop-blur-sm">
-          <div>
+        <header
+          className={`sticky top-0 z-50 -mx-[calc(50vw-50%)] px-[calc(50vw-50%)] flex items-center gap-3 transition-colors duration-200 ${
+            isScrolled ? 'bg-white/85 backdrop-blur-sm border-b border-neutral-200/80' : 'bg-transparent'
+          }`}
+        >
+          <div className="app-container pt-0 w-full flex items-center justify-between gap-3">
+          <div className="flex-none min-w-[200px]">
             {(formId || formJson) && (
               <>
                 <h1 className="text-2xl font-bold tracking-tight text-slate-900">Form Editor</h1>
-                <p className="mt-1 text-sm text-slate-600">Build your form and manage responses in one place.</p>
+                <p className="mt-1 hidden sm:block text-sm text-slate-600 truncate max-w-[640px]">Build your form and manage responses in one place.</p>
               </>
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex-1 flex flex-wrap items-center justify-center gap-2">
             {user && formJson && formId && (
               <button
                 type="button"
@@ -1213,12 +1227,13 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
               </button>
             )}
 
-            <Link to="/dashboard" className="text-sm font-medium text-neutral-700 hover:text-primary-600" title="Back to My Forms">
-              Dashboard
+          </div>
+          <div className="flex-none flex items-center gap-3">
+            <Link to="/dashboard" className="text-sm font-medium text-neutral-700 hover:text-primary-600" title="Back to Forms">
+              Forms
             </Link>
-
-
             <UserMenu />
+          </div>
           </div>
         </header>
 

@@ -50,6 +50,15 @@ const PublicFormPage: React.FC = () => {
     return () => { alive = false; };
   }, [formId]);
 
+  // Scroll reveal for sticky header
+  const [isScrolled, setIsScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setIsScrolled(window.scrollY > 0);
+    onScroll(); // initialize on mount
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   return (
     <div
       className="min-h-screen bg-neutral-50"
@@ -58,7 +67,11 @@ const PublicFormPage: React.FC = () => {
       }}
     >
       <main className="mx-auto max-w-3xl px-4 pt-0 pb-10">
-        <header className="sticky top-0 z-50 -mx-[calc(50vw-50%)] px-[calc(50vw-50%)] mb-6 flex items-center justify-between bg-white/85 backdrop-blur-sm">
+        <header
+          className={`sticky top-0 z-50 -mx-[calc(50vw-50%)] px-[calc(50vw-50%)] mb-6 flex items-center justify-between transition-colors duration-200 ${
+            isScrolled ? 'bg-white/85 backdrop-blur-sm border-b border-neutral-200/80' : 'bg-transparent'
+          }`}
+        >
           <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
           <div className="flex items-center gap-3">
             <Link
