@@ -11,6 +11,8 @@ const PublicFormPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [formJson, setFormJson] = useState<any | null>(null);
   const [title, setTitle] = useState<string>('Form');
+  const [themePrimary, setThemePrimary] = useState<string | null>(null);
+  const [themeBackground, setThemeBackground] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -32,6 +34,9 @@ const PublicFormPage: React.FC = () => {
         } else {
           setTitle(row.title || 'Form');
           setFormJson(row.form);
+          // Initialize theme from stored document (fallback to embedded form theme)
+          setThemePrimary((row as any)?.theme_primary_color ?? (row as any)?.form?.theme_primary_color ?? null);
+          setThemeBackground((row as any)?.theme_background_color ?? (row as any)?.form?.theme_background_color ?? null);
         }
       } catch (e: any) {
         if (!alive) return;
@@ -46,7 +51,12 @@ const PublicFormPage: React.FC = () => {
   }, [formId]);
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div
+      className="min-h-screen"
+      style={{
+        background: `linear-gradient(180deg, ${themeBackground || '#F8FAFF'} 0%, #FFFFFF 60%)`,
+      }}
+    >
       <main className="mx-auto max-w-3xl px-4 py-10">
         <header className="mb-6 flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
@@ -81,6 +91,8 @@ const PublicFormPage: React.FC = () => {
             formData={formJson}
             formId={formId!}
             preview={new URLSearchParams(location.search).get('preview') === 'true'}
+            themePrimaryColor={themePrimary || (formJson as any)?.theme_primary_color || undefined}
+            themeBackgroundColor={themeBackground || (formJson as any)?.theme_background_color || undefined}
           />
         )}
       </main>

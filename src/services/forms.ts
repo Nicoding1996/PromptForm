@@ -22,11 +22,18 @@ export type StoredForm = {
   title: string;
   description?: string;
   form: FormData;
+
+  // Theme (Adaptive Theming System)
+  theme_name?: string; // e.g., "Indigo" | "Slate" | "Rose" | "Amber" | "Emerald" | "Sky"
+  theme_primary_color?: string; // e.g., "#6366F1"
+  theme_background_color?: string; // e.g., "#E0E7FF"
+
   // Persisted AI summary (Markdown) and last updated timestamp
   aiSummary?: string;
   aiSummaryUpdatedAt?: Timestamp;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
+
   // New fields for dashboard enhancements
   lastOpenedAt?: Timestamp;
   responseCount?: number;
@@ -38,6 +45,21 @@ export async function saveFormForUser(userId: string, form: FormData, existingId
   if (!userId) throw new Error('Missing userId');
   if (!form) throw new Error('Missing form');
 
+  // Extract theme fields from the AI-generated form JSON if present
+  const themeObj: any = (form as any).theme || {};
+  const theme_name: string | null =
+    (form as any).theme_name ?? (form as any).themeName ?? themeObj.name ?? null;
+  const theme_primary_color: string | null =
+    (form as any).theme_primary_color ??
+    (form as any).themePrimaryColor ??
+    themeObj.primaryColor ??
+    null;
+  const theme_background_color: string | null =
+    (form as any).theme_background_color ??
+    (form as any).themeBackgroundColor ??
+    themeObj.backgroundColor ??
+    null;
+
   if (existingId) {
     const ref = doc(db, FORMS_COL, existingId);
     await updateDoc(ref, {
@@ -45,6 +67,10 @@ export async function saveFormForUser(userId: string, form: FormData, existingId
       title: form.title,
       description: form.description ?? '',
       form,
+      // Adaptive Theming fields
+      theme_name,
+      theme_primary_color,
+      theme_background_color,
       updatedAt: serverTimestamp(),
     });
     return existingId;
@@ -55,6 +81,10 @@ export async function saveFormForUser(userId: string, form: FormData, existingId
     title: form.title,
     description: form.description ?? '',
     form,
+    // Adaptive Theming fields
+    theme_name,
+    theme_primary_color,
+    theme_background_color,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
@@ -157,6 +187,22 @@ export async function markFormOpened(id: string): Promise<void> {
   await updateDoc(ref, { lastOpenedAt: serverTimestamp() });
 }
 
+export async function updateFormTheme(
+  id: string,
+  theme: {
+    theme_name: string;
+    theme_primary_color: string;
+    theme_background_color: string;
+  }
+): Promise<void> {
+  const ref = doc(db, FORMS_COL, id);
+  await updateDoc(ref, {
+    theme_name: theme.theme_name,
+    theme_primary_color: theme.theme_primary_color,
+    theme_background_color: theme.theme_background_color,
+    updatedAt: serverTimestamp(),
+  });
+}
 export async function deleteForm(id: string): Promise<void> {
   // Perform delete on the client with the current authenticated user so Firestore rules apply:
   // allow delete: if request.auth != null && get(...forms/$(formId)).data.userId == request.auth.uid;

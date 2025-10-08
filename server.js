@@ -133,7 +133,13 @@ app.post('/generate-form', async (req, res) => {
             "description": "A short description for this result.",
             "scoreRange": { "from": 0, "to": 0 }
           }
-        ]
+        ],
+
+        // Adaptive Theming (required):
+        // Name must be one of: Indigo | Slate | Rose | Amber | Emerald | Sky
+        "theme_name": "Indigo",
+        "theme_primary_color": "#6366F1",
+        "theme_background_color": "#E0E7FF"
       }
       
       Follow these critical rules:
@@ -162,6 +168,23 @@ app.post('/generate-form', async (req, res) => {
         - Sections must not be counted for scoring even when "isQuiz": true.
       - 'submit': Ensure there is exactly one field with type "submit".
       - If the user's request implies a longer introduction or context, include a helpful summary in the "description" field.
+
+      THEME RULES:
+      - Based on the form's topic, suggest a theme using:
+        [Indigo, Slate, Rose, Amber, Emerald, Sky].
+      - For a business/professional form, prefer "Indigo" or "Slate".
+      - For a fun/quiz/consumer form, prefer "Rose" or "Amber".
+      - Output the following top-level keys (required):
+        "theme_name" (one of the names above),
+        "theme_primary_color" (hex),
+        "theme_background_color" (hex, soft/pastel).
+      - Use these canonical mappings unless context strongly suggests another:
+        Indigo -> primary #6366F1, background #E0E7FF
+        Slate  -> primary #475569, background #E2E8F0
+        Rose   -> primary #F43F5E, background #FFE4E6
+        Amber  -> primary #F59E0B, background #FEF3C7
+        Emerald-> primary #10B981, background #D1FAE5
+        Sky    -> primary #0EA5E9, background #E0F2FE
 
       QUIZ/ASSESSMENT RULES:
       - If the user's prompt contains keywords that imply a knowledge test—such as "quiz", "test", "exam", "true or false", or "knowledge check"—you MUST add a new top-level property "isQuiz": true on the main JSON object. Do NOT trigger quiz mode for generic workplace/self "assessment" or "evaluation" forms.
@@ -372,7 +395,12 @@ Additional user instructions (context): "${context.trim()}". Use these instructi
         ],
         "resultPages": [
           { "title": "Outcome A", "description": "Result description", "scoreRange": { "from": 0, "to": 0 } }
-        ]
+        ],
+
+        // Adaptive Theming (required):
+        "theme_name": "Indigo",
+        "theme_primary_color": "#6366F1",
+        "theme_background_color": "#E0E7FF"
       }
  
       Follow these critical rules:
@@ -401,6 +429,18 @@ Additional user instructions (context): "${context.trim()}". Use these instructi
         - Sections must not be counted for scoring even when "isQuiz": true.
       - 'submit': Ensure there is exactly one field with type "submit".
       - If the user's request implies a longer introduction or context, include a helpful summary in the "description" field.
+
+      THEME RULES:
+      - Based on the form's topic/context, choose a theme from [Indigo, Slate, Rose, Amber, Emerald, Sky].
+      - Prefer Indigo/Slate for business/professional; Rose/Amber for fun/quiz.
+      - Output top-level keys: "theme_name", "theme_primary_color", "theme_background_color".
+      - Canonical mappings:
+        Indigo -> #6366F1 / #E0E7FF
+        Slate  -> #475569 / #E2E8F0
+        Rose   -> #F43F5E / #FFE4E6
+        Amber  -> #F59E0B / #FEF3C7
+        Emerald-> #10B981 / #D1FAE5
+        Sky    -> #0EA5E9 / #E0F2FE
 
       QUIZ/ASSESSMENT RULES:
       - If the user's prompt or the image/context contains keywords that imply a knowledge test—such as "quiz", "test", "exam", "true or false", or "knowledge check"—you MUST add a new top-level property "isQuiz": true on the main JSON object. Do NOT trigger quiz mode for generic workplace/self "assessment" or "evaluation" forms.
@@ -603,7 +643,12 @@ Additional user instructions (context): "${userContext}"
         ],
         "resultPages": [
           { "title": "Outcome A", "description": "Result description", "scoreRange": { "from": 0, "to": 0 } }
-        ]
+        ],
+
+        // Adaptive Theming (required):
+        "theme_name": "Indigo",
+        "theme_primary_color": "#6366F1",
+        "theme_background_color": "#E0E7FF"
       }
       
       Follow these critical rules:
@@ -632,6 +677,18 @@ Additional user instructions (context): "${userContext}"
         - Sections must not be counted for scoring even when "isQuiz": true.
       - 'submit': Ensure there is exactly one field with type "submit".
       - If the user's request implies a longer introduction or context, include a helpful summary in the "description" field.
+
+      THEME RULES:
+      - Choose a theme from [Indigo, Slate, Rose, Amber, Emerald, Sky] based on topic/context.
+      - Prefer Indigo/Slate for business; Rose/Amber for fun quizzes.
+      - Output top-level: "theme_name", "theme_primary_color", "theme_background_color".
+      - Canonical mappings:
+        Indigo -> #6366F1 / #E0E7FF
+        Slate  -> #475569 / #E2E8F0
+        Rose   -> #F43F5E / #FFE4E6
+        Amber  -> #F59E0B / #FEF3C7
+        Emerald-> #10B981 / #D1FAE5
+        Sky    -> #0EA5E9 / #E0F2FE
 
       QUIZ/ASSESSMENT RULES:
       - If the user's prompt or the document content contains keywords that imply a knowledge test—such as "quiz", "test", "exam", "true or false", or "knowledge check"—you MUST add a new top-level property "isQuiz": true on the main JSON object. Do NOT trigger quiz mode for generic workplace/self "assessment" or "evaluation" forms.
@@ -912,13 +969,19 @@ CRITICAL REQUIREMENTS:
     ],
     "resultPages": [
       { "title": "string", "description": "string", "scoreRange": { "from": 0, "to": 0 } }
-    ]
+    ],
+
+    // Adaptive Theming (preserve if present; update only if the command explicitly changes theme)
+    "theme_name": "Indigo|Slate|Rose|Amber|Emerald|Sky",
+    "theme_primary_color": "#RRGGBB",
+    "theme_background_color": "#RRGGBB"
   }
 - Exactly one "submit" field must exist and be last in order.
 - For "radio" | "checkbox" | "select": include "options"; omit for other types (including radioGrid).
 - radioGrid must use "rows" (string[]) and "columns" ({ "label": string, "points": number }[]).
 - If you add or rename fields, ensure unique, URL-safe snake_case "name" values.
 - Maintain logical consistency; do not degrade the form's functionality.
+- If the input JSON contains top-level theming keys (theme_name, theme_primary_color, theme_background_color), you MUST preserve them unless the user command explicitly asks to change theme.
 - Output ONLY the raw JSON object.
 
 User command:

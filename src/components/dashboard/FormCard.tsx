@@ -108,13 +108,38 @@ const FormCard: React.FC<Props> = ({ form, onShare, onDelete, onRename }) => {
       }}
     >
       <Card className="overflow-hidden">
-      {/* Abstract preview */}
-      <div className="h-40 w-full bg-slate-50">
-        <div className="p-4 space-y-2">
-          <div className="h-2 w-1/2 rounded-full bg-slate-300"></div>
-          <div className="h-2 w-full rounded-full bg-slate-200"></div>
-          <div className="h-2 w-full rounded-full bg-slate-200"></div>
-          <div className="h-2 w-3/4 rounded-full bg-slate-200"></div>
+      {/* Theme-aware thumbnail */}
+      <div
+        className="h-40 w-full relative"
+        style={{
+          background: `linear-gradient(135deg, ${form.theme_background_color || '#F8FAFF'} 0%, #FFFFFF 70%)`,
+        }}
+        aria-label="Form theme preview"
+      >
+        {/* Primary color top bar */}
+        <div
+          className="absolute left-0 right-0 top-0 h-10"
+          style={{ backgroundColor: form.theme_primary_color || '#E5E7EB' }}
+          aria-hidden="true"
+        />
+        {/* Abstract content lines */}
+        <div className="relative p-4 space-y-2">
+          <div
+            className="h-2 w-1/2 rounded-full"
+            style={{ backgroundColor: 'rgba(0,0,0,0.18)' }}
+          />
+          <div
+            className="h-2 w-full rounded-full"
+            style={{ backgroundColor: 'rgba(0,0,0,0.12)' }}
+          />
+          <div
+            className="h-2 w-full rounded-full"
+            style={{ backgroundColor: 'rgba(0,0,0,0.12)' }}
+          />
+          <div
+            className="h-2 w-3/4 rounded-full"
+            style={{ backgroundColor: 'rgba(0,0,0,0.12)' }}
+          />
         </div>
       </div>
 

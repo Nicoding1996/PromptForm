@@ -15,6 +15,9 @@ type Props = {
   formData: FormData | null;
   formId: string;
   preview?: boolean;
+  // Adaptive Theming (optional overrides passed from page)
+  themePrimaryColor?: string;
+  themeBackgroundColor?: string;
 };
 
 // Live range control with reactive value display
@@ -48,7 +51,7 @@ const LiveRange: React.FC<{
     </div>
   );
 };
-const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false }) => {
+const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false, themePrimaryColor, themeBackgroundColor: _themeBackgroundColor }) => {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +71,10 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
   const actionBase = useMemo(() => {
     return (import.meta as any)?.env?.VITE_API_BASE || 'http://localhost:3001';
   }, []);
+
+  // Theme variables (from props, with sensible defaults)
+  const brand = themePrimaryColor || '#4F46E5'; // indigo-600 fallback
+  const styleVars = { ['--color-brand-600' as any]: brand } as React.CSSProperties;
 
   if (!formData) return null;
 
@@ -488,7 +495,7 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
                     id={optId}
                     name={field.name}
                     value={opt}
-                    className="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    className="h-4 w-4 border-gray-300 text-[--color-brand-600] focus:ring-[--color-brand-600]"
                     required={required && optIdx === 0}
                     defaultChecked={saved ? normalize(saved) === normalize(opt) : false}
                   />
@@ -524,7 +531,7 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
                       id={optId}
                       name={field.name}
                       value={opt}
-                      className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      className="h-4 w-4 rounded border-gray-300 text-[--color-brand-600] focus:ring-[--color-brand-600]"
                       defaultChecked={savedSet.has(normalize(opt))}
                     />
                     <span>{opt}</span>
@@ -629,7 +636,7 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
                               id={id}
                               name={rowName}
                               value={String(cIdx)}
-                              className="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                              className="h-4 w-4 border-gray-300 text-[--color-brand-600] focus:ring-[--color-brand-600]"
                               aria-label={`${row} - ${colLabel}`}
                               required={required && cIdx === 0}
                               defaultChecked={savedIdx === cIdx}
@@ -655,7 +662,7 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
   if (submitted) {
     if (preview) {
       return (
-        <section className="mt-8 card p-6">
+        <section className="mt-8 card p-6" style={styleVars}>
           <div className="text-center">
             <h2 className="text-lg font-semibold text-gray-900">Preview submission simulated</h2>
             <p className="mt-1 text-sm text-gray-600">This is a preview only. No data was saved.</p>
@@ -679,7 +686,7 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
 
     if (matched) {
       return (
-        <section className="mt-8 card p-6">
+        <section className="mt-8 card p-6" style={styleVars}>
           <div className="mx-auto max-w-2xl space-y-3 text-center">
             <h2 className="text-xl font-bold text-gray-900">{matched.title || 'Your Result'}</h2>
             <p className="text-sm text-gray-500">
@@ -693,11 +700,11 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
     }
 
     return (
-      <section className="mt-8 card p-6">
+      <section className="mt-8 card p-6" style={styleVars}>
         <div className="text-center">
           <h2 className="text-lg font-semibold text-gray-900">Thank you for your response!</h2>
           {(formData as any)?.isQuiz === true && lastScore != null && lastMaxScore != null ? (
-            <p className="mt-2 text-base font-semibold text-indigo-700">
+            <p className="mt-2 text-base font-semibold" style={{ color: brand }}>
               You scored {lastScore} out of {lastMaxScore}!
             </p>
           ) : (
@@ -725,7 +732,7 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
           </a>
         </div>
       )}
-      <section className="mt-8 card p-6">
+      <section className="mt-8 card p-6" style={styleVars}>
         <div className="mb-6">
           <h2 className="block text-xl font-semibold text-gray-900">{formData.title}</h2>
           {formData.description && <p className="mt-1 text-sm text-gray-600">{formData.description}</p>}
@@ -761,7 +768,8 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
               <button
                 type="button"
                 onClick={(e) => handleNext(e)}
-                className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
+                className="rounded-md px-4 py-2 text-sm font-semibold text-white shadow-sm focus-visible:ring-2 focus-visible:ring-[--color-brand-600] focus-visible:ring-offset-2"
+                style={{ backgroundColor: brand }}
               >
                 Next
               </button>
@@ -770,8 +778,8 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
                 ref={submitBtnRef}
                 type="submit"
                 disabled={submitting || navBlockActive}
-                style={{ pointerEvents: navBlockActive ? 'none' : undefined }}
-                className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-500 focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                style={{ pointerEvents: navBlockActive ? 'none' : undefined, backgroundColor: brand }}
+                className="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors focus-visible:ring-2 focus-visible:ring-[--color-brand-600] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
                 title={preview ? 'This submit is simulated in preview mode' : ''}
               >
                 {submitting ? 'Submitting...' : submitLabel}

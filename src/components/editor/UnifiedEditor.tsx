@@ -7,14 +7,15 @@ import ResultCard from './ResultCard';
 import SuggestionChips from './SuggestionChips';
 import { useAuth } from '../../context/AuthContext';
 import UserMenu from '../ui/UserMenu';
-import { getFormById, saveFormForUser, listResponsesForForm, type StoredResponse } from '../../services/forms';
+import { getFormById, saveFormForUser, listResponsesForForm, type StoredResponse, updateFormTheme } from '../../services/forms';
 import IndividualResponsesView from '../responses/IndividualResponsesView';
 import SummaryView from '../responses/SummaryView';
-import { Save, ExternalLink, Loader2, Share2, Eye, ClipboardList, UserPlus, MessageSquare, HelpCircle, Sparkles } from 'lucide-react';
+import { Save, ExternalLink, Loader2, Share2, Eye, ClipboardList, UserPlus, MessageSquare, HelpCircle, Sparkles, Palette } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { AnimatePresence, motion } from 'framer-motion';
 import Button from '../ui/Button';
 import Card from '../ui/Card';
+import StylePanel from './StylePanel';
 
 type UnifiedEditorProps = {
   formId?: string;
@@ -60,6 +61,10 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
   // Persisted AI summary for this form (loaded from Firestore)
   const [aiSummary, setAiSummary] = useState<string>('');
 
+  // Style panel & theme state (Adaptive Theming)
+  const [styleOpen, setStyleOpen] = useState<boolean>(false);
+  const [themeName, setThemeName] = useState<string | null>(null);
+
   // AI prompt visibility (toggle with Sparkles)
   const location = useLocation();
   const defaultAiVisible = useMemo(() => {
@@ -81,6 +86,8 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
         if (row?.form) setFormJson(row.form);
         // Load any saved AI summary for inline display in SummaryView
         setAiSummary((row as any)?.aiSummary || '');
+        // Initialize theme state from stored doc or embedded form meta
+        setThemeName((row as any)?.theme_name ?? (row as any)?.form?.theme_name ?? null);
       } catch {
         // ignore; keep empty builder if not found
       }
@@ -1109,6 +1116,31 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                 <Sparkles className="h-4 w-4 text-primary-600" />
               </button>
             )}
+
+            {/* Style (theme) button */}
+            {formId ? (
+              <button
+                type="button"
+                onClick={() => setStyleOpen(true)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-white text-neutral-700 ring-1 ring-neutral-200 hover:bg-neutral-50"
+                title="Style"
+                aria-label="Style panel"
+              >
+                <Palette className="h-4 w-4 text-indigo-600" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {}}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-white text-neutral-400 ring-1 ring-neutral-200"
+                title="Save form first to customize style"
+                aria-disabled="true"
+                disabled
+              >
+                <Palette className="h-4 w-4" />
+              </button>
+            )}
+
             <Link to="/dashboard" className="text-sm font-medium text-neutral-700 hover:text-primary-600" title="Back to My Forms">
               Dashboard
             </Link>
@@ -1475,6 +1507,32 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
           </>
         )}
       </main>
+
+      {/* Style Panel for theme selection */}
+      <StylePanel
+        open={styleOpen}
+        currentName={themeName as any}
+        onClose={() => setStyleOpen(false)}
+        onSelect={async (choice) => {
+          if (!formId) {
+            toast.error('Save the form first to update the theme.');
+            return;
+          }
+          try {
+            await updateFormTheme(formId, {
+              theme_name: choice.name,
+              theme_primary_color: choice.primary,
+              theme_background_color: choice.background,
+            });
+            setThemeName(choice.name);
+            toast.success('Theme updated');
+          } catch (e) {
+            toast.error('Failed to update theme.');
+          } finally {
+            setStyleOpen(false);
+          }
+        }}
+      />
 
     </div>
   );
