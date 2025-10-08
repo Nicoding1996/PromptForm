@@ -341,7 +341,11 @@ export const AdvancedEditor: React.FC<{
           aria-busy={isAssisting}
           disabled={isAssisting}
           onClick={() => !isAssisting && onAiAssistQuestion?.(index)}
-          className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-white text-indigo-700 ring-1 ring-indigo-200 hover:bg-indigo-50 disabled:opacity-60 disabled:cursor-not-allowed"
+          className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-white hover:bg-neutral-50 disabled:opacity-60 disabled:cursor-not-allowed"
+          style={{
+            color: 'var(--pf-brand, #334155)', // neutral fallback when no theme
+            boxShadow: 'inset 0 0 0 1px var(--pf-brand, #CBD5E1)',
+          }}
         >
           {isAssisting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
         </button>
@@ -696,8 +700,12 @@ const TypePalette: React.FC<{
             e.stopPropagation();
             onPick(key);
           }}
-          className="flex items-center gap-2 rounded-md border-2 bg-white px-3 py-2 text-left text-sm font-medium shadow-sm transition hover:bg-[var(--pf-brand,#4F46E5)] hover:text-white"
-          style={{ borderColor: 'var(--pf-brand, #4F46E5)', color: 'var(--pf-brand, #4F46E5)' }}
+          className="flex items-center gap-2 rounded-md border-2 bg-white px-3 py-2 text-left text-sm font-medium shadow-sm transition hover:shadow-md"
+          style={{
+            borderColor: 'var(--pf-brand, #4F46E5)',
+            color: 'var(--pf-brand, #4F46E5)',
+            background: 'transparent',
+          }}
         >
           <Icon className="h-4 w-4" />
           {label}

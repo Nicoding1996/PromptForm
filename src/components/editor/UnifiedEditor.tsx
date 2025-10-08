@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import CommandBar from '../CommandBar';
 import FormRenderer from '../FormRenderer';
@@ -78,15 +78,43 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
       : undefined;
   }, [themePrimary]);
 
-  // Ensure immediate reflection across the entire app (including portals)
-  useEffect(() => {
-    if (themePrimary) {
-      try {
+  // Ensure immediate reflection across the entire app (including portals).
+  // useLayoutEffect prevents a 1-frame flash of the previous theme on navigation.
+  useLayoutEffect(() => {
+    try {
+      if (themePrimary) {
         document.documentElement.style.setProperty('--pf-brand', themePrimary);
         document.documentElement.style.setProperty('--pf-brand-hover', themePrimary);
-      } catch {}
-    }
+      } else {
+        // Clear any previous brand so colors don't "stick" when navigating
+        document.documentElement.style.removeProperty('--pf-brand');
+        document.documentElement.style.removeProperty('--pf-brand-hover');
+      }
+    } catch {}
   }, [themePrimary]);
+
+  // Reset theme immediately when navigating to another form to avoid flash/stickiness.
+  // useLayoutEffect ensures the clear happens before first paint of the new route.
+  useLayoutEffect(() => {
+    // Clear local theme state and root CSS vars first; loader will populate real values
+    setThemeName(null);
+    setThemePrimary(null);
+    setThemeBackground(null);
+    try {
+      document.documentElement.style.removeProperty('--pf-brand');
+      document.documentElement.style.removeProperty('--pf-brand-hover');
+    } catch {}
+  }, [formId]);
+
+  // Clear CSS brand variables when this editor unmounts, so colors don't leak to other pages
+  useEffect(() => {
+    return () => {
+      try {
+        document.documentElement.style.removeProperty('--pf-brand');
+        document.documentElement.style.removeProperty('--pf-brand-hover');
+      } catch {}
+    };
+  }, []);
 
   // AI prompt visibility (toggle with Sparkles)
   const location = useLocation();
