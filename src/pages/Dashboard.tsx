@@ -205,7 +205,7 @@ const Dashboard: React.FC = () => {
               onClick={() => setViewMode('grid')}
               aria-pressed={viewMode === 'grid'}
               title="Grid view"
-              className={`h-9 w-9 inline-flex items-center justify-center rounded-md border ${viewMode === 'grid' ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white text-neutral-700 hover:bg-neutral-100 border-neutral-300'}`}
+              className={`h-9 w-9 inline-flex items-center justify-center rounded-md border ${viewMode === 'grid' ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-neutral-700 hover:bg-neutral-100 border-neutral-300'}`}
             >
               <LayoutGrid className="h-4 w-4" />
             </button>
@@ -214,7 +214,7 @@ const Dashboard: React.FC = () => {
               onClick={() => setViewMode('list')}
               aria-pressed={viewMode === 'list'}
               title="List view"
-              className={`h-9 w-9 inline-flex items-center justify-center rounded-md border ${viewMode === 'list' ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white text-neutral-700 hover:bg-neutral-100 border-neutral-300'}`}
+              className={`h-9 w-9 inline-flex items-center justify-center rounded-md border ${viewMode === 'list' ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-neutral-700 hover:bg-neutral-100 border-neutral-300'}`}
             >
               <List className="h-4 w-4" />
             </button>
