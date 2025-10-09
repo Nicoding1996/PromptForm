@@ -197,15 +197,18 @@ const SummaryView: React.FC<Props> = ({ formId, aiSummaryInitial, form, response
   const [isReportLoading, setIsReportLoading] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
   const [reportText, setReportText] = useState(aiSummaryInitial || '');
+  // Flag to scroll only right after we generate a new report (avoid on mount/tab revisit)
+  const [justGenerated, setJustGenerated] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const summaryRef = useRef<HTMLDivElement | null>(null);
 
-  // When a new/loaded report exists, scroll it into view for discovery
+  // Scroll only immediately after generating a new report (not on initial mount or tab switch)
   useEffect(() => {
-    if (reportText && summaryRef.current) {
+    if (justGenerated && reportText && summaryRef.current) {
       summaryRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setJustGenerated(false);
     }
-  }, [reportText]);
+  }, [reportText, justGenerated]);
 
   // Sync local state with server-provided initial summary after async load
   useEffect(() => {
@@ -240,8 +243,10 @@ const SummaryView: React.FC<Props> = ({ formId, aiSummaryInitial, form, response
         throw new Error(text || 'Failed to generate report.');
       }
 
+      // Mark that this report was just generated to trigger a one-time scroll
+      setJustGenerated(true);
       setReportText(text);
-
+      
       // Persist via authenticated client (avoids server-side permission issues)
       if (formId) {
         try {
