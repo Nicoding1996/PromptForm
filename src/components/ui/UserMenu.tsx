@@ -41,7 +41,7 @@ const UserMenu: React.FC = () => {
         onClick={loginWithGoogle}
         className="inline-flex items-center rounded-md bg-primary-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-700"
       >
-        Login with Google
+        Login or Sign Up with Google
       </button>
     );
   }

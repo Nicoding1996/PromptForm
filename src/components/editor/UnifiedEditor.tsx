@@ -1214,24 +1214,15 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
               >
                 <Palette className="h-4 w-4 text-indigo-600" />
               </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => {}}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-white text-neutral-400 ring-1 ring-neutral-200"
-                title="Save form first to customize style"
-                aria-disabled="true"
-                disabled
-              >
-                <Palette className="h-4 w-4" />
-              </button>
-            )}
+            ) : null}
 
           </div>
           <div className="flex-none flex items-center gap-3">
-            <Link to="/dashboard" className="text-sm font-medium text-neutral-700 hover:text-primary-600" title="Back to Forms">
-              Forms
-            </Link>
+            {user && (
+              <Link to="/dashboard" className="text-sm font-medium text-neutral-700 hover:text-primary-600" title="Back to Forms">
+                Forms
+              </Link>
+            )}
             <UserMenu />
           </div>
           </div>
