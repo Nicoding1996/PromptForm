@@ -130,9 +130,8 @@ const Dashboard: React.FC = () => {
               isScrolled ? 'bg-white/85 backdrop-blur-sm border-b border-neutral-200/80' : 'bg-transparent'
             }`}
           >
-            <div className="px-6 sm:px-8 lg:px-10 grid grid-cols-[auto_auto_1fr] items-center gap-4">
+            <div className="px-6 sm:px-8 lg:px-10 grid grid-cols-[auto_1fr] items-center">
               <Link to="/" aria-label="Home" className="inline-flex items-center"><Logo className="h-12 w-auto" /></Link>
-              <Link to="/dashboard" className="text-sm font-medium text-neutral-700 hover:text-primary-600">Forms</Link>
               <div className="justify-self-end"><UserMenu /></div>
             </div>
           </header>
@@ -157,9 +156,8 @@ const Dashboard: React.FC = () => {
               isScrolled ? 'bg-white/85 backdrop-blur-sm border-b border-neutral-200/80' : 'bg-transparent'
             }`}
           >
-            <div className="px-6 sm:px-8 lg:px-10 grid grid-cols-[auto_auto_1fr] items-center gap-4">
+            <div className="px-6 sm:px-8 lg:px-10 grid grid-cols-[auto_1fr] items-center">
               <Link to="/" aria-label="Home" className="inline-flex items-center"><Logo className="h-12 w-auto" /></Link>
-              <Link to="/dashboard" className="text-sm font-medium text-neutral-700 hover:text-primary-600">Forms</Link>
               <div className="justify-self-end"><UserMenu /></div>
             </div>
           </header>
@@ -181,13 +179,10 @@ const Dashboard: React.FC = () => {
             isScrolled ? 'bg-white/85 backdrop-blur-sm border-b border-neutral-200/80' : 'bg-transparent'
           }`}
         >
-          <div className="px-6 sm:px-8 lg:px-10 grid grid-cols-[auto_auto_1fr] items-center gap-4">
+          <div className="px-6 sm:px-8 lg:px-10 grid grid-cols-[auto_1fr] items-center">
             <Link to="/" aria-label="Home" className="inline-flex items-center"><Logo className="h-12 w-auto" /></Link>
-            <Link to="/dashboard" className="text-sm font-medium text-neutral-700 hover:text-primary-600">Forms</Link>
             <div className="justify-self-end flex items-center gap-3">
-              <Link to="/" className="text-sm font-medium text-neutral-700 hover:text-primary-600">
-                Home
-              </Link>
+              <Link to="/dashboard" className="text-sm font-medium text-neutral-700 hover:text-primary-600">Forms</Link>
               <UserMenu />
             </div>
           </div>

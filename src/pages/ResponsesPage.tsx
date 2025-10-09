@@ -6,11 +6,14 @@ import type { FormData, FormField } from '../components/FormRenderer';
 import Card from '../components/ui/Card';
 import SummaryView from '../components/responses/SummaryView';
 import IndividualResponsesView from '../components/responses/IndividualResponsesView';
+import { useAuth } from '../context/AuthContext';
+import UserMenu from '../components/ui/UserMenu';
 
 type TabKey = 'summary' | 'individual';
 
 const ResponsesPage: React.FC = () => {
   const { formId } = useParams<{ formId: string }>();
+  const { user } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,13 +67,30 @@ const ResponsesPage: React.FC = () => {
               <Link to="/" aria-label="Home" className="inline-flex items-center">
                 <Logo className="h-12 w-auto" />
               </Link>
-              <Link to="/dashboard" className="text-sm font-medium text-neutral-700 hover:text-primary-600">Forms</Link>
             </div>
-            <div className="flex items-center gap-2">
-              <Link to="/dashboard" className="btn-ghost">Back to Dashboard</Link>
-              {formId && (
-                <Link to={`/form/${formId}`} className="btn-ghost">View Public Form</Link>
+            <div className="flex items-center gap-3">
+              {user && (
+                <Link to="/dashboard" className="text-sm font-medium text-neutral-700 hover:text-primary-600">
+                  Forms
+                </Link>
               )}
+              <Link
+                to="/dashboard"
+                className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100 transition-colors"
+                title="Back to Dashboard"
+              >
+                Back to Dashboard
+              </Link>
+              {formId && (
+                <Link
+                  to={`/form/${formId}`}
+                  className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100 transition-colors"
+                  title="View Public Form"
+                >
+                  View Public Form
+                </Link>
+              )}
+              <UserMenu />
             </div>
           </div>
         </header>

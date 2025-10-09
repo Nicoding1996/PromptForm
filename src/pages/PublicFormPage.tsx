@@ -3,6 +3,8 @@ import { Link, useParams, useLocation } from 'react-router-dom';
 import { getFormById } from '../services/forms';
 import PublicFormRenderer from '../components/PublicFormRenderer';
 import { Logo } from '../components/ui/Logo';
+import { useAuth } from '../context/AuthContext';
+import UserMenu from '../components/ui/UserMenu';
 
 const PublicFormPage: React.FC = () => {
   const { formId } = useParams<{ formId: string }>();
@@ -13,6 +15,7 @@ const PublicFormPage: React.FC = () => {
   const [formJson, setFormJson] = useState<any | null>(null);
   const [themePrimary, setThemePrimary] = useState<string | null>(null);
   const [themeBackground, setThemeBackground] = useState<string | null>(null);
+  const { user } = useAuth();
 
   useEffect(() => {
     let alive = true;
@@ -76,17 +79,14 @@ const PublicFormPage: React.FC = () => {
               <Link to="/" aria-label="Home" className="inline-flex items-center">
                 <Logo className="h-12 w-auto" />
               </Link>
-              <Link to="/dashboard" className="text-sm font-medium text-neutral-700 hover:text-primary-600">
-                Forms
-              </Link>
             </div>
             <div className="flex items-center gap-3">
-              <Link
-                to="/"
-                className="rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50"
-              >
-                Home
-              </Link>
+              {user && (
+                <Link to="/dashboard" className="text-sm font-medium text-neutral-700 hover:text-primary-600">
+                  Forms
+                </Link>
+              )}
+              <UserMenu />
             </div>
           </div>
         </header>
