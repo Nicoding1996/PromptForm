@@ -6,7 +6,7 @@ import Card from '../components/ui/Card';
 import SummaryView from '../components/responses/SummaryView';
 import IndividualResponsesView from '../components/responses/IndividualResponsesView';
 
-type TabKey = 'summary' | 'question' | 'individual';
+type TabKey = 'summary' | 'individual';
 
 const ResponsesPage: React.FC = () => {
   const { formId } = useParams<{ formId: string }>();
@@ -106,20 +106,6 @@ const ResponsesPage: React.FC = () => {
                 Summary
               </button>
               <button
-                id="rs-tab-question"
-                role="tab"
-                aria-controls="rs-panel-question"
-                type="button"
-                onClick={() => setActiveTab('question')}
-                className={
-                  'rounded-md px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary-500/50 ' +
-                  (activeTab === 'question' ? 'bg-primary-600 text-white shadow-sm' : 'text-neutral-700 hover:bg-neutral-50')
-                }
-                aria-selected={activeTab === 'question'}
-              >
-                Question
-              </button>
-              <button
                 id="rs-tab-individual"
                 role="tab"
                 aria-controls="rs-panel-individual"
@@ -142,18 +128,6 @@ const ResponsesPage: React.FC = () => {
               </div>
             )}
 
-            {activeTab === 'question' && (
-              <div
-                id="rs-panel-question"
-                role="tabpanel"
-                aria-labelledby="rs-tab-question"
-                className="rounded-lg border border-dashed border-gray-300 m-4 p-6 text-sm text-gray-700"
-                tabIndex={0}
-              >
-                <h2 className="text-base font-semibold text-gray-900">Question View (Coming Soon)</h2>
-                <p className="mt-1 text-gray-600">Per-question breakdown will appear here.</p>
-              </div>
-            )}
 
             {activeTab === 'individual' && (
               <div id="rs-panel-individual" role="tabpanel" aria-labelledby="rs-tab-individual" className="p-4" tabIndex={0}>

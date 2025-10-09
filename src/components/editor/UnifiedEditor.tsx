@@ -55,7 +55,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
   const [responses, setResponses] = useState<StoredResponse[]>([]);
   const [respLoading, setRespLoading] = useState(false);
   const [respError, setRespError] = useState<string | null>(null);
-  const [responsesSubTab, setResponsesSubTab] = useState<'summary' | 'question' | 'individual'>('individual');
+  const [responsesSubTab, setResponsesSubTab] = useState<'summary' | 'individual'>('summary');
 
   // Persisted AI summary for this form (loaded from Firestore)
   const [aiSummary, setAiSummary] = useState<string>('');
@@ -1520,21 +1520,6 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                       Summary
                     </button>
                     <button
-                      id="rs-tab-question"
-                      role="tab"
-                      aria-controls="rs-panel-question"
-                      type="button"
-                      onClick={() => setResponsesSubTab('question')}
-                      className={
-                        'rounded-md px-3 py-1.5 text-sm font-medium ' +
-                        (responsesSubTab === 'question' ? 'text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
-                      }
-                      style={responsesSubTab === 'question' ? { backgroundColor: 'var(--pf-brand, #4F46E5)' } : undefined}
-                      aria-selected={responsesSubTab === 'question'}
-                    >
-                      Question
-                    </button>
-                    <button
                       id="rs-tab-individual"
                       role="tab"
                       aria-controls="rs-panel-individual"
@@ -1557,18 +1542,6 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                     </div>
                   )}
 
-                  {responsesSubTab === 'question' && (
-                    <div
-                      id="rs-panel-question"
-                      role="tabpanel"
-                      aria-labelledby="rs-tab-question"
-                      className="rounded-lg border border-dashed border-gray-300 p-6 text-sm text-gray-700"
-                      tabIndex={0}
-                    >
-                      <h2 className="text-base font-semibold text-gray-900">Question View (Coming Soon)</h2>
-                      <p className="mt-1 text-gray-600">Per-question breakdown will appear here.</p>
-                    </div>
-                  )}
 
                   {responsesSubTab === 'individual' && (
                     <div id="rs-panel-individual" role="tabpanel" aria-labelledby="rs-tab-individual" tabIndex={0}>
