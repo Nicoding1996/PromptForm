@@ -4,7 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { listFormsForUser, type StoredForm, deleteForm, updateFormTitle } from '../services/forms';
 import UserMenu from '../components/ui/UserMenu';
 import FormCard from '../components/dashboard/FormCard';
-import { Trash2, Share2, Copy, X } from 'lucide-react';
+import FormList from '../components/dashboard/FormList';
+import { Trash2, Share2, Copy, X, LayoutGrid, List } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 const Dashboard: React.FC = () => {
@@ -17,6 +18,11 @@ const Dashboard: React.FC = () => {
   const [renameOpenId, setRenameOpenId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState<string>('');
   const [renaming, setRenaming] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => {
+    const v = (localStorage.getItem('dashboard:viewMode') as 'grid' | 'list') || 'grid';
+    return v === 'list' ? 'list' : 'grid';
+  });
 
   // Focus management for modals
   const lastFocusRef = useRef<HTMLElement | null>(null);
@@ -42,6 +48,20 @@ const Dashboard: React.FC = () => {
     () => (shareForm ? `${baseUrl}/form/${shareForm.id}` : ''),
     [baseUrl, shareForm]
   );
+
+  // Persist view mode
+  useEffect(() => {
+    try {
+      localStorage.setItem('dashboard:viewMode', viewMode);
+    } catch {}
+  }, [viewMode]);
+
+  // Filtered forms by search query
+  const filteredForms = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return forms;
+    return forms.filter((f) => (f.title || 'Untitled form').toLowerCase().includes(q));
+  }, [forms, searchQuery]);
 
   useEffect(() => {
     let isMounted = true;
@@ -163,6 +183,39 @@ const Dashboard: React.FC = () => {
           </div>
         </header>
 
+        <div className="mb-4 flex items-center justify-end gap-3">
+          <div className="relative w-full max-w-xs">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search forms..."
+              className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              aria-label="Search forms"
+            />
+          </div>
+          <div role="group" aria-label="View toggle" className="inline-flex gap-2">
+            <button
+              type="button"
+              onClick={() => setViewMode('grid')}
+              aria-pressed={viewMode === 'grid'}
+              title="Grid view"
+              className={`h-9 w-9 inline-flex items-center justify-center rounded-md border ${viewMode === 'grid' ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white text-neutral-700 hover:bg-neutral-100 border-neutral-300'}`}
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('list')}
+              aria-pressed={viewMode === 'list'}
+              title="List view"
+              className={`h-9 w-9 inline-flex items-center justify-center rounded-md border ${viewMode === 'list' ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white text-neutral-700 hover:bg-neutral-100 border-neutral-300'}`}
+            >
+              <List className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
         <section className="card p-6">
           {loading ? (
             <div className="animate-pulse space-y-3">
@@ -174,33 +227,60 @@ const Dashboard: React.FC = () => {
             <p className="text-sm text-slate-700">No forms saved yet.</p>
           ) : (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {forms.map((f) => (
-                  <FormCard
-                    key={f.id}
-                    form={f}
-                    onShare={(id) => {
-                      try {
-                        lastFocusRef.current = (document.activeElement as HTMLElement) ?? null;
-                      } catch {}
-                      setShareOpenId(id);
-                    }}
-                    onDelete={(id) => {
-                      try {
-                        lastFocusRef.current = (document.activeElement as HTMLElement) ?? null;
-                      } catch {}
-                      setConfirmDeleteId(id);
-                    }}
-                    onRename={(id: string, currentTitle: string) => {
-                      try {
-                        lastFocusRef.current = (document.activeElement as HTMLElement) ?? null;
-                      } catch {}
-                      setRenameOpenId(id);
-                      setRenameValue(currentTitle);
-                    }}
-                  />
-                ))}
-              </div>
+              {filteredForms.length === 0 ? (
+                <p className="text-sm text-slate-700">No forms match your search.</p>
+              ) : viewMode === 'grid' ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {filteredForms.map((f) => (
+                    <FormCard
+                      key={f.id}
+                      form={f}
+                      onShare={(id) => {
+                        try {
+                          lastFocusRef.current = (document.activeElement as HTMLElement) ?? null;
+                        } catch {}
+                        setShareOpenId(id);
+                      }}
+                      onDelete={(id) => {
+                        try {
+                          lastFocusRef.current = (document.activeElement as HTMLElement) ?? null;
+                        } catch {}
+                        setConfirmDeleteId(id);
+                      }}
+                      onRename={(id: string, currentTitle: string) => {
+                        try {
+                          lastFocusRef.current = (document.activeElement as HTMLElement) ?? null;
+                        } catch {}
+                        setRenameOpenId(id);
+                        setRenameValue(currentTitle);
+                      }}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <FormList
+                  forms={filteredForms}
+                  onShare={(id) => {
+                    try {
+                      lastFocusRef.current = (document.activeElement as HTMLElement) ?? null;
+                    } catch {}
+                    setShareOpenId(id);
+                  }}
+                  onDelete={(id) => {
+                    try {
+                      lastFocusRef.current = (document.activeElement as HTMLElement) ?? null;
+                    } catch {}
+                    setConfirmDeleteId(id);
+                  }}
+                  onRename={(id, currentTitle) => {
+                    try {
+                      lastFocusRef.current = (document.activeElement as HTMLElement) ?? null;
+                    } catch {}
+                    setRenameOpenId(id);
+                    setRenameValue(currentTitle);
+                  }}
+                />
+              )}
 
               {/* Share modal */}
               {shareOpenId && shareForm && (
