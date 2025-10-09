@@ -1111,7 +1111,13 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // UI
+    // AI toggle button styles (distinct icon-only button)
+    const aiButtonClass = aiBarVisible
+      ? 'inline-flex h-9 w-9 items-center justify-center rounded-full bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200 hover:bg-indigo-100 transition-colors'
+      : 'inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-neutral-600 ring-1 ring-neutral-200 hover:bg-neutral-100 transition-colors';
+    const aiIconClass = aiBarVisible ? 'h-4 w-4 text-indigo-600' : 'h-4 w-4 text-neutral-600';
+  
+    // UI
   return (
     <div
       className="min-h-screen bg-neutral-50"
@@ -1193,11 +1199,11 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
               <button
                 type="button"
                 onClick={() => setAiBarVisible((v) => !v)}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-white text-neutral-700 ring-1 ring-neutral-200 hover:bg-neutral-50"
+                className={aiButtonClass}
                 title={aiBarVisible ? 'Hide AI bar' : 'Show AI bar'}
                 aria-pressed={aiBarVisible}
               >
-                <Sparkles className="h-4 w-4 text-primary-600" />
+                <Sparkles className={aiIconClass} />
               </button>
             )}
 
