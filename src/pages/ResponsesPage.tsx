@@ -58,15 +58,17 @@ const ResponsesPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-neutral-50">
       <main className="app-container">
-        <header className="mb-6 flex items-center justify-between">
-          <Link to="/" aria-label="Home" className="inline-flex items-center">
-            <Logo className="h-12 w-auto" />
-          </Link>
-          <div className="flex items-center gap-2">
-            <Link to="/dashboard" className="btn-ghost">Back to Dashboard</Link>
-            {formId && (
-              <Link to={`/form/${formId}`} className="btn-ghost">View Public Form</Link>
-            )}
+        <header className="mb-6 py-4">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+            <Link to="/" aria-label="Home" className="inline-flex items-center">
+              <Logo className="h-12 w-auto" />
+            </Link>
+            <div className="flex items-center gap-2">
+              <Link to="/dashboard" className="btn-ghost">Back to Dashboard</Link>
+              {formId && (
+                <Link to={`/form/${formId}`} className="btn-ghost">View Public Form</Link>
+              )}
+            </div>
           </div>
         </header>
 

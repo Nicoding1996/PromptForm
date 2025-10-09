@@ -67,20 +67,22 @@ const PublicFormPage: React.FC = () => {
     >
       <main className="mx-auto max-w-3xl px-4 pt-0 pb-10">
         <header
-          className={`sticky top-0 z-50 -mx-[calc(50vw-50%)] px-[calc(50vw-50%)] mb-6 flex items-center justify-between transition-colors duration-200 ${
+          className={`sticky top-0 z-50 -mx-[calc(50vw-50%)] px-[calc(50vw-50%)] mb-6 py-4 transition-colors duration-200 ${
             isScrolled ? 'bg-white/85 backdrop-blur-sm border-b border-neutral-200/80' : 'bg-transparent'
           }`}
         >
-          <Link to="/" aria-label="Home" className="inline-flex items-center">
-            <Logo className="h-12 w-auto" />
-          </Link>
-          <div className="flex items-center gap-3">
-            <Link
-              to="/"
-              className="rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50"
-            >
-              Home
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+            <Link to="/" aria-label="Home" className="inline-flex items-center">
+              <Logo className="h-12 w-auto" />
             </Link>
+            <div className="flex items-center gap-3">
+              <Link
+                to="/"
+                className="rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50"
+              >
+                Home
+              </Link>
+            </div>
           </div>
         </header>
 
