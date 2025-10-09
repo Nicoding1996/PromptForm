@@ -126,13 +126,14 @@ const Dashboard: React.FC = () => {
       <div className="min-h-screen bg-gradient-to-b from-neutral-50 to-white">
         <main className="app-container pt-0">
           <header
-            className={`sticky top-0 z-50 -mx-[calc(50vw-50%)] px-[calc(50vw-50%)] mb-6 py-4 transition-colors duration-200 ${
+            className={`sticky top-0 z-50 -mx-[calc(50vw-50%)] px-0 mb-6 py-4 transition-colors duration-200 ${
               isScrolled ? 'bg-white/85 backdrop-blur-sm border-b border-neutral-200/80' : 'bg-transparent'
             }`}
           >
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+            <div className="px-6 sm:px-8 lg:px-10 grid grid-cols-[auto_auto_1fr] items-center gap-4">
               <Link to="/" aria-label="Home" className="inline-flex items-center"><Logo className="h-12 w-auto" /></Link>
-              <UserMenu />
+              <Link to="/dashboard" className="text-sm font-medium text-neutral-700 hover:text-primary-600">Forms</Link>
+              <div className="justify-self-end"><UserMenu /></div>
             </div>
           </header>
           <div className="card p-6">
@@ -152,13 +153,14 @@ const Dashboard: React.FC = () => {
       <div className="min-h-screen bg-gradient-to-b from-neutral-50 to-white">
         <main className="app-container pt-0">
           <header
-            className={`sticky top-0 z-50 -mx-[calc(50vw-50%)] px-[calc(50vw-50%)] mb-6 py-4 transition-colors duration-200 ${
+            className={`sticky top-0 z-50 -mx-[calc(50vw-50%)] px-0 mb-6 py-4 transition-colors duration-200 ${
               isScrolled ? 'bg-white/85 backdrop-blur-sm border-b border-neutral-200/80' : 'bg-transparent'
             }`}
           >
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+            <div className="px-6 sm:px-8 lg:px-10 grid grid-cols-[auto_auto_1fr] items-center gap-4">
               <Link to="/" aria-label="Home" className="inline-flex items-center"><Logo className="h-12 w-auto" /></Link>
-              <UserMenu />
+              <Link to="/dashboard" className="text-sm font-medium text-neutral-700 hover:text-primary-600">Forms</Link>
+              <div className="justify-self-end"><UserMenu /></div>
             </div>
           </header>
           <div className="card p-6">
@@ -175,13 +177,14 @@ const Dashboard: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-b from-neutral-50 to-white">
       <main className="app-container pt-0">
         <header
-          className={`sticky top-0 z-50 -mx-[calc(50vw-50%)] px-[calc(50vw-50%)] mb-6 py-4 transition-colors duration-200 ${
+          className={`sticky top-0 z-50 -mx-[calc(50vw-50%)] px-0 mb-6 py-4 transition-colors duration-200 ${
             isScrolled ? 'bg-white/85 backdrop-blur-sm border-b border-neutral-200/80' : 'bg-transparent'
           }`}
         >
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+          <div className="px-6 sm:px-8 lg:px-10 grid grid-cols-[auto_auto_1fr] items-center gap-4">
             <Link to="/" aria-label="Home" className="inline-flex items-center"><Logo className="h-12 w-auto" /></Link>
-            <div className="flex items-center gap-3">
+            <Link to="/dashboard" className="text-sm font-medium text-neutral-700 hover:text-primary-600">Forms</Link>
+            <div className="justify-self-end flex items-center gap-3">
               <Link to="/" className="text-sm font-medium text-neutral-700 hover:text-primary-600">
                 Home
               </Link>

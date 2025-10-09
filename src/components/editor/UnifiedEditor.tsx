@@ -1122,18 +1122,19 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
     >
       <main id="form-editor-container" className="app-container pt-0 flex flex-col gap-6">
         <header
-          className={`sticky top-0 z-50 -mx-[calc(50vw-50%)] px-[calc(50vw-50%)] py-4 transition-colors duration-200 ${
+          className={`sticky top-0 z-50 -mx-[calc(50vw-50%)] px-0 py-4 transition-colors duration-200 ${
             isScrolled ? 'bg-white/85 backdrop-blur-sm border-b border-neutral-200/80' : 'bg-transparent'
           }`}
         >
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
-          <div className="flex-none">
-            <Link to="/" aria-label="Home" className="inline-flex items-center">
-              <Logo className="h-14 md:h-16 w-auto" />
-            </Link>
-          </div>
+          <div className="px-6 sm:px-8 lg:px-10 grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+            <div className="justify-self-start flex items-center gap-4">
+              <Link to="/" aria-label="Home" className="inline-flex items-center">
+                <Logo className="h-12 w-auto" />
+              </Link>
+              <Link to="/dashboard" className="text-sm font-medium text-neutral-700 hover:text-primary-600">Forms</Link>
+            </div>
 
-          <div className="flex-1 flex flex-wrap items-center justify-center gap-2">
+            <div className="justify-self-center flex flex-wrap items-center justify-center gap-2">
             {user && formJson && formId && (
               <button
                 type="button"
@@ -1215,12 +1216,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
             ) : null}
 
           </div>
-          <div className="flex-none flex items-center gap-3">
-            {user && (
-              <Link to="/dashboard" className="text-sm font-medium text-neutral-700 hover:text-primary-600" title="Back to Forms">
-                Forms
-              </Link>
-            )}
+          <div className="justify-self-end flex items-center gap-3">
             <UserMenu />
           </div>
           </div>
