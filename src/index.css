@@ -141,3 +141,57 @@ html, body, #root { height: 100%; }
     @apply border border-neutral-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent;
   }
 }
+
+/* Aurora gradient background for homepage (soft, slow, multi-color mesh) */
+@layer base {
+  .aurora-bg {
+    position: relative;
+    min-height: 100vh;
+    /* Gentle base gradient to white for premium feel */
+    background:
+      radial-gradient(1200px 800px at 10% -10%, rgba(79, 70, 229, 0.18), transparent 60%),
+      radial-gradient(900px 700px at 110% 0%, rgba(139, 92, 246, 0.16), transparent 60%),
+      radial-gradient(800px 800px at 50% 110%, rgba(236, 72, 153, 0.12), transparent 60%),
+      radial-gradient(900px 900px at -10% 90%, rgba(59, 130, 246, 0.14), transparent 60%),
+      linear-gradient(180deg, #F8FAFF 0%, #FFFFFF 65%);
+    overflow: hidden;
+    isolation: isolate; /* ensure pseudo elements layer behind content within this stacking context */
+  }
+
+  .aurora-bg::before,
+  .aurora-bg::after {
+    content: "";
+    position: absolute;
+    inset: -20%;
+    pointer-events: none;
+    z-index: -1; /* place behind the content but within .aurora-bg */
+    /* Indigo-centered hues with purple, blue, and hint of pink */
+    background:
+      radial-gradient(40% 35% at 20% 30%, rgba(79, 70, 229, 0.25), transparent 60%),
+      radial-gradient(35% 35% at 80% 25%, rgba(139, 92, 246, 0.22), transparent 60%),
+      radial-gradient(35% 35% at 30% 80%, rgba(236, 72, 153, 0.18), transparent 60%),
+      radial-gradient(35% 35% at 90% 70%, rgba(59, 130, 246, 0.20), transparent 60%);
+    filter: blur(60px) saturate(110%);
+    animation: aurora-shift 60s ease-in-out infinite alternate;
+    opacity: 0.7;
+    will-change: transform;
+  }
+
+  .aurora-bg::after {
+    animation-duration: 85s;
+    transform: scale(1.05);
+    opacity: 0.55;
+  }
+
+  @keyframes aurora-shift {
+    0%   { transform: translate3d(-3%, -2%, 0) rotate(0deg) scale(1); }
+    50%  { transform: translate3d(2%, 3%, 0) rotate(8deg)  scale(1.05); }
+    100% { transform: translate3d(-3%, -2%, 0) rotate(0deg) scale(1); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .aurora-bg::before,
+    .aurora-bg::after { animation: none; }
+  }
+}
+/* End aurora background */

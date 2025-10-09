@@ -1116,14 +1116,15 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
       ? 'inline-flex h-9 w-9 items-center justify-center rounded-full bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200 hover:bg-indigo-100 transition-colors'
       : 'inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-neutral-600 ring-1 ring-neutral-200 hover:bg-neutral-100 transition-colors';
     const aiIconClass = aiBarVisible ? 'h-4 w-4 text-indigo-600' : 'h-4 w-4 text-neutral-600';
+    const isHomepage = !formId && !formJson;
   
     // UI
   return (
     <div
-      className="min-h-screen bg-neutral-50"
+      className={`min-h-screen ${isHomepage ? 'aurora-bg' : 'bg-neutral-50'}`}
       style={{
         ...(brandStyleVars || {}),
-        background: `linear-gradient(to bottom, ${themeBackground || '#F8FAFF'} 0%, #FFFFFF 65%)`,
+        ...(isHomepage ? {} : { background: `linear-gradient(to bottom, ${themeBackground || '#F8FAFF'} 0%, #FFFFFF 65%)` }),
       }}
     >
       <main id="form-editor-container" className="app-container pt-0 flex flex-col gap-6">
@@ -1233,7 +1234,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
         {!formId && !formJson ? (
           <section className="mx-auto w-full max-w-4xl py-4">
             <div className="flex flex-col items-center text-center">
-              <h1 className="text-4xl font-bold text-neutral-800">Create a new form in seconds</h1>
+              <h1 className="text-4xl font-bold text-neutral-800">Effortless forms, powered by AI.</h1>
               <p className="mt-2 text-lg text-neutral-600">Describe the form you need, or start with a template. Our AI will handle the rest.</p>
 
               <div className="mt-8 w-full md:w-4/5 mx-auto">
