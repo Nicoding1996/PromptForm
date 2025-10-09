@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useParams, useLocation } from 'react-router-dom';
 import { getFormById } from '../services/forms';
 import PublicFormRenderer from '../components/PublicFormRenderer';
+import { Logo } from '../components/ui/Logo';
 
 const PublicFormPage: React.FC = () => {
   const { formId } = useParams<{ formId: string }>();
@@ -10,7 +11,6 @@ const PublicFormPage: React.FC = () => {
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formJson, setFormJson] = useState<any | null>(null);
-  const [title, setTitle] = useState<string>('Form');
   const [themePrimary, setThemePrimary] = useState<string | null>(null);
   const [themeBackground, setThemeBackground] = useState<string | null>(null);
 
@@ -32,7 +32,6 @@ const PublicFormPage: React.FC = () => {
           setNotFound(true);
           setFormJson(null);
         } else {
-          setTitle(row.title || 'Form');
           setFormJson(row.form);
           // Initialize theme from stored document (fallback to embedded form theme)
           setThemePrimary((row as any)?.theme_primary_color ?? (row as any)?.form?.theme_primary_color ?? null);
@@ -72,7 +71,9 @@ const PublicFormPage: React.FC = () => {
             isScrolled ? 'bg-white/85 backdrop-blur-sm border-b border-neutral-200/80' : 'bg-transparent'
           }`}
         >
-          <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
+          <Link to="/" aria-label="Home" className="inline-flex items-center">
+            <Logo className="h-12 w-auto" />
+          </Link>
           <div className="flex items-center gap-3">
             <Link
               to="/"

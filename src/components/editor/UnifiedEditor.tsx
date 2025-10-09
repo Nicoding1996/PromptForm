@@ -7,6 +7,7 @@ import ResultCard from './ResultCard';
 import SuggestionChips from './SuggestionChips';
 import { useAuth } from '../../context/AuthContext';
 import UserMenu from '../ui/UserMenu';
+import { Logo } from '../ui/Logo';
 import { getFormById, saveFormForUser, listResponsesForForm, type StoredResponse, updateFormTheme } from '../../services/forms';
 import IndividualResponsesView from '../responses/IndividualResponsesView';
 import SummaryView from '../responses/SummaryView';
@@ -1126,13 +1127,10 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
           }`}
         >
           <div className="app-container pt-0 w-full flex items-center justify-between gap-3">
-          <div className="flex-none min-w-[200px]">
-            {(formId || formJson) && (
-              <>
-                <h1 className="text-2xl font-bold tracking-tight text-slate-900">Form Editor</h1>
-                <p className="mt-1 hidden sm:block text-sm text-slate-600 truncate max-w-[640px]">Build your form and manage responses in one place.</p>
-              </>
-            )}
+          <div className="flex-none">
+            <Link to="/" aria-label="Home" className="inline-flex items-center">
+              <Logo className="h-14 md:h-16 w-auto" />
+            </Link>
           </div>
 
           <div className="flex-1 flex flex-wrap items-center justify-center gap-2">

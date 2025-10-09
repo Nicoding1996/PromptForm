@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { listFormsForUser, type StoredForm, deleteForm, updateFormTitle } from '../services/forms';
 import UserMenu from '../components/ui/UserMenu';
+import { Logo } from '../components/ui/Logo';
 import FormCard from '../components/dashboard/FormCard';
 import FormList from '../components/dashboard/FormList';
 import { Trash2, Share2, Copy, X, LayoutGrid, List } from 'lucide-react';
@@ -129,7 +130,7 @@ const Dashboard: React.FC = () => {
               isScrolled ? 'bg-white/85 backdrop-blur-sm border-b border-neutral-200/80' : 'bg-transparent'
             }`}
           >
-            <h1 className="text-2xl font-bold text-neutral-900">My Forms</h1>
+            <Link to="/" aria-label="Home" className="inline-flex items-center"><Logo className="h-12 w-auto" /></Link>
             <UserMenu />
           </header>
           <div className="card p-6">
@@ -153,7 +154,7 @@ const Dashboard: React.FC = () => {
               isScrolled ? 'bg-white/85 backdrop-blur-sm border-b border-neutral-200/80' : 'bg-transparent'
             }`}
           >
-            <h1 className="text-2xl font-bold text-neutral-900">My Forms</h1>
+            <Link to="/" aria-label="Home" className="inline-flex items-center"><Logo className="h-12 w-auto" /></Link>
             <UserMenu />
           </header>
           <div className="card p-6">
@@ -174,7 +175,7 @@ const Dashboard: React.FC = () => {
             isScrolled ? 'bg-white/85 backdrop-blur-sm border-b border-neutral-200/80' : 'bg-transparent'
           }`}
         >
-          <h1 className="text-2xl font-bold text-neutral-900">My Forms</h1>
+          <Link to="/" aria-label="Home" className="inline-flex items-center"><Logo className="h-12 w-auto" /></Link>
           <div className="flex items-center gap-3">
             <Link to="/" className="text-sm font-medium text-neutral-700 hover:text-primary-600">
               Home

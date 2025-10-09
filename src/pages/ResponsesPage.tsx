@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { Logo } from '../components/ui/Logo';
 import { getFormById, listResponsesForForm, type StoredResponse } from '../services/forms';
 import type { FormData, FormField } from '../components/FormRenderer';
 import Card from '../components/ui/Card';
@@ -58,7 +59,9 @@ const ResponsesPage: React.FC = () => {
     <div className="min-h-screen bg-neutral-50">
       <main className="app-container">
         <header className="mb-6 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-neutral-900">Responses</h1>
+          <Link to="/" aria-label="Home" className="inline-flex items-center">
+            <Logo className="h-12 w-auto" />
+          </Link>
           <div className="flex items-center gap-2">
             <Link to="/dashboard" className="btn-ghost">Back to Dashboard</Link>
             {formId && (
