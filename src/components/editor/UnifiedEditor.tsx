@@ -4,7 +4,9 @@ import CommandBar from '../CommandBar';
 import FormRenderer from '../FormRenderer';
 import type { FormData, FormField, ResultPage } from '../FormRenderer';
 import ResultCard from './ResultCard';
+import OutcomeRangesAssistant from './OutcomeRangesAssistant';
 import SuggestionChips from './SuggestionChips';
+import { validateOutcomeRanges } from './outcomesUtils';
 import { useAuth } from '../../context/AuthContext';
 import UserMenu from '../ui/UserMenu';
 import { Logo } from '../ui/Logo';
@@ -226,6 +228,97 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
   }, [formJson]);
 
   const quizMode = formJson?.isQuiz === true;
+
+  // Step 0: Compute current max and outcome validity (independent of change)
+  const currentMaxScore = useMemo(() => computeMaxPossibleScore(formJson), [formJson]);
+  const outcomeValidity = useMemo(() => {
+    const pages = (formJson as any)?.resultPages as ResultPage[] | undefined;
+    return validateOutcomeRanges(pages ?? [], currentMaxScore);
+  }, [formJson, currentMaxScore]);
+
+  // Step 1: Detect total possible score changes (mirrors PublicFormRenderer scoring rules)
+  function computeMaxPossibleScore(form: FormData | null): number {
+    if (!form || form.isQuiz !== true) return 0;
+
+    let max = 0;
+
+    for (const f of form.fields ?? []) {
+      const anyF: any = f;
+
+      // RadioGrid: per-row maximum based on column points with ordinal fallback
+      if (f.type === 'radioGrid') {
+        const rows = anyF.rows ?? [];
+        const cols = anyF.columns ?? [];
+
+        const rawPoints: number[] = cols.map((c: any) => {
+          if (typeof c === 'string') return NaN;
+          const p = Number(c?.points);
+          return Number.isFinite(p) ? p : NaN;
+        });
+
+        const allMissing = rawPoints.every((p) => !Number.isFinite(p));
+        const allEqualFinite =
+          rawPoints.every((p) => Number.isFinite(p)) &&
+          rawPoints.every((p) => p === rawPoints[0]);
+
+        const fallbackOrdinal = allMissing || allEqualFinite;
+        const effectivePoints = (idx: number): number => {
+          if (fallbackOrdinal) return idx + 1;
+          const p = rawPoints[idx];
+          return Number.isFinite(p) ? p : 1;
+        };
+
+        const maxColPts =
+          cols.length > 0
+            ? Math.max(...cols.map((_: any, i: number) => effectivePoints(i)))
+            : 0;
+
+        max += rows.length * maxColPts;
+        continue;
+      }
+
+      // Gradable standard fields: include only if they have a defined correct answer/pattern
+      const pointsRaw = Number(anyF.points ?? 1);
+      const points = Number.isFinite(pointsRaw) ? pointsRaw : 1;
+
+      const patternStr = anyF.answerPattern;
+      const hasPattern = typeof patternStr === 'string' && patternStr.length > 0;
+
+      let gradable = false;
+      if (f.type === 'radio' || f.type === 'select') {
+        gradable = hasPattern || (typeof anyF.correctAnswer === 'string' && anyF.correctAnswer.length > 0);
+      } else if (f.type === 'checkbox') {
+        gradable =
+          hasPattern ||
+          (Array.isArray(anyF.correctAnswer) && anyF.correctAnswer.length > 0) ||
+          (typeof anyF.correctAnswer === 'string' && anyF.correctAnswer.length > 0);
+      } else if (f.type === 'text' || f.type === 'textarea') {
+        gradable = hasPattern || (typeof anyF.correctAnswer === 'string' && anyF.correctAnswer.length > 0);
+      }
+
+      if (gradable) max += points;
+    }
+
+    return max;
+  }
+
+  // Holds previous (baseline) and current computed max score
+  const [scoreChange, setScoreChange] = useState<{ old: number | null; current: number; changed: boolean }>({
+    old: null,
+    current: 0,
+    changed: false,
+  });
+  const [rangesAssistantOpen, setRangesAssistantOpen] = useState(false);
+
+  // Recompute when the form changes; initialize baseline on first compute
+  useEffect(() => {
+    const curr = computeMaxPossibleScore(formJson);
+    setScoreChange((prev) => {
+      const old = prev.old ?? curr; // first run establishes baseline
+      const changed = old !== curr;
+      return { old, current: curr, changed };
+    });
+  }, [formJson]);
 
   // ===== In-place editor handlers =====
   const handleUpdateFieldLabel = (fieldIndex: number, newLabel: string) => {
@@ -1392,6 +1485,55 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                     </div>
                   )}
 
+                  {quizMode && scoreChange.changed && (
+                    <div className="rounded-md border border-amber-200 bg-amber-50 p-3 mb-3 text-sm text-amber-900 flex items-center justify-between">
+                      <div className="mr-2">
+                        Total possible score changed from <strong>{scoreChange.old ?? 0}</strong> to <strong>{scoreChange.current}</strong>. Your outcome ranges may need updates.
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setRangesAssistantOpen(true)}
+                          className="rounded-md bg-white px-2 py-1 text-xs font-medium text-amber-900 ring-1 ring-amber-200 hover:bg-amber-100"
+                        >
+                          Review & Update Ranges
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setScoreChange((s) => ({ old: s.current, current: s.current, changed: false }))}
+                          className="rounded-md bg-white px-2 py-1 text-xs font-medium text-amber-900 ring-1 ring-amber-200 hover:bg-amber-100"
+                          title="Dismiss this notice (keeps your current ranges)"
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {/* Proactive invalid-ranges banner (even if total score did not just change) */}
+                  {quizMode && !outcomeValidity.valid && (
+                    <div className="rounded-md border border-red-200 bg-red-50 p-3 mb-3 text-sm text-red-900">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="mr-2">
+                          <div className="font-medium">Outcome ranges need attention.</div>
+                          <ul className="mt-1 list-disc pl-5 space-y-0.5">
+                            {outcomeValidity.issues.slice(0, 4).map((m, i) => (
+                              <li key={i}>{m}</li>
+                            ))}
+                            {outcomeValidity.issues.length > 4 ? <li>…and more</li> : null}
+                          </ul>
+                        </div>
+                        <div className="shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setRangesAssistantOpen(true)}
+                            className="rounded-md bg-white px-2 py-1 text-xs font-medium text-red-900 ring-1 ring-red-200 hover:bg-red-100"
+                          >
+                            Review & Update Ranges
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   {quizMode && (
                     <section className="rounded-md border border-indigo-100 bg-indigo-50/20 p-3">
                       <div className="mb-2 flex items-center justify-between">
@@ -1566,6 +1708,21 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
         )}
       </main>
 
+      {/* Outcome Ranges Assistant Modal */}
+      {quizMode && (
+        <OutcomeRangesAssistant
+          open={rangesAssistantOpen}
+          oldMax={scoreChange.old ?? scoreChange.current}
+          newMax={scoreChange.current}
+          pages={(((formJson as any)?.resultPages ?? []) as ResultPage[])}
+          onClose={() => setRangesAssistantOpen(false)}
+          onApply={(updatedPages) => {
+            setFormJson((prev) => (prev ? { ...prev, resultPages: updatedPages } : prev));
+            setRangesAssistantOpen(false);
+            setScoreChange((s) => ({ old: s.current, current: s.current, changed: false }));
+          }}
+        />
+      )}
       {/* Style Panel for theme selection */}
       <StylePanel
         open={styleOpen}

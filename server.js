@@ -101,6 +101,25 @@ app.post('/generate-form', async (req, res) => {
       generationConfig: { responseMimeType: 'application/json' },
     });
 
+    // Prompt Enhancer: add guardrails for outcome-based quizzes/personality tests
+    const addQuizGuardrails = (promptText) => {
+      const keywords = ["personality test", "assessment", "what type of", "what kind of", "which are you", "disc", "enneagram", "mbti"];
+      const lowerCasePrompt = String(promptText || "").toLowerCase();
+      if (keywords.some((keyword) => lowerCasePrompt.includes(keyword))) {
+        return `
+
+---
+CRITICAL INSTRUCTION: When you generate 'resultPages' with 'scoreRange', you MUST follow these rules:
+
+All score ranges must be in ascending numerical order.
+There must be no numerical gaps between the ranges.
+There must be no numerical overlaps between the ranges.
+Every possible score must map to exactly one outcome.
+---`;
+      }
+      return "";
+    };
+
     const masterPrompt = `
       You are an expert web form generator. Your sole purpose is to take a user's request and return a valid JSON object that represents a web form.
       Do not include any conversational text, explanations, or markdown formatting like \`\`\`json. Only return the raw JSON object.
@@ -206,7 +225,7 @@ app.post('/generate-form', async (req, res) => {
             }
         - Provide reasonable placeholder score ranges that partition the total possible points, if inferable; otherwise set { "from": 0, "to": 0 } as placeholders.
       
-      User's request: "${req.body.prompt}"
+      User's request: "${req.body.prompt}" ${addQuizGuardrails(req.body.prompt)}
     `;
 
     const result = await model.generateContent(masterPrompt);
