@@ -1206,8 +1206,8 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
 
     // AI toggle button styles (distinct icon-only button)
     const aiButtonClass = aiBarVisible
-      ? 'inline-flex h-9 w-9 items-center justify-center rounded-full bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200 hover:bg-indigo-100 transition-colors'
-      : 'inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-neutral-600 ring-1 ring-neutral-200 hover:bg-neutral-100 transition-colors';
+      ? 'inline-flex h-8 w-8 md:h-9 md:w-9 items-center justify-center rounded-full bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200 hover:bg-indigo-100 transition-colors'
+      : 'inline-flex h-8 w-8 md:h-9 md:w-9 items-center justify-center rounded-full bg-white text-neutral-600 ring-1 ring-neutral-200 hover:bg-neutral-100 transition-colors';
     const aiIconClass = aiBarVisible ? 'h-4 w-4 text-indigo-600' : 'h-4 w-4 text-neutral-600';
     const isHomepage = !formId && !formJson;
   
@@ -1226,20 +1226,20 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
             isScrolled ? 'bg-white/85 backdrop-blur-sm border-b border-neutral-200/80' : 'bg-transparent'
           }`}
         >
-          <div className="px-6 sm:px-8 lg:px-10 grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+          <div className="px-4 sm:px-8 lg:px-10 grid grid-cols-2 md:grid-cols-[1fr_auto_1fr] items-center gap-x-3 gap-y-2">
             <div className="justify-self-start flex items-center gap-4">
               <Link to="/" aria-label="Home" className="inline-flex items-center">
-                <Logo className="h-12 w-auto" />
+                <Logo className="h-10 w-auto sm:h-12" />
               </Link>
             </div>
 
-            <div className="justify-self-center flex flex-wrap items-center justify-center gap-2">
+            <div className="justify-self-center col-span-2 md:col-span-1 order-3 md:order-none w-full flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
             {user && formJson && formId && (
               <button
                 type="button"
                 onClick={handleSaveForm}
                 disabled={saving || !!lastSavedId}
-                className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100 transition-colors"
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1 md:px-3 md:py-1.5 text-xs md:text-sm text-neutral-700 hover:bg-neutral-100 transition-colors"
                 title="Save this form"
               >
                 <span className="inline-flex items-center gap-1">
@@ -1251,7 +1251,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
             {lastSavedId && (
               <Link
                 to={`/form/${lastSavedId}`}
-                className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100 transition-colors"
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1 md:px-3 md:py-1.5 text-xs md:text-sm text-neutral-700 hover:bg-neutral-100 transition-colors"
                 title="Open the public link for this form"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -1267,7 +1267,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                 <button
                   type="button"
                   onClick={handleSharePublicLink}
-                  className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100 transition-colors"
+                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 md:px-3 md:py-1.5 text-xs md:text-sm text-neutral-700 hover:bg-neutral-100 transition-colors"
                   title="Copy public link"
                 >
                   <span className="inline-flex items-center gap-1">
@@ -1279,7 +1279,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                   to={`/form/${formId || lastSavedId}?preview=true`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100 transition-colors"
+                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 md:px-3 md:py-1.5 text-xs md:text-sm text-neutral-700 hover:bg-neutral-100 transition-colors"
                   title="Open public preview in a new tab"
                 >
                   <span className="inline-flex items-center gap-1">
@@ -1306,7 +1306,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
               <button
                 type="button"
                 onClick={() => setStyleOpen(true)}
-                className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100 transition-colors"
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1 md:px-3 md:py-1.5 text-xs md:text-sm text-neutral-700 hover:bg-neutral-100 transition-colors"
                 title="Style"
                 aria-label="Style panel"
               >
@@ -1316,7 +1316,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
             ) : null}
 
           </div>
-          <div className="justify-self-end flex items-center gap-3">
+          <div className="justify-self-end order-2 md:order-none flex items-center gap-2 sm:gap-3">
             {user && <Link to="/dashboard" className="text-sm font-medium text-neutral-700 hover:text-primary-600">Forms</Link>}
             <UserMenu />
           </div>
