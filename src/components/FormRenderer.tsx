@@ -44,6 +44,19 @@ export interface FormField {
   name: string;
   options?: string[]; // required for radio | checkbox | select
 
+  // UX extras (optional)
+  placeholder?: string;
+  helperText?: string;
+
+  // Validation metadata (optional)
+  required?: boolean; // legacy/simple required flag
+  validation?: {
+    required?: boolean;
+    minLength?: number;
+    maxLength?: number;
+    pattern?: string; // e.g., "email" or a regex string
+  };
+
   // Optional per-section subtitle (for type === 'section')
   subtitle?: string;
   
@@ -55,6 +68,10 @@ export interface FormField {
   rows?: string[]; // array of row labels/questions
   // Supports legacy string[] and new detailed objects { label, points }
   columns?: (string | { label: string; points?: number })[]; // array of column choices
+
+  // Range bounds (commonly used by 'range' type)
+  min?: number;
+  max?: number;
 }
 
 export interface ResultPage {

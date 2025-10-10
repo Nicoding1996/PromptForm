@@ -400,8 +400,15 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
   const valueFor = (name: string): any => allAnswers[name];
 
   const renderField = (field: FormField, idx: number) => {
-    const required = (field as any).required === true;
+    const v = ((field as any)?.validation ?? {}) as any;
+    const required = (field as any).required === true || v?.required === true;
+    const placeholder = (field as any).placeholder ?? '';
+    const helperText = (field as any).helperText as string | undefined;
+    const minLength = Number.isFinite(Number(v?.minLength)) ? Number(v?.minLength) : undefined;
+    const maxLength = Number.isFinite(Number(v?.maxLength)) ? Number(v?.maxLength) : undefined;
+    const pattern = typeof v?.pattern === 'string' && v.pattern !== 'email' ? v.pattern : undefined;
     const labelId = `${field.name}-label`;
+    const helperId = helperText ? `${field.name}-help` : undefined;
     const labelNode = (
       <span id={labelId} className={baseLabelClass}>
         {field.label}
@@ -430,7 +437,13 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
             required={required}
             defaultValue={field.type === 'file' ? undefined : defaultVal}
             aria-labelledby={labelId}
+            aria-describedby={helperId}
+            placeholder={placeholder || undefined}
+            minLength={minLength}
+            maxLength={maxLength}
+            pattern={pattern}
           />
+          {helperText ? <p id={helperId} className="text-xs text-gray-500">{helperText}</p> : null}
         </div>
       );
     }
@@ -454,6 +467,7 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
             className="h-2 w-full appearance-none rounded-lg bg-slate-200 accent-[--color-brand-600]"
             ariaLabelledBy={labelId}
           />
+          {helperText ? <p id={helperId} className="text-xs text-gray-500">{helperText}</p> : null}
         </div>
       );
     }
@@ -471,7 +485,12 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
             required={required}
             defaultValue={defaultVal}
             aria-labelledby={labelId}
+            aria-describedby={helperId}
+            placeholder={placeholder || undefined}
+            minLength={minLength}
+            maxLength={maxLength}
           />
+          {helperText ? <p id={helperId} className="text-xs text-gray-500">{helperText}</p> : null}
         </div>
       );
     }
@@ -498,6 +517,7 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
                     className="h-4 w-4 border-gray-300 text-[--color-brand-600] focus:ring-[--color-brand-600]"
                     required={required && optIdx === 0}
                     defaultChecked={saved ? normalize(saved) === normalize(opt) : false}
+                    aria-describedby={helperId}
                   />
                   <label className="text-sm text-gray-700" htmlFor={optId}>
                     {opt}
@@ -506,6 +526,7 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
               );
             })}
           </div>
+          {helperText ? <p id={helperId} className="text-xs text-gray-500">{helperText}</p> : null}
         </div>
       );
     }
@@ -533,27 +554,33 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
                       value={opt}
                       className="h-4 w-4 rounded border-gray-300 text-[--color-brand-600] focus:ring-[--color-brand-600]"
                       defaultChecked={savedSet.has(normalize(opt))}
+                      aria-describedby={helperId}
                     />
                     <span>{opt}</span>
                   </label>
                 );
               })}
             </div>
+            {helperText ? <p id={helperId} className="text-xs text-gray-500">{helperText}</p> : null}
           </div>
         );
       }
       // Single checkbox fallback
       return (
-        <label className="flex items-center gap-2 text-sm text-gray-700" key={`${field.name}-${idx}`}>
-          <input
-            type="checkbox"
-            id={field.name}
-            name={field.name}
-            className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-            defaultChecked={!!savedVal}
-          />
-          <span>{field.label}</span>
-        </label>
+        <div className="flex flex-col gap-1" key={`${field.name}-${idx}`}>
+          <label className="flex items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              id={field.name}
+              name={field.name}
+              className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              defaultChecked={!!savedVal}
+              aria-describedby={helperId}
+            />
+            <span>{field.label}</span>
+          </label>
+          {helperText ? <p id={helperId} className="text-xs text-gray-500">{helperText}</p> : null}
+        </div>
       );
     }
 
@@ -570,9 +597,10 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
             defaultValue={saved || ''}
             required={required}
             aria-labelledby={labelId}
+            aria-describedby={helperId}
           >
             <option value="" disabled>
-              Select an option
+              {placeholder || 'Select an option'}
             </option>
             {options.map((opt, optIdx) => (
               <option key={`${field.name}-opt-${optIdx}`} value={opt}>
@@ -580,6 +608,7 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
               </option>
             ))}
           </select>
+          {helperText ? <p id={helperId} className="text-xs text-gray-500">{helperText}</p> : null}
         </div>
       );
     }
@@ -640,6 +669,7 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
                               aria-label={`${row} - ${colLabel}`}
                               required={required && cIdx === 0}
                               defaultChecked={savedIdx === cIdx}
+                              aria-describedby={helperId}
                             />
                           </td>
                         );
@@ -650,6 +680,7 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
               </tbody>
             </table>
           </div>
+          {helperText ? <p id={helperId} className="text-xs text-gray-500">{helperText}</p> : null}
         </div>
       );
     }

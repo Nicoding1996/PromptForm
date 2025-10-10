@@ -134,6 +134,14 @@ Every possible score must map to exactly one outcome.
             "label": "Field Label",
             "type": "text | email | password | textarea | radio | checkbox | select | date | time | file | range | radioGrid | section | submit",
             "name": "lowercase_field_label_with_underscores",
+            "placeholder": "Optional placeholder text",
+            "helperText": "Optional helper text below the field",
+            "validation": {                      // optional; include when helpful
+              "required": true,
+              "minLength": 2,
+              "maxLength": 50,
+              "pattern": "email"                 // e.g., for email fields
+            },
             "options": ["Option 1", "Option 2"],
             "rows": ["Row 1", "Row 2"],       // only for radioGrid
             "columns": [                      // only for radioGrid; per-column scoring objects
@@ -153,14 +161,14 @@ Every possible score must map to exactly one outcome.
             "scoreRange": { "from": 0, "to": 0 }
           }
         ],
-
+ 
         // Adaptive Theming (required):
         // Name must be one of: Indigo | Slate | Rose | Amber | Emerald | Sky
         "theme_name": "Indigo",
         "theme_primary_color": "#6366F1",
         "theme_background_color": "#E0E7FF"
       }
-      
+       
       Follow these critical rules:
       - 'type': Use the most appropriate type based on the user's request.
         - For short text: "text"
@@ -187,6 +195,15 @@ Every possible score must map to exactly one outcome.
         - Sections must not be counted for scoring even when "isQuiz": true.
       - 'submit': Ensure there is exactly one field with type "submit".
       - If the user's request implies a longer introduction or context, include a helpful summary in the "description" field.
+ 
+      VALIDATION & UX RULES:
+      - Based on the context, add a "validation" object where appropriate.
+        - If a field seems mandatory (e.g., Name, Email, Subject), set "validation": { "required": true }.
+        - For email fields, prefer type "email"; also set validation.pattern = "email".
+        - For text-like fields, use "validation.minLength" and/or "validation.maxLength" when reasonable.
+      - Add a helpful "placeholder" string for fields where an example would be useful.
+      - Add a concise "helperText" when a field needs additional explanation.
+      - The "name" for each field MUST be a unique snake_case identifier within the form. If duplicates would occur, append a numeric suffix (e.g., "_2", "_3").
 
       THEME RULES:
       - Based on the form's topic, suggest a theme using:
@@ -297,11 +314,17 @@ You are a form question expert. Take the user's partial prompt and expand it int
 
 Allowed keys and rules:
 - Required: "label", "type", "name".
+- Optional UX: "placeholder", "helperText".
+- Optional "validation": { "required"?: boolean, "minLength"?: number, "maxLength"?: number, "pattern"?: "email" | string }.
 - "type" must be one of: "text", "email", "password", "textarea", "radio", "checkbox", "select", "date", "time", "file", "range", "radioGrid".
 - Do NOT return "section" or "submit".
 - For "radio" | "checkbox" | "select": include "options": ["..."] with 2–6 sensible values.
 - For "radioGrid": include "rows": ["..."] and "columns": [{ "label": "...", "points": 1 }, ...].
 - For "range": include integer "min" and "max" if inferable (e.g., 1..5 or 0..10).
+- Validation guidance:
+  - If the field is clearly mandatory (e.g., Name, Email), set validation.required = true.
+  - If type is "email", set validation.pattern = "email".
+  - Add sensible minLength/maxLength for text/password/textarea when appropriate.
 - Do not include "correctAnswer" unless the user's prompt clearly implies a knowledge quiz; otherwise omit quiz-specific fields.
 
 Naming rule:
@@ -402,6 +425,14 @@ Additional user instructions (context): "${context.trim()}". Use these instructi
             "label": "Field Label",
             "type": "text | email | password | textarea | radio | checkbox | select | date | time | file | range | radioGrid | section | submit",
             "name": "lowercase_field_label_with_underscores",
+            "placeholder": "Optional placeholder text",
+            "helperText": "Optional helper text below the field",
+            "validation": {                      // optional; include when helpful
+              "required": true,
+              "minLength": 2,
+              "maxLength": 50,
+              "pattern": "email"                 // e.g., for email fields
+            },
             "options": ["Option 1", "Option 2"],
             "rows": ["Row 1", "Row 2"],       // only for radioGrid
             "columns": [                      // only for radioGrid; per-column scoring objects
@@ -415,7 +446,7 @@ Additional user instructions (context): "${context.trim()}". Use these instructi
         "resultPages": [
           { "title": "Outcome A", "description": "Result description", "scoreRange": { "from": 0, "to": 0 } }
         ],
-
+ 
         // Adaptive Theming (required):
         "theme_name": "Indigo",
         "theme_primary_color": "#6366F1",
@@ -448,6 +479,15 @@ Additional user instructions (context): "${context.trim()}". Use these instructi
         - Sections must not be counted for scoring even when "isQuiz": true.
       - 'submit': Ensure there is exactly one field with type "submit".
       - If the user's request implies a longer introduction or context, include a helpful summary in the "description" field.
+ 
+      VALIDATION & UX RULES:
+      - Based on the context, add a "validation" object where appropriate.
+        - If a field seems mandatory (e.g., Name, Email, Subject), set "validation": { "required": true }.
+        - For email fields, prefer type "email"; also set validation.pattern = "email".
+        - For text-like fields, use "validation.minLength" and/or "validation.maxLength" when reasonable.
+      - Add a helpful "placeholder" string for fields where an example would be useful.
+      - Add a concise "helperText" when a field needs additional explanation.
+      - The "name" for each field MUST be a unique snake_case identifier within the form. If duplicates would occur, append a numeric suffix (e.g., "_2", "_3").
 
       THEME RULES:
       - Based on the form's topic/context, choose a theme from [Indigo, Slate, Rose, Amber, Emerald, Sky].
@@ -650,6 +690,14 @@ Additional user instructions (context): "${userContext}"
             "label": "Field Label",
             "type": "text | email | password | textarea | radio | checkbox | select | date | time | file | range | radioGrid | section | submit",
             "name": "lowercase_field_label_with_underscores",
+            "placeholder": "Optional placeholder text",
+            "helperText": "Optional helper text below the field",
+            "validation": {                      // optional; include when helpful
+              "required": true,
+              "minLength": 2,
+              "maxLength": 50,
+              "pattern": "email"                 // e.g., for email fields
+            },
             "options": ["Option 1", "Option 2"],
             "rows": ["Row 1", "Row 2"],       // only for radioGrid
             "columns": [                      // only for radioGrid; per-column scoring objects
@@ -663,13 +711,13 @@ Additional user instructions (context): "${userContext}"
         "resultPages": [
           { "title": "Outcome A", "description": "Result description", "scoreRange": { "from": 0, "to": 0 } }
         ],
-
+ 
         // Adaptive Theming (required):
         "theme_name": "Indigo",
         "theme_primary_color": "#6366F1",
         "theme_background_color": "#E0E7FF"
       }
-      
+       
       Follow these critical rules:
       - 'type': Use the most appropriate type based on the user's request or the provided content.
         - For short text: "text"
@@ -696,6 +744,15 @@ Additional user instructions (context): "${userContext}"
         - Sections must not be counted for scoring even when "isQuiz": true.
       - 'submit': Ensure there is exactly one field with type "submit".
       - If the user's request implies a longer introduction or context, include a helpful summary in the "description" field.
+ 
+      VALIDATION & UX RULES:
+      - Based on the context, add a "validation" object where appropriate.
+        - If a field seems mandatory (e.g., Name, Email, Subject), set "validation": { "required": true }.
+        - For email fields, prefer type "email"; also set validation.pattern = "email".
+        - For text-like fields, use "validation.minLength" and/or "validation.maxLength" when reasonable.
+      - Add a helpful "placeholder" string for fields where an example would be useful.
+      - Add a concise "helperText" when a field needs additional explanation.
+      - The "name" for each field MUST be a unique snake_case identifier within the form. If duplicates would occur, append a numeric suffix (e.g., "_2", "_3").
 
       THEME RULES:
       - Choose a theme from [Indigo, Slate, Rose, Amber, Emerald, Sky] based on topic/context.
@@ -970,35 +1027,44 @@ Do not add any conversational text or markdown.
 
 CRITICAL REQUIREMENTS:
 - Preserve a valid schema compatible with this structure:
-  {
-    "title": "string",
-    "description": "string",
-    "isQuiz": boolean,
-    "fields": [
-      {
-        "label": "string",
-        "type": "text | email | password | textarea | radio | checkbox | select | date | time | file | range | radioGrid | section | submit",
-        "name": "snake_case_identifier",
-        "options": ["..."],                       // only for radio, checkbox, select
-        "rows": ["..."],                          // only for radioGrid
-        "columns": [{ "label": "A", "points": 1 }], // only for radioGrid
-        "correctAnswer": "..." | ["..."],         // only if isQuiz and option-based field
-        "points": 1                               // only if isQuiz
-      }
-    ],
-    "resultPages": [
-      { "title": "string", "description": "string", "scoreRange": { "from": 0, "to": 0 } }
-    ],
+{
+  "title": "string",
+  "description": "string",
+  "isQuiz": boolean,
+  "fields": [
+    {
+      "label": "string",
+      "type": "text | email | password | textarea | radio | checkbox | select | date | time | file | range | radioGrid | section | submit",
+      "name": "snake_case_identifier",
+      "placeholder": "Optional placeholder text",
+      "helperText": "Optional helper text below the field",
+      "validation": {                           // optional; include when helpful
+        "required": true,
+        "minLength": 2,
+        "maxLength": 50,
+        "pattern": "email"                      // e.g., for email fields
+      },
+      "options": ["..."],                       // only for radio, checkbox, select
+      "rows": ["..."],                          // only for radioGrid
+      "columns": [{ "label": "A", "points": 1 }], // only for radioGrid
+      "correctAnswer": "..." | ["..."],         // only if isQuiz and option-based field
+      "points": 1                               // only if isQuiz
+    }
+  ],
+  "resultPages": [
+    { "title": "string", "description": "string", "scoreRange": { "from": 0, "to": 0 } }
+  ],
 
-    // Adaptive Theming (preserve if present; update only if the command explicitly changes theme)
-    "theme_name": "Indigo|Slate|Rose|Amber|Emerald|Sky",
-    "theme_primary_color": "#RRGGBB",
-    "theme_background_color": "#RRGGBB"
-  }
+  // Adaptive Theming (preserve if present; update only if the command explicitly changes theme)
+  "theme_name": "Indigo|Slate|Rose|Amber|Emerald|Sky",
+  "theme_primary_color": "#RRGGBB",
+  "theme_background_color": "#RRGGBB"
+}
 - Exactly one "submit" field must exist and be last in order.
 - For "radio" | "checkbox" | "select": include "options"; omit for other types (including radioGrid).
 - radioGrid must use "rows" (string[]) and "columns" ({ "label": string, "points": number }[]).
-- If you add or rename fields, ensure unique, URL-safe snake_case "name" values.
+- If you add or rename fields, ensure unique, URL-safe snake_case "name" values across the entire form.
+- Preserve and reasonably enhance UX details ("placeholder", "helperText") and "validation" unless the command requests their removal or change.
 - Maintain logical consistency; do not degrade the form's functionality.
 - If the input JSON contains top-level theming keys (theme_name, theme_primary_color, theme_background_color), you MUST preserve them unless the user command explicitly asks to change theme.
 - Output ONLY the raw JSON object.
