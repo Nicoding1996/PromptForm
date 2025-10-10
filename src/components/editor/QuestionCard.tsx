@@ -65,6 +65,11 @@ type Props = {
     newPoints: number
   ) => void;
   onUpdateRangeBounds: (fieldIndex: number, min: number, max: number) => void;
+
+  // AI refactor temporary highlight status
+  highlightStatus?: 'added' | 'modified' | null;
+  // Set of field names currently highlighted (controls fade-out window)
+  highlightedSet?: Set<string>;
 };
 
 const QuestionCard: React.FC<Props> = (props) => {
@@ -339,7 +344,17 @@ const QuestionCard: React.FC<Props> = (props) => {
 
     return null;
   })();
-
+  
+  const showHighlight = props.highlightedSet?.has(field.name);
+  const highlightClass =
+    showHighlight
+      ? props.highlightStatus === 'added'
+        ? 'bg-green-100'
+        : props.highlightStatus === 'modified'
+        ? 'bg-blue-100'
+        : ''
+      : '';
+  
   return (
     <FieldRow
       id={`field-${index}`}
@@ -356,6 +371,10 @@ const QuestionCard: React.FC<Props> = (props) => {
           <GripVertical className="h-5 w-5" />
         </button>
       )}
+      className={highlightClass}
+      dataAnchorId={field.name}
+      dataFieldName={field.name}
+      dataIndex={index}
     >
       {/* Delete button (appears on hover) */}
       <button

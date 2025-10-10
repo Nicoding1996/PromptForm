@@ -54,6 +54,13 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
   const [refactorError, setRefactorError] = useState<string | null>(null);
   const [isRefactoring, setIsRefactoring] = useState(false);
 
+  // Instant AI refactor UX state
+  const prevFormRef = useRef<FormData | null>(null);
+  const [highlightedFields, setHighlightedFields] = useState<Set<string>>(new Set());
+  const [changeTypes, setChangeTypes] = useState<Record<string, 'added' | 'modified'>>({});
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [lastChangeSummary, setLastChangeSummary] = useState<any>(null);
+
   // Responses state
   const [responses, setResponses] = useState<StoredResponse[]>([]);
   const [respLoading, setRespLoading] = useState(false);
@@ -229,6 +236,38 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
 
   const quizMode = formJson?.isQuiz === true;
 
+  // Compute rendered field order (non-submit first, then submit) to match FormRenderer
+  const getDisplayFields = (form: FormData | null): FormField[] => {
+    const raw = (form?.fields ?? []) as FormField[];
+    const submit = raw.filter((f) => f.type === 'submit');
+    const non = raw.filter((f) => f.type !== 'submit');
+    return [...non, ...submit];
+  };
+
+  // Find the current rendered index by field.name
+  const displayIndexByName = (name: string): number => {
+    const list = getDisplayFields(formJson);
+    return list.findIndex((f) => f.name === name);
+  };
+
+  // Click-to-focus handler used by the AI Changes popover
+  const handleFocusFieldByName = (name: string) => {
+    try {
+      const idx = displayIndexByName(name);
+      if (idx >= 0) {
+        setFocus(idx);
+      }
+      const el = document.querySelector(`[data-anchor-id="${name}"]`) as HTMLElement | null;
+      if (el && typeof (el as any).scrollIntoView === 'function') {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      // Re-trigger a highlight just for this field; global timer will clear after 5s
+      setHighlightedFields(new Set([name]));
+    } catch {
+      // no-op
+    }
+  };
+
   // Step 0: Compute current max and outcome validity (independent of change)
   const currentMaxScore = useMemo(() => computeMaxPossibleScore(formJson), [formJson]);
   const outcomeValidity = useMemo(() => {
@@ -319,6 +358,14 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
       return { old, current: curr, changed };
     });
   }, [formJson]);
+
+  // Temporary highlight cleanup after 5 seconds
+  useEffect(() => {
+    if (highlightedFields && highlightedFields.size > 0) {
+      const t = window.setTimeout(() => setHighlightedFields(new Set()), 5000);
+      return () => window.clearTimeout(t);
+    }
+  }, [highlightedFields]);
 
   // ===== In-place editor handlers =====
   const handleUpdateFieldLabel = (fieldIndex: number, newLabel: string) => {
@@ -1062,6 +1109,9 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
       setRefactorError('No form to refactor. Generate or open a form first.');
       return;
     }
+    // Save snapshot for Undo
+    prevFormRef.current = formJson;
+
     setIsRefactoring(true);
     setRefactorLoading(true);
     try {
@@ -1071,7 +1121,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
         body: JSON.stringify({ formJson, command }),
       });
 
-      let data: unknown = null;
+      let data: any = null;
       try {
         data = await resp.json();
       } catch {}
@@ -1094,8 +1144,111 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
         return;
       }
 
-      setFormJson(data as FormData);
+      // Support both legacy (raw JSON) and new ({ newFormJson, changeSummary }) payloads
+      let newForm: FormData | null = null;
+      let changeSummary: any = null;
+      if ('newFormJson' in (data as any) || 'changeSummary' in (data as any)) {
+        newForm = (data as any).newFormJson ?? (data as any).form ?? null;
+        changeSummary = (data as any).changeSummary ?? null;
+      } else {
+        newForm = data as FormData;
+      }
+
+      if (!newForm) {
+        setRefactorError('Refactor returned no form JSON.');
+        return;
+      }
+
+      // Apply instantly
+      setFormJson(newForm as FormData);
       setLastSavedId(null);
+
+      // Build highlight map
+      const buildDiffMap = (prev: FormData | null, next: FormData | null): Record<string, 'added' | 'modified'> => {
+        const map: Record<string, 'added' | 'modified'> = {};
+        const prevByName = new Map((prev?.fields ?? []).map((f: any) => [f.name, f]));
+        const nextByName = new Map((next?.fields ?? []).map((f: any) => [f.name, f]));
+        nextByName.forEach((nf, name) => {
+          const pf = prevByName.get(name);
+          if (!pf) {
+            map[name] = 'added';
+            return;
+          }
+          const { name: _n1, ...a } = (pf as any) ?? {};
+          const { name: _n2, ...b } = (nf as any) ?? {};
+          if (JSON.stringify(a) !== JSON.stringify(b)) {
+            map[name] = 'modified';
+          }
+        });
+        return map;
+      };
+
+      let map: Record<string, 'added' | 'modified'> = {};
+      if (changeSummary && (Array.isArray(changeSummary.added) || Array.isArray(changeSummary.modified))) {
+        const m: Record<string, 'added' | 'modified'> = {};
+        const addedArr = Array.isArray(changeSummary.added) ? changeSummary.added : [];
+        const modArr = Array.isArray(changeSummary.modified) ? changeSummary.modified : [];
+        for (const id of addedArr) {
+          if (typeof id === 'string') m[id] = 'added';
+        }
+        for (const id of modArr) {
+          if (typeof id === 'string') m[id] = 'modified';
+        }
+        map = Object.keys(m).length > 0 ? m : buildDiffMap(prevFormRef.current, newForm);
+      } else {
+        map = buildDiffMap(prevFormRef.current, newForm);
+      }
+
+      setChangeTypes(map);
+      setHighlightedFields(new Set(Object.keys(map)));
+      setLastChangeSummary(
+        changeSummary || {
+          added: Object.entries(map)
+            .filter(([, v]) => v === 'added')
+            .map(([k]) => k),
+          modified: Object.entries(map)
+            .filter(([, v]) => v === 'modified')
+            .map(([k]) => k),
+        }
+      );
+
+      // Enhanced toast (10s) with Show details + Undo
+      toast.custom(
+        (t) => (
+          <div className="pointer-events-auto w-[320px] rounded-md bg-white p-3 shadow-lg ring-1 ring-gray-200">
+            <div className="text-sm font-medium text-gray-900">Form updated</div>
+            <div className="mt-1 text-xs text-gray-600">AI changes applied instantly.</div>
+            <div className="mt-2 flex items-center gap-4">
+              <button
+                type="button"
+                className="text-xs font-medium text-indigo-700 hover:underline"
+                onClick={() => {
+                  setDetailsOpen(true);
+                  toast.dismiss((t as any).id);
+                }}
+              >
+                Show details
+              </button>
+              <button
+                type="button"
+                className="text-xs font-medium text-gray-700 hover:underline"
+                onClick={() => {
+                  if (prevFormRef.current) {
+                    setFormJson(prevFormRef.current);
+                  }
+                  setChangeTypes({});
+                  setHighlightedFields(new Set());
+                  setDetailsOpen(false);
+                  toast.dismiss((t as any).id);
+                }}
+              >
+                Undo
+              </button>
+            </div>
+          </div>
+        ),
+        { duration: 10000 }
+      );
     } catch (e: any) {
       setRefactorError(e?.message || 'Network error while contacting backend.');
     } finally {
@@ -1594,7 +1747,8 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                           onUpdateFormTitle={handleUpdateFormTitle}
                           onUpdateFormDescription={handleUpdateFormDescription}
                           // Advanced editor props
-                          focusedFieldIndex={focusedFieldIndex}
+                          highlightMap={changeTypes}
+                          highlightedSet={highlightedFields}                          focusedFieldIndex={focusedFieldIndex}
                           setFocusedFieldIndex={setFocus}
                           onUpdateFieldOption={handleUpdateFieldOption}
                           onAddFieldOption={handleAddFieldOption}
@@ -1752,6 +1906,98 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
         }}
         onThemeUpdate={handleThemeUpdate}
       />
+
+      {/* Non-blocking "Show details" popover */}
+      {detailsOpen && (
+        <div className="fixed bottom-6 right-6 z-[60] w-80 rounded-lg bg-white shadow-lg ring-1 ring-gray-200">
+          <div className="flex items-center justify-between border-b border-gray-200 px-4 py-2">
+            <h3 className="text-sm font-semibold text-gray-900">AI changes</h3>
+            <button
+              type="button"
+              onClick={() => setDetailsOpen(false)}
+              className="inline-flex h-6 w-6 items-center justify-center rounded hover:bg-gray-100"
+              aria-label="Close"
+              title="Close"
+            >
+              ×
+            </button>
+          </div>
+          <div className="max-h-80 overflow-auto p-3 text-sm text-gray-800">
+            {(() => {
+              const sum = lastChangeSummary || {};
+              const added =
+                Array.isArray(sum.added)
+                  ? sum.added
+                  : Object.entries(changeTypes)
+                      .filter(([, v]) => v === 'added')
+                      .map(([k]) => k);
+                const modified =
+                  Array.isArray(sum.modified)
+                    ? sum.modified
+                    : Object.entries(changeTypes)
+                      .filter(([, v]) => v === 'modified')
+                      .map(([k]) => k);
+              const removed = Array.isArray(sum.removed) ? sum.removed : [];
+
+              return (
+                <div className="space-y-3">
+                  {added.length > 0 && (
+                    <div>
+                      <div className="font-medium text-green-700">Added</div>
+                      <ul className="list-disc pl-5">
+                        {added.map((id: any) => (
+                          <li key={`ad-${String(id)}`}>
+                            <button
+                              type="button"
+                              className="text-indigo-700 hover:underline"
+                              onClick={() => handleFocusFieldByName(String(id))}
+                              title="Scroll to field"
+                            >
+                              {String(id)}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {modified.length > 0 && (
+                    <div>
+                      <div className="font-medium text-blue-700">Modified</div>
+                      <ul className="list-disc pl-5">
+                        {modified.map((id: any) => (
+                          <li key={`md-${String(id)}`}>
+                            <button
+                              type="button"
+                              className="text-indigo-700 hover:underline"
+                              onClick={() => handleFocusFieldByName(String(id))}
+                              title="Scroll to field"
+                            >
+                              {String(id)}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {removed.length > 0 && (
+                    <div>
+                      <div className="font-medium text-gray-700">Removed</div>
+                      <ul className="list-disc pl-5">
+                        {removed.map((id: any) => (
+                          <li key={`rm-${String(id)}`}>{String(id)}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {added.length === 0 && modified.length === 0 && removed.length === 0 && (
+                    <div className="text-gray-600">No detailed changes provided.</div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
 
     </div>
   );

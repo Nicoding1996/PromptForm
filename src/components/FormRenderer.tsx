@@ -135,6 +135,11 @@ interface FormRendererProps {
   
   // Section editing
   onUpdateSectionSubtitle?: (fieldIndex: number, subtitle: string) => void;
+  
+  // Highlighting map for AI refactor effects
+  highlightMap?: Record<string, 'added' | 'modified'>;
+  // Set of field names currently highlighted (for fade-out control)
+  highlightedSet?: Set<string>;
 }
 
 
@@ -632,7 +637,11 @@ export const FieldRow: React.FC<{
   children: React.ReactNode;
   onDragHandleReady?: (attrs: React.HTMLAttributes<any>) => React.ReactNode;
   onClick?: () => void;
-}> = ({ id, children, onDragHandleReady, onClick }) => {
+  className?: string;
+  dataAnchorId?: string;
+  dataFieldName?: string;
+  dataIndex?: number;
+}> = ({ id, children, onDragHandleReady, onClick, className, dataAnchorId, dataFieldName, dataIndex }) => {
   const { attributes, listeners, setNodeRef: setDragRef, transform } = useDraggable({ id });
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id });
   
@@ -646,7 +655,10 @@ export const FieldRow: React.FC<{
       }}
       style={style}
       onClick={onClick}
-      className={`group relative rounded-lg border border-gray-200 bg-white p-3 transition-shadow ${isOver ? 'ring-2 ring-indigo-400' : ''}`}
+      data-anchor-id={dataAnchorId}
+      data-field-name={dataFieldName}
+      data-index={typeof dataIndex === 'number' ? String(dataIndex) : undefined}
+      className={`group relative rounded-lg border border-gray-200 p-3 transition-colors duration-1000 ease-out ${isOver ? 'ring-2 ring-indigo-400' : ''} ${className ?? ''}`}
     >
       {/* Drag handle slot (appears on hover) */}
       <div className="absolute -left-3 top-3 hidden rounded-md text-gray-500 group-hover:block">
@@ -782,6 +794,8 @@ const FormRenderer: React.FC<FormRendererProps> = ({
   onUpdateRangeBounds,
   // Section edit
   onUpdateSectionSubtitle,
+  highlightMap,
+  highlightedSet,
 }) => {
   // Ensure the submit field (if any) always renders last
   const rawFields: FormField[] = (formData?.fields ?? []) as FormField[];
@@ -880,6 +894,8 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                   index={idx}
                   isFocused={focusedFieldIndex === idx}
                   onFocus={setFocusedFieldIndex}
+                  highlightStatus={highlightMap?.[field.name] ?? null}
+                  highlightedSet={highlightedSet}
                   {...{
                     onUpdateFieldLabel,
                     onDeleteField,
