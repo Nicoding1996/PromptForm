@@ -707,18 +707,6 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
 
   // Submitted view (outcomes or simple score)
   if (submitted) {
-    if (preview) {
-      return (
-        <section className="mt-8">
-          <Card className="p-6">
-            <div className="text-center">
-              <h2 className="text-lg font-semibold text-gray-900">Preview submission simulated</h2>
-              <p className="mt-1 text-sm text-gray-600">This is a preview only. No data was saved.</p>
-            </div>
-          </Card>
-        </section>
-      );
-    }
     const pages = (formData as any)?.resultPages as Array<any> | undefined;
     const hasOutcomes = Array.isArray(pages) && pages.length > 0;
 
@@ -811,7 +799,7 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
         <div className="mb-4 rounded-md bg-yellow-50 border border-yellow-200 p-3 text-sm text-yellow-900 flex items-center justify-between">
           <div>
             <strong className="font-semibold">Preview mode</strong>
-            <span className="ml-2 text-gray-700">You are viewing a non-interactive preview. Submissions are disabled.</span>
+            <span className="ml-2 text-gray-700">You are viewing a preview. Submissions are simulated and not saved.</span>
           </div>
           <a
             href={window.location.pathname}

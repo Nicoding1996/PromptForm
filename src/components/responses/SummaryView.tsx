@@ -488,11 +488,11 @@ const SummaryView: React.FC<Props> = ({ formId, aiSummaryInitial, form, response
       {outcomeDistribution && outcomeDistribution.length > 0 && (
         <Card className="mb-4 p-4">
           <h3 className="mb-2 text-base font-semibold text-neutral-900">Overall Outcome Distribution</h3>
-          <div className="h-56">
+          <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={outcomeDistribution} margin={{ top: 8, right: 8, left: 8, bottom: 28 }}>
+              <BarChart data={outcomeDistribution} margin={{ top: 12, right: 12, left: 12, bottom: 80 }}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" interval={0} tickMargin={8} />
+                <XAxis dataKey="name" angle={-45} textAnchor="end" interval={0} tickMargin={8} />
                 <YAxis allowDecimals={false} />
                 <Tooltip />
                 <Bar dataKey="value">
@@ -542,9 +542,9 @@ const SummaryView: React.FC<Props> = ({ formId, aiSummaryInitial, form, response
                           <Legend />
                         </PieChart>
                       ) : (
-                        <BarChart data={data} margin={{ top: 8, right: 8, left: 8, bottom: 28 }}>
+                        <BarChart data={data} margin={{ top: 12, right: 12, left: 12, bottom: 80 }}>
                           <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="name" interval={0} tickMargin={8} />
+                          <XAxis dataKey="name" angle={-45} textAnchor="end" interval={0} tickMargin={8} />
                           <YAxis allowDecimals={false} />
                           <Tooltip />
                           <Bar dataKey="value">
@@ -571,9 +571,9 @@ const SummaryView: React.FC<Props> = ({ formId, aiSummaryInitial, form, response
                   <h4 className="mb-3 text-sm font-semibold text-gray-900">{label}</h4>
                   <div className="h-56">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={data} margin={{ top: 8, right: 8, left: 8, bottom: 28 }}>
+                      <BarChart data={data} margin={{ top: 12, right: 12, left: 12, bottom: 80 }}>
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" interval={0} tickMargin={8} />
+                        <XAxis dataKey="name" angle={-45} textAnchor="end" interval={0} tickMargin={8} />
                         <YAxis allowDecimals={false} />
                         <Tooltip />
                         <Bar dataKey="value">
@@ -595,12 +595,12 @@ const SummaryView: React.FC<Props> = ({ formId, aiSummaryInitial, form, response
                   <h4 className="mb-3 text-sm font-semibold text-gray-900">{label}</h4>
                   <div className="space-y-6">
                     {perRow.map((row, idx) => (
-                      <div key={`${key}-row-${idx}`} className="h-56">
+                      <div key={`${key}-row-${idx}`} className="h-64">
                         <div className="mb-2 text-xs font-medium text-gray-600">{row.row}</div>
                         <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={row.data} margin={{ top: 8, right: 8, left: 8, bottom: 28 }}>
+                          <BarChart data={row.data} margin={{ top: 12, right: 12, left: 12, bottom: 80 }}>
                             <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="name" interval={0} tickMargin={8} />
+                            <XAxis dataKey="name" angle={-45} textAnchor="end" interval={0} tickMargin={8} />
                             <YAxis allowDecimals={false} />
                             <Tooltip />
                             <Bar dataKey="value">
