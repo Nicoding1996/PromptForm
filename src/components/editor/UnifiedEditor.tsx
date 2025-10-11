@@ -46,6 +46,59 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [lastSavedId, setLastSavedId] = useState<string | null>(null);
+
+  // Re-enable Save button when there are unsaved changes.
+  // Any mutation to formJson means the current in-memory form differs from the last persisted version.
+  // Clearing lastSavedId switches the UI from "✓ Saved!" back to an enabled "Save".
+  useEffect(() => {
+    setLastSavedId(null);
+  }, [formJson]);
+
+  // --- Hybrid Auto-Save (debounced) ---
+  // Track latest saving/lastSavedId values inside refs to avoid stale closures.
+  const savingRef = useRef<boolean>(saving);
+  useEffect(() => {
+    savingRef.current = saving;
+  }, [saving]);
+  const lastSavedIdRef = useRef<string | null>(lastSavedId);
+  useEffect(() => {
+    lastSavedIdRef.current = lastSavedId;
+  }, [lastSavedId]);
+
+  // Debounce timer + mount guard (skip the initial hydration change).
+  const autoSaveTimerRef = useRef<number | null>(null);
+  const hasMountedRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    // Only auto-save when editing an existing form with an authenticated user
+    if (!formId || !user || !formJson) return;
+
+    // Skip the first run triggered by initial load/hydration
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      return;
+    }
+
+    // Debounce 2.5s after the latest change
+    if (autoSaveTimerRef.current) {
+      window.clearTimeout(autoSaveTimerRef.current);
+    }
+    autoSaveTimerRef.current = window.setTimeout(() => {
+      // If still unsaved and not already saving, persist changes
+      if (!savingRef.current && lastSavedIdRef.current === null) {
+        void handleSaveForm();
+      }
+    }, 2500);
+
+    // Cleanup any pending timer on re-run/unmount
+    return () => {
+      if (autoSaveTimerRef.current) {
+        window.clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
+      }
+    };
+  }, [formJson, formId, user, /* intentionally not watching lastSavedId/saving to avoid canceling timer */]);
+
   // AI assist in-flight indicator (index of field being generated)
   const [assistingIndex, setAssistingIndex] = useState<number | null>(null);
 
@@ -1608,17 +1661,22 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
 
             <div className="justify-self-center col-span-2 md:col-span-1 order-3 md:order-none w-full flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
             {user && formJson && formId && (
-              <button
-                type="button"
-                onClick={handleSaveForm}
-                disabled={saving || !!lastSavedId}
-                className="inline-flex items-center gap-1 rounded-md px-2 py-1 md:px-3 md:py-1.5 text-xs md:text-sm text-neutral-700 hover:bg-neutral-100 transition-colors"
-                title="Save this form"
-              >
-                <span className="inline-flex items-center gap-1">
-                  {!saving ? <Save className="h-4 w-4" /> : null} {lastSavedId ? '✓ Saved!' : saving ? 'Saving...' : 'Save'}
+              <>
+                <button
+                  type="button"
+                  onClick={handleSaveForm}
+                  disabled={saving || !!lastSavedId}
+                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 md:px-3 md:py-1.5 text-xs md:text-sm text-neutral-700 hover:bg-neutral-100 transition-colors"
+                  title="Save this form"
+                >
+                  <span className="inline-flex items-center gap-1">
+                    {!saving ? <Save className="h-4 w-4" /> : null} Save
+                  </span>
+                </button>
+                <span aria-live="polite" className="ml-2 text-xs md:text-sm text-neutral-600">
+                  {saving ? 'Saving...' : lastSavedId ? '✓ Saved!' : 'Unsaved changes'}
                 </span>
-              </button>
+              </>
             )}
 
             {lastSavedId && (
