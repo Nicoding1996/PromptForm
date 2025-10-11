@@ -865,28 +865,29 @@ const TypePalette: React.FC<{
       {/* Distinct AI suggestion action at top */}
       <button
         type="button"
-        className="col-span-full flex items-start gap-3 rounded-md border-2 border-indigo-300 bg-indigo-50 px-3 py-3 text-left shadow-sm transition hover:bg-indigo-100"
+        className="col-span-full flex items-start gap-3 rounded-md border-2 border-indigo-300 bg-indigo-50 px-3 py-3 text-left shadow-sm transition hover:bg-indigo-100 disabled:opacity-60 disabled:cursor-not-allowed"
         onMouseDown={(e) => {
           e.preventDefault();
           e.stopPropagation();
           if (!suggestLoading) {
             onSuggestWithAI?.();
-            onClose();
           }
         }}
         onClick={(e) => {
           e.stopPropagation();
           if (!suggestLoading) {
             onSuggestWithAI?.();
-            onClose();
           }
         }}
         disabled={suggestLoading}
+        aria-busy={suggestLoading}
         title="Let the AI generate a new question for you."
       >
-        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-white text-sm">✨</span>
+        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-white text-sm">
+          {suggestLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : '✨'}
+        </span>
         <span className="flex flex-col">
-          <span className="text-sm font-semibold text-indigo-900">{suggestLoading ? 'Suggesting…' : 'Suggest with AI'}</span>
+          <span className="text-sm font-semibold text-indigo-900">{suggestLoading ? 'Generating…' : 'Suggest with AI'}</span>
           <span className="text-xs text-indigo-800 opacity-90">Let the AI generate a new question for you.</span>
         </span>
       </button>
@@ -899,14 +900,17 @@ const TypePalette: React.FC<{
             // Prevent focus/unfocus side-effects and insert immediately
             e.preventDefault();
             e.stopPropagation();
+            if (suggestLoading) return;
             onPick(key);
           }}
           onClick={(e) => {
             // Fallback for keyboard/assistive tech
             e.stopPropagation();
+            if (suggestLoading) return;
             onPick(key);
           }}
-          className="flex items-center gap-2 rounded-md border-2 bg-white px-3 py-2 text-left text-sm font-medium shadow-sm transition hover:shadow-md"
+          disabled={suggestLoading}
+          className={`flex items-center gap-2 rounded-md border-2 bg-white px-3 py-2 text-left text-sm font-medium shadow-sm transition hover:shadow-md ${suggestLoading ? 'opacity-50 pointer-events-none' : ''}`}
           style={{
             borderColor: 'var(--pf-brand, #4F46E5)',
             color: 'var(--pf-brand, #4F46E5)',
@@ -922,13 +926,17 @@ const TypePalette: React.FC<{
         onMouseDown={(e) => {
           e.preventDefault();
           e.stopPropagation();
+          if (suggestLoading) return;
           onClose();
         }}
         onClick={(e) => {
           e.stopPropagation();
+          if (suggestLoading) return;
           onClose();
         }}
-        className="col-span-full justify-self-start text-sm text-gray-600 hover:underline"
+        disabled={suggestLoading}
+        aria-disabled={suggestLoading}
+        className="col-span-full justify-self-start text-sm text-gray-600 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
       >
         Close
       </button>
@@ -997,13 +1005,14 @@ const FormRenderer: React.FC<FormRendererProps> = ({
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
       if (chooserAfter == null) return;
+      if (suggestLoading) return; // Keep palette open while AI is generating
       const target = e.target as HTMLElement;
       if (target.closest('[data-type-palette="true"]')) return;
       setChooserAfter(null);
     };
     document.addEventListener('mousedown', onDocClick, true);
     return () => document.removeEventListener('mousedown', onDocClick, true);
-  }, [chooserAfter]);
+  }, [chooserAfter, suggestLoading]);
 
   const indexFromId = (id: string) => {
     const n = Number(id.replace('field-', ''));
