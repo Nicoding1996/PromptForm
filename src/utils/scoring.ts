@@ -297,10 +297,28 @@ export function calculateResult(form: FormData, submission: Record<string, any>)
   if (qt === 'KNOWLEDGE') {
     return calculateKnowledge(form, submission);
   }
-  // Default: treat as knowledge if legacy isQuiz==true else no scoring
+
+  // Heuristic auto-detection for legacy/unspecified forms:
+  // Treat as OUTCOME only if:
+  //  - Any field has trait-based scoring rules, OR
+  //  - There are result pages that include a stable outcomeId (explicit outcome-based config)
+  const hasTraitScoring =
+    Array.isArray(form.fields) &&
+    (form.fields as any[]).some((f) => Array.isArray((f as any).scoring) && (f as any).scoring.length > 0);
+
+  const hasOutcomeIds =
+    Array.isArray(form.resultPages) &&
+    (form.resultPages as ResultPage[]).some((p) => typeof (p as any)?.outcomeId === 'string' && (p as any).outcomeId.length > 0);
+
+  if (hasTraitScoring || hasOutcomeIds) {
+    return calculateOutcome(form, submission);
+  }
+
+  // Legacy quiz flag -> knowledge
   if ((form as any)?.isQuiz === true) {
     return calculateKnowledge(form, submission);
   }
+
   // No scoring configured
   return { type: 'KNOWLEDGE', score: 0, maxScore: 0 };
 }
