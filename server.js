@@ -383,10 +383,10 @@ User prompt: "${prompt}"
     });
   }
 });
-// AI Suggest Question endpoint (Trait-Based Scoring)
+// AI Suggest Question endpoint (Universal + Unique)
 // POST /suggest-question
 // Body: { form: CompleteFormJson }
-// Returns: Single field JSON with "scoring" entries mapping to existing outcome IDs.
+// Returns: Single field JSON adapted to quizType with strict anti-duplication
 app.post('/suggest-question', async (req, res) => {
   try {
     const { form } = req.body ?? {};
@@ -394,43 +394,75 @@ app.post('/suggest-question', async (req, res) => {
       return res.status(400).json({ error: 'Invalid "form" object in request body.' });
     }
 
-    // Build an outcome catalog from resultPages with stable IDs
-    const pages = Array.isArray(form?.resultPages) ? form.resultPages : [];
-    const toSnake = (s) =>
-      String(s || '')
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '_')
-        .replace(/^_+|_+$/g, '');
-    const outcomeCatalog = pages.map((p, i) => {
-      const title = String(p?.title || `Outcome ${i + 1}`);
-      const id =
-        String(p?.id || p?.outcomeId || `outcome_${toSnake(title) || i + 1}`);
-      return { id, title };
-    });
+    // Determine quizType context
+    const quizTypeRaw = String(form?.quizType || '').toUpperCase();
+    const quizType = (quizTypeRaw === 'KNOWLEDGE' || quizTypeRaw === 'OUTCOME') ? quizTypeRaw : null;
 
-    if (!outcomeCatalog.length) {
-      return res.status(400).json({
-        error:
-          'Form is missing "resultPages" with outcomes. Cannot map scoring to outcomes.',
-      });
-    }
+    // Build existing labels/names for anti-duplication
+    const fieldsArr = Array.isArray(form?.fields) ? form.fields : [];
+    const existingLabels = fieldsArr.map((f) => String(f?.label ?? '')).filter((s) => s.trim().length > 0);
+    const existingNames = fieldsArr.map((f) => String(f?.name ?? '')).filter((s) => s.trim().length > 0);
+    const existingLabelsBlock = JSON.stringify(existingLabels, null, 2);
+    const existingNamesBlock = JSON.stringify(existingNames, null, 2);
 
     // Compact/condense form JSON for prompt if very large
     const formStr = JSON.stringify(form, null, 2);
     const formBlock =
-      formStr.length > ANALYZE_JSON_CHAR_LIMIT
-        ? condenseText(formStr, ANALYZE_JSON_CHAR_LIMIT)
-        : formStr;
-    const catalogBlock = JSON.stringify(outcomeCatalog, null, 2);
+      formStr.length > ANALYZE_JSON_CHAR_LIMIT ? condenseText(formStr, ANALYZE_JSON_CHAR_LIMIT) : formStr;
 
+    // Model
     const model = genAI.getGenerativeModel({
       model: GEMINI_MODEL,
       generationConfig: { responseMimeType: 'application/json' },
     });
 
-    const masterPrompt = `
+    // Shared anti-duplication clause (applied to all quiz types)
+    const ANTI_DUP_CLAUSE = `
+CRITICAL UNIQUENESS REQUIREMENT:
+- The new question you generate MUST be unique and not a duplicate or a simple rephrasing of any question already present in the form.
+- Compare against the existing labels and names below and ensure conceptual novelty. Do not re-use or trivially reword them.
+- Existing labels: ${existingLabelsBlock}
+- Existing names: ${existingNamesBlock}
+- The "name" you output MUST be a new, unique snake_case identifier not present in the existing names list.`;
+
+    // Guardrails text for outcome-based assessments (kept consistent with generate-form)
+    const OUTCOME_GUARDRAILS = `
+---
+CRITICAL INSTRUCTION: When you generate 'resultPages' with 'scoreRange', you MUST follow these rules:
+
+All score ranges must be in ascending numerical order.
+There must be no numerical gaps between the ranges.
+There must be no numerical overlaps between the ranges.
+Every possible score must map to exactly one outcome.
+The from value of the very first score_range in the list MUST always be 0.
+---`;
+
+    let masterPrompt = '';
+
+    if (quizType === 'OUTCOME') {
+      // Build outcome catalog from resultPages with stable IDs
+      const pages = Array.isArray(form?.resultPages) ? form.resultPages : [];
+      const toSnake = (s) =>
+        String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+      const outcomeCatalog = pages.map((p, i) => {
+        const title = String(p?.title || `Outcome ${i + 1}`);
+        const id = String(p?.id || p?.outcomeId || `outcome_${toSnake(title) || i + 1}`);
+        return { id, title };
+      });
+
+      if (!outcomeCatalog.length) {
+        return res.status(400).json({
+          error: 'Form is missing "resultPages" with outcomes. Cannot map scoring to outcomes.',
+        });
+      }
+
+      const catalogBlock = JSON.stringify(outcomeCatalog, null, 2);
+
+      masterPrompt = `
 You are an expert psychometrician. Based on the provided form's existing questions and outcomes (JSON), generate ONE new, relevant question that fits the assessment's theme.
 Your response must be a single, valid JSON object for the new form field. This object MUST include the new, detailed "scoring" array, correctly mapping the new question's answers to the existing outcome IDs.
+
+${ANTI_DUP_CLAUSE}
 
 Rules:
 - Allowed field "type": "radio", "checkbox", "select", or "radioGrid". Prefer "radio" or "radioGrid" for trait assessments.
@@ -440,20 +472,62 @@ Rules:
   - "rows": ["Row 1", "Row 2", ...]
   - "columns": ["Rarely True", "Sometimes True", "Always True"]   // labels only; do NOT include points here
 - The field MUST include "scoring": an array of objects mapping specific answers to points for specific outcomes:
-  - For radio/select/checkbox:
-    { "option": "Option Text", "points": 1, "outcomeId": "<one-of-existing-outcome-ids>" }
-  - For radioGrid (applies per-row selection):
-    { "column": "Column Label", "points": 1, "outcomeId": "<one-of-existing-outcome-ids>" }
+  - For radio/select/checkbox: { "option": "Option Text", "points": 1, "outcomeId": "<one-of-existing-outcome-ids>" }
+  - For radioGrid (applies per-row selection): { "column": "Column Label", "points": 1, "outcomeId": "<one-of-existing-outcome-ids>" }
 - Use ONLY these existing outcome IDs exactly as provided (do not invent new IDs):
 ${catalogBlock}
-- "name" must be a unique snake_case identifier not used elsewhere in the provided form.
 - Do not include "section" or "submit" types.
 - Do not include "correctAnswer" for this task.
 - Do NOT include any surrounding prose or markdown. Output only the JSON object.
 
 Existing form (for context):
 """${formBlock}"""
+
+${OUTCOME_GUARDRAILS}
 `;
+    } else if (quizType === 'KNOWLEDGE') {
+      // Knowledge quiz: SME prompt that outputs a single option-based question with correctAnswer
+      masterPrompt = `
+You are a subject matter expert creating a knowledge-check question that complements the existing quiz.
+Generate ONE new option-based question aligned with the form's topic.
+
+${ANTI_DUP_CLAUSE}
+
+Output ONLY a single field JSON object with:
+- Required: "label", "type", "name"
+- Allowed "type": "radio", "checkbox", or "select" (choose the best fit)
+- Include "options": ["..."] with 3–6 plausible answers
+- MUST include "correctAnswer":
+  - For "radio" or "select": a single string exactly matching one of the options
+  - For "checkbox": an array of one or more strings, each exactly matching options
+- Include "points": 1
+- Do NOT include "scoring" or "resultPages"
+- Do NOT include "section" or "submit"
+- Do NOT include any surrounding prose or markdown. Output only the JSON object.
+
+Existing form (for context):
+"""${formBlock}"""
+`;
+    } else {
+      // Normal forms: form design expert prompt (no scoring/correctAnswer)
+      masterPrompt = `
+You are a form design expert. Propose ONE new, relevant, non-duplicate question that improves this form.
+
+${ANTI_DUP_CLAUSE}
+
+Output ONLY a single field JSON object with:
+- Required: "label", "type", "name"
+- "type" may be one of: "text", "email", "password", "textarea", "radio", "checkbox", "select", "date", "time", "file", "range", "radioGrid"
+- For "radio" | "checkbox" | "select": include "options": ["..."] (2–6 values)
+- For "radioGrid": include "rows": ["..."] and "columns": ["..."] (labels only; do not include points)
+- Do NOT include "correctAnswer" or "scoring"
+- Do NOT include "section" or "submit"
+- Do NOT include any surrounding prose or markdown. Output only the JSON object.
+
+Existing form (for context):
+"""${formBlock}"""
+`;
+    }
 
     const result = await model.generateContent(masterPrompt);
     const response = await result.response;
@@ -461,11 +535,7 @@ Existing form (for context):
     // Safety handling
     const promptFeedback = response?.promptFeedback;
     if (promptFeedback?.blockReason) {
-      console.warn(
-        '[SAFETY] suggest-question prompt blocked:',
-        promptFeedback.blockReason,
-        promptFeedback
-      );
+      console.warn('[SAFETY] suggest-question prompt blocked:', promptFeedback.blockReason, promptFeedback);
       return res.status(400).json({
         error: 'Prompt rejected for safety reasons.',
         reason: promptFeedback.blockReason,
@@ -475,9 +545,7 @@ Existing form (for context):
     const text = (response?.text?.() ?? '').trim();
     if (!text) {
       console.error('[suggest-question] Empty model response.');
-      return res
-        .status(502)
-        .json({ error: 'Upstream model returned an empty response.' });
+      return res.status(502).json({ error: 'Upstream model returned an empty response.' });
     }
 
     let fieldJson;
