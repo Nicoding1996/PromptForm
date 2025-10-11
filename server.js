@@ -488,26 +488,28 @@ ${OUTCOME_GUARDRAILS}
     } else if (quizType === 'KNOWLEDGE') {
       // Knowledge quiz: SME prompt that outputs a single option-based question with correctAnswer
       masterPrompt = `
-You are a subject matter expert creating a knowledge-check question that complements the existing quiz.
-Generate ONE new option-based question aligned with the form's topic.
-
-${ANTI_DUP_CLAUSE}
-
-Output ONLY a single field JSON object with:
-- Required: "label", "type", "name"
-- Allowed "type": "radio", "checkbox", or "select" (choose the best fit)
-- Include "options": ["..."] with 3–6 plausible answers
-- MUST include "correctAnswer":
-  - For "radio" or "select": a single string exactly matching one of the options
-  - For "checkbox": an array of one or more strings, each exactly matching options
-- Include "points": 1
-- Do NOT include "scoring" or "resultPages"
-- Do NOT include "section" or "submit"
-- Do NOT include any surrounding prose or markdown. Output only the JSON object.
-
-Existing form (for context):
-"""${formBlock}"""
-`;
+ You are a subject matter expert creating a knowledge-check question that complements the existing quiz.
+ Generate ONE new option-based question aligned with the form's topic.
+ 
+ ${ANTI_DUP_CLAUSE}
+ 
+ CRITICAL REQUIREMENT: You MUST determine the correct answer for the question you generate. Your final JSON output MUST include a correctAnswer key with the correct option's text, and a points key with a value of 1.
+ 
+ Output ONLY a single field JSON object with:
+ - Required: "label", "type", "name"
+ - Allowed "type": "radio", "checkbox", or "select" (choose the best fit)
+ - Include "options": ["..."] with 3–6 plausible answers
+ - MUST include "correctAnswer":
+   - For "radio" or "select": a single string exactly matching one of the options
+   - For "checkbox": an array of one or more strings, each exactly matching options
+ - Include "points": 1
+ - Do NOT include "scoring" or "resultPages"
+ - Do NOT include "section" or "submit"
+ - Do NOT include any surrounding prose or markdown. Output only the JSON object.
+ 
+ Existing form (for context):
+ """${formBlock}"""
+ `;
     } else {
       // Normal forms: form design expert prompt (no scoring/correctAnswer)
       masterPrompt = `

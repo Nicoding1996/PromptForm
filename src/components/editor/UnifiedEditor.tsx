@@ -235,8 +235,25 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
     const fields = (formJson.fields ?? []).filter((f) => f.type !== 'submit');
     return fields.map((f) => ({ key: f.name, label: f.label, field: f }));
   }, [formJson]);
-
-  const quizMode = formJson?.isQuiz === true;
+ 
+  // Consider knowledge-quiz indicators if any field carries a correct answer or explicit answer pattern.
+  const anyKnowledgeIndicators = useMemo(() => {
+    const fields = (formJson?.fields ?? []) as any[];
+    return fields.some((f) => {
+      const ca = (f as any)?.correctAnswer;
+      const hasCA =
+        (typeof ca === 'string' && ca.trim().length > 0) ||
+        (Array.isArray(ca) && ca.length > 0);
+      const pattern = (f as any)?.answerPattern;
+      const hasPattern = typeof pattern === 'string' && pattern.length > 0;
+      return hasCA || hasPattern;
+    });
+  }, [formJson]);
+ 
+  const quizMode =
+    (formJson?.isQuiz === true) ||
+    ((formJson as any)?.quizType === 'KNOWLEDGE') ||
+    anyKnowledgeIndicators;
 
   // Compute rendered field order (non-submit first, then submit) to match FormRenderer
   const getDisplayFields = (form: FormData | null): FormField[] => {
@@ -922,6 +939,30 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
             outcomeId: String(r?.outcomeId || ''),
           }));
         }
+        // Knowledge quizzes: carry over correct answer and points when provided
+        if (typeof (data as any).correctAnswer === 'string' || Array.isArray((data as any).correctAnswer)) {
+          next.correctAnswer = (data as any).correctAnswer;
+        }
+        if (Number.isFinite(Number((data as any).points))) {
+          next.points = Math.max(0, Math.floor(Number((data as any).points)));
+        }
+        // Fallback for knowledge quizzes: if AI omitted correctAnswer, default to first option so highlighting works
+        // Only apply to knowledge context; never apply to OUTCOME flows.
+        const isKnowledgeForm =
+          ((prev as any)?.quizType === 'KNOWLEDGE') ||
+          (((prev as any)?.quizType !== 'OUTCOME') && !Array.isArray((next as any)?.scoring));
+        if (isKnowledgeForm && (next.type === 'radio' || next.type === 'select' || next.type === 'checkbox')) {
+          const opts = Array.isArray((next as any).options) ? (next as any).options : [];
+          const hasCA =
+            (typeof (next as any).correctAnswer === 'string' && String((next as any).correctAnswer).trim().length > 0) ||
+            (Array.isArray((next as any).correctAnswer) && (next as any).correctAnswer.length > 0);
+          if (!hasCA && opts.length > 0) {
+            (next as any).correctAnswer = next.type === 'checkbox' ? [opts[0]] : opts[0];
+          }
+          if ((next as any).points == null || !Number.isFinite((next as any).points)) {
+            (next as any).points = 1;
+          }
+        }
 
         // Insert before submit if present, otherwise push to end
         const submitIdx = fields.findIndex((f: any) => f.type === 'submit');
@@ -930,8 +971,21 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
 
         // Focus newly appended field
         setFocusedFieldIndex(insertAt);
-
-        return { ...prev, fields };
+ 
+        // Promote knowledge mode at the form level so quiz UI and highlighting are consistently enabled.
+        const topLevelPatch =
+          isKnowledgeForm
+            ? {
+                isQuiz: true,
+                // Do not overwrite OUTCOME; otherwise prefer KNOWLEDGE to unlock knowledge UI.
+                quizType:
+                  (prev as any)?.quizType === 'OUTCOME'
+                    ? 'OUTCOME'
+                    : ((prev as any)?.quizType || 'KNOWLEDGE'),
+              }
+            : {};
+ 
+        return { ...prev, ...topLevelPatch, fields };
       });
     } catch (e: any) {
       setError(e?.message || 'Suggest with AI failed.');
@@ -1003,7 +1057,30 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
               }
             : {}),
         };
-
+        // Carry over knowledge quiz attributes when present
+        if (typeof (data as any).correctAnswer === 'string' || Array.isArray((data as any).correctAnswer)) {
+          (next as any).correctAnswer = (data as any).correctAnswer as any;
+        }
+        if (Number.isFinite(Number((data as any).points))) {
+          (next as any).points = Math.max(0, Math.floor(Number((data as any).points)));
+        }
+        // Fallback for knowledge quizzes: if AI omitted correctAnswer, default to first option to enable highlighting
+        const isKnowledgeForm =
+          ((prev as any)?.quizType === 'KNOWLEDGE') ||
+          (((prev as any)?.quizType !== 'OUTCOME') && !Array.isArray((next as any)?.scoring));
+        if (isKnowledgeForm && (next.type === 'radio' || next.type === 'select' || next.type === 'checkbox')) {
+          const opts = Array.isArray((next as any).options) ? (next as any).options : [];
+          const hasCA =
+            (typeof (next as any).correctAnswer === 'string' && String((next as any).correctAnswer).trim().length > 0) ||
+            (Array.isArray((next as any).correctAnswer) && (next as any).correctAnswer.length > 0);
+          if (!hasCA && opts.length > 0) {
+            (next as any).correctAnswer = next.type === 'checkbox' ? [opts[0]] : opts[0];
+          }
+          if ((next as any).points == null || !Number.isFinite((next as any).points)) {
+            (next as any).points = 1;
+          }
+        }
+ 
         fields[fieldIndex] = next;
 
         // Keep submit field last
@@ -1012,8 +1089,20 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
           const [submit] = fields.splice(submitIdx, 1);
           fields.push(submit);
         }
-
-        return { ...prev, fields };
+ 
+        // Promote knowledge mode at the form level for assist-generated knowledge questions.
+        const topLevelPatch =
+          isKnowledgeForm
+            ? {
+                isQuiz: true,
+                quizType:
+                  (prev as any)?.quizType === 'OUTCOME'
+                    ? 'OUTCOME'
+                    : ((prev as any)?.quizType || 'KNOWLEDGE'),
+              }
+            : {};
+ 
+        return { ...prev, ...topLevelPatch, fields };
       });
     } catch (e: any) {
       setError(e?.message || 'AI Assist failed.');
