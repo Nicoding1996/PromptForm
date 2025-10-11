@@ -517,7 +517,7 @@ You are a form design expert. Propose ONE new, relevant, non-duplicate question 
 
 ${ANTI_DUP_CLAUSE}
 
-Output ONLY a single field JSON object with:
+CRITICAL RULE: This is a standard feedback form, NOT a quiz. Your JSON response for the new field MUST NOT include the isQuiz, correctAnswer, points, or scoring keys. Generate a simple, non-scored question field.Output ONLY a single field JSON object with:
 - Required: "label", "type", "name"
 - "type" may be one of: "text", "email", "password", "textarea", "radio", "checkbox", "select", "date", "time", "file", "range", "radioGrid"
 - For "radio" | "checkbox" | "select": include "options": ["..."] (2–6 values)
@@ -561,6 +561,32 @@ Existing form (for context):
         fieldJson = JSON.parse(slice);
       } else {
         throw new Error('Model response was not valid JSON.');
+      }
+    }
+
+    // Hard guardrails: sanitize quiz-only keys for normal (non-quiz) forms
+    if (!quizType) {
+      if (fieldJson && typeof fieldJson === 'object') {
+        // Remove any quiz/scoring related keys the model might have hallucinated
+        delete fieldJson.correctAnswer;
+        delete fieldJson.points;
+        if (Array.isArray(fieldJson.scoring)) delete fieldJson.scoring;
+        delete fieldJson.isQuiz;
+
+        // Normalize radioGrid: ensure columns are labels only (strip objects/points)
+        const t = String(fieldJson?.type || '').toLowerCase();
+        if (t === 'radiogrid' && Array.isArray(fieldJson.columns)) {
+          fieldJson.columns = fieldJson.columns
+            .map((c) => (typeof c === 'string' ? c : (c && typeof c.label === 'string' ? c.label : '')))
+            .filter((s) => typeof s === 'string' && s.length > 0);
+        }
+
+        // Normalize options to plain strings if objects were returned
+        if (Array.isArray(fieldJson.options)) {
+          fieldJson.options = fieldJson.options
+            .map((o) => (typeof o === 'string' ? o : (o && typeof o.label === 'string' ? o.label : '')))
+            .filter((s) => typeof s === 'string' && s.length > 0);
+        }
       }
     }
 

@@ -992,19 +992,38 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
             outcomeId: String(r?.outcomeId || ''),
           }));
         }
-        // Knowledge quizzes: carry over correct answer and points when provided
+        // Carry over knowledge attributes only if present in response
         if (typeof (data as any).correctAnswer === 'string' || Array.isArray((data as any).correctAnswer)) {
           next.correctAnswer = (data as any).correctAnswer;
         }
         if (Number.isFinite(Number((data as any).points))) {
           next.points = Math.max(0, Math.floor(Number((data as any).points)));
         }
-        // Fallback for knowledge quizzes: if AI omitted correctAnswer, default to first option so highlighting works
-        // Only apply to knowledge context; never apply to OUTCOME flows.
-        const isKnowledgeForm =
-          ((prev as any)?.quizType === 'KNOWLEDGE') ||
-          (((prev as any)?.quizType !== 'OUTCOME') && !Array.isArray((next as any)?.scoring));
-        if (isKnowledgeForm && (next.type === 'radio' || next.type === 'select' || next.type === 'checkbox')) {
+
+        // Determine context (do NOT auto-switch a normal form into quiz mode)
+        const prevQuizType = (prev as any)?.quizType;
+        const wasKnowledge = prevQuizType === 'KNOWLEDGE' || ((prev as any)?.isQuiz === true && prevQuizType === 'KNOWLEDGE');
+        const wasOutcome = prevQuizType === 'OUTCOME' || Array.isArray((prev as any)?.resultPages);
+        const aiSuggestsOutcome = Array.isArray((next as any)?.scoring) && (next as any).scoring.length > 0;
+        const aiSuggestsKnowledge = typeof (data as any).correctAnswer !== 'undefined' || typeof (data as any).answerPattern === 'string';
+
+        const isOutcomeContext = wasOutcome || aiSuggestsOutcome;
+        const isKnowledgeContext = wasKnowledge || (!wasOutcome && aiSuggestsKnowledge);
+
+        // In normal forms, strip any quiz-only keys the AI might have added
+        if (!isOutcomeContext && !isKnowledgeContext) {
+          delete (next as any).correctAnswer;
+          delete (next as any).points;
+          if (Array.isArray((next as any).scoring)) delete (next as any).scoring;
+          if ((next as any).type === 'radioGrid' && Array.isArray((next as any).columns)) {
+            (next as any).columns = (next as any).columns
+              .map((c: any) => (typeof c === 'string' ? c : String(c?.label ?? '')))
+              .filter((s: any) => typeof s === 'string' && s.length > 0);
+          }
+        }
+
+        // Knowledge fallback only when truly in knowledge context
+        if (isKnowledgeContext && (next.type === 'radio' || next.type === 'select' || next.type === 'checkbox')) {
           const opts = Array.isArray((next as any).options) ? (next as any).options : [];
           const hasCA =
             (typeof (next as any).correctAnswer === 'string' && String((next as any).correctAnswer).trim().length > 0) ||
@@ -1024,20 +1043,18 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
 
         // Focus newly appended field
         setFocusedFieldIndex(insertAt);
- 
-        // Promote knowledge mode at the form level so quiz UI and highlighting are consistently enabled.
+
+        // Promote quiz mode ONLY when actually in quiz contexts
         const topLevelPatch =
-          isKnowledgeForm
+          isOutcomeContext
+            ? { isQuiz: true, quizType: 'OUTCOME' as any }
+            : isKnowledgeContext
             ? {
                 isQuiz: true,
-                // Do not overwrite OUTCOME; otherwise prefer KNOWLEDGE to unlock knowledge UI.
-                quizType:
-                  (prev as any)?.quizType === 'OUTCOME'
-                    ? 'OUTCOME'
-                    : ((prev as any)?.quizType || 'KNOWLEDGE'),
+                quizType: (prev as any)?.quizType === 'OUTCOME' ? 'OUTCOME' : ('KNOWLEDGE' as any),
               }
             : {};
- 
+
         return { ...prev, ...topLevelPatch, fields };
       });
     } catch (e: any) {
@@ -1117,11 +1134,31 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
         if (Number.isFinite(Number((data as any).points))) {
           (next as any).points = Math.max(0, Math.floor(Number((data as any).points)));
         }
-        // Fallback for knowledge quizzes: if AI omitted correctAnswer, default to first option to enable highlighting
-        const isKnowledgeForm =
-          ((prev as any)?.quizType === 'KNOWLEDGE') ||
-          (((prev as any)?.quizType !== 'OUTCOME') && !Array.isArray((next as any)?.scoring));
-        if (isKnowledgeForm && (next.type === 'radio' || next.type === 'select' || next.type === 'checkbox')) {
+
+        // Determine context from existing form + AI response
+        const prevQuizType = (prev as any)?.quizType;
+        const wasKnowledge = prevQuizType === 'KNOWLEDGE' || ((prev as any)?.isQuiz === true && prevQuizType === 'KNOWLEDGE');
+        const wasOutcome = prevQuizType === 'OUTCOME' || Array.isArray((prev as any)?.resultPages);
+        const aiSuggestsOutcome = Array.isArray((next as any)?.scoring) && (next as any).scoring.length > 0;
+        const aiSuggestsKnowledge = typeof (data as any).correctAnswer !== 'undefined' || typeof (data as any).answerPattern === 'string';
+
+        const isOutcomeContext = wasOutcome || aiSuggestsOutcome;
+        const isKnowledgeContext = wasKnowledge || (!wasOutcome && aiSuggestsKnowledge);
+
+        // If not a quiz context, strip quiz-only keys to avoid flipping the editor into quiz mode
+        if (!isOutcomeContext && !isKnowledgeContext) {
+          delete (next as any).correctAnswer;
+          delete (next as any).points;
+          if (Array.isArray((next as any).scoring)) delete (next as any).scoring;
+          if ((next as any).type === 'radioGrid' && Array.isArray((next as any).columns)) {
+            (next as any).columns = (next as any).columns
+              .map((c: any) => (typeof c === 'string' ? c : String(c?.label ?? '')))
+              .filter((s: any) => typeof s === 'string' && s.length > 0);
+          }
+        }
+
+        // Knowledge fallback only when truly in knowledge context
+        if (isKnowledgeContext && (next.type === 'radio' || next.type === 'select' || next.type === 'checkbox')) {
           const opts = Array.isArray((next as any).options) ? (next as any).options : [];
           const hasCA =
             (typeof (next as any).correctAnswer === 'string' && String((next as any).correctAnswer).trim().length > 0) ||
@@ -1135,7 +1172,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
         }
  
         fields[fieldIndex] = next;
-
+ 
         // Keep submit field last
         const submitIdx = fields.findIndex((f) => f.type === 'submit');
         if (submitIdx >= 0 && submitIdx !== fields.length - 1) {
@@ -1143,16 +1180,12 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
           fields.push(submit);
         }
  
-        // Promote knowledge mode at the form level for assist-generated knowledge questions.
+        // Promote quiz mode ONLY when actually in quiz contexts
         const topLevelPatch =
-          isKnowledgeForm
-            ? {
-                isQuiz: true,
-                quizType:
-                  (prev as any)?.quizType === 'OUTCOME'
-                    ? 'OUTCOME'
-                    : ((prev as any)?.quizType || 'KNOWLEDGE'),
-              }
+          isOutcomeContext
+            ? { isQuiz: true, quizType: 'OUTCOME' as any }
+            : isKnowledgeContext
+            ? { isQuiz: true, quizType: (prev as any)?.quizType === 'OUTCOME' ? 'OUTCOME' : ('KNOWLEDGE' as any) }
             : {};
  
         return { ...prev, ...topLevelPatch, fields };
@@ -1241,7 +1274,38 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
   const handleSetQuizMode = (enabled: boolean) => {
     setFormJson((prev) => {
       if (!prev) return prev;
-      return { ...prev, isQuiz: !!enabled };
+
+      // When enabling, just mark quiz mode on
+      if (enabled) {
+        return { ...prev, isQuiz: true };
+      }
+
+      // When disabling, fully sanitize quiz artifacts so the toggle stays off:
+      const next: any = { ...prev };
+
+      // Remove top-level quiz flags and outcome config
+      delete next.isQuiz;
+      delete next.quizType;
+      if (Array.isArray(next.resultPages)) {
+        delete next.resultPages;
+      }
+
+      // Strip quiz-only keys from all fields and normalize radioGrid columns to labels-only
+      next.fields = (Array.isArray(next.fields) ? next.fields : []).map((f: any) => {
+        const nf: any = { ...f };
+        delete nf.correctAnswer;
+        delete nf.points;
+        delete nf.scoring;
+        delete nf.answerPattern; // prevent knowledge detection
+        if (nf.type === 'radioGrid' && Array.isArray(nf.columns)) {
+          nf.columns = nf.columns
+            .map((c: any) => (typeof c === 'string' ? c : String(c?.label ?? '')))
+            .filter((s: any) => typeof s === 'string' && s.length > 0);
+        }
+        return nf;
+      });
+
+      return next;
     });
   };
 
