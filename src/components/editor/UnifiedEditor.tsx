@@ -53,6 +53,8 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
   const [refactorLoading, setRefactorLoading] = useState(false);
   const [refactorError, setRefactorError] = useState<string | null>(null);
   const [isRefactoring, setIsRefactoring] = useState(false);
+  // Suggest-with-AI macro action loading state
+  const [suggestLoading, setSuggestLoading] = useState(false);
 
   // Instant AI refactor UX state
   const prevFormRef = useRef<FormData | null>(null);
@@ -829,6 +831,115 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
     });
   };
 
+  // "Suggest with AI" (macro-level: append a brand new question at the end/before submit)
+  const handleSuggestWithAI = async () => {
+    if (!formJson || suggestLoading) return;
+    setError(null);
+    setSuggestLoading(true);
+    try {
+      const resp = await fetch('http://localhost:3001/suggest-question', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ form: formJson }),
+      });
+      let data: any = null;
+      try {
+        data = await resp.json();
+      } catch {}
+      if (!resp.ok) {
+        const msg = (data && (data.error || data.message)) || `Suggest failed (${resp.status})`;
+        throw new Error(msg);
+      }
+      if (!data || typeof data !== 'object') {
+        throw new Error('Suggest returned invalid data.');
+      }
+
+      // Normalize and append
+      const makeSnake = (s: string) =>
+        String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+
+      setFormJson((prev) => {
+        if (!prev) return prev;
+        const fields = [...(prev.fields ?? [])];
+
+        // Generate unique name
+        let name =
+          (typeof data.name === 'string' && data.name.trim().length
+            ? makeSnake(data.name)
+            : makeSnake(String(data.label || 'question'))) || 'question';
+        const used = new Set(fields.map((f: any) => f.name));
+        if (used.has(name)) {
+          const base = name || 'question';
+          let i = 1;
+          while (used.has(`${base}_${i}`)) i++;
+          name = `${base}_${i}`;
+        }
+
+        const allowedTypes = new Set([
+          'text',
+          'email',
+          'password',
+          'textarea',
+          'radio',
+          'checkbox',
+          'select',
+          'date',
+          'time',
+          'file',
+          'range',
+          'radioGrid',
+          'section',
+          'submit',
+        ]);
+        const type = typeof data.type === 'string' && allowedTypes.has(data.type) ? data.type : 'text';
+
+        const next: any = {
+          label: String(data.label || 'New Question'),
+          type,
+          name,
+          ...(Array.isArray(data.options) ? { options: data.options.map(String) } : {}),
+          ...(Array.isArray(data.rows) ? { rows: data.rows.map(String) } : {}),
+          ...(Array.isArray(data.columns)
+            ? {
+                columns: data.columns.map((c: any) =>
+                  typeof c === 'string'
+                    ? c
+                    : {
+                        label: String(c?.label ?? ''),
+                        points: Number.isFinite(Number(c?.points)) ? Number(c.points) : 1,
+                      }
+                ),
+              }
+            : {}),
+        };
+
+        // Preserve trait-based scoring array when provided
+        if (Array.isArray((data as any).scoring)) {
+          next.scoring = (data as any).scoring.map((r: any) => ({
+            option: typeof r?.option === 'string' ? r.option : undefined,
+            column: typeof r?.column === 'string' ? r.column : undefined,
+            points: Number.isFinite(Number(r?.points)) ? Math.floor(Number(r.points)) : 1,
+            outcomeId: String(r?.outcomeId || ''),
+          }));
+        }
+
+        // Insert before submit if present, otherwise push to end
+        const submitIdx = fields.findIndex((f: any) => f.type === 'submit');
+        const insertAt = submitIdx >= 0 ? submitIdx : fields.length;
+        fields.splice(insertAt, 0, next);
+
+        // Focus newly appended field
+        setFocusedFieldIndex(insertAt);
+
+        return { ...prev, fields };
+      });
+    } catch (e: any) {
+      setError(e?.message || 'Suggest with AI failed.');
+    } finally {
+      setSuggestLoading(false);
+    }
+  };
+
   // AI Assist
   const handleAiAssistQuestion = async (fieldIndex: number) => {
     if (assistingIndex !== null) return;
@@ -961,6 +1072,26 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
       if (!f) return prev;
       const next: any = { ...f, points: Math.max(0, Math.floor(Number(points) || 0)) || 1 };
       fields[fieldIndex] = next as FormField;
+      return { ...prev, fields };
+    });
+  };
+
+  // Trait-based scoring updater
+  const handleUpdateFieldScoring = (fieldIndex: number, scoring: any[]) => {
+    setFormJson((prev) => {
+      if (!prev) return prev;
+      const fields = [...prev.fields];
+      const f = fields[fieldIndex];
+      if (!f) return prev;
+      const sanitized = Array.isArray(scoring)
+        ? scoring.map((r: any) => ({
+            ...(r?.option ? { option: String(r.option) } : {}),
+            ...(r?.column ? { column: String(r.column) } : {}),
+            points: Math.max(0, Math.floor(Number(r?.points) || 0)) || 1,
+            outcomeId: String(r?.outcomeId || ''),
+          }))
+        : [];
+      fields[fieldIndex] = { ...(f as any), scoring: sanitized } as any;
       return { ...prev, fields };
     });
   };
@@ -1748,7 +1879,8 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                           onUpdateFormDescription={handleUpdateFormDescription}
                           // Advanced editor props
                           highlightMap={changeTypes}
-                          highlightedSet={highlightedFields}                          focusedFieldIndex={focusedFieldIndex}
+                          highlightedSet={highlightedFields}
+                          focusedFieldIndex={focusedFieldIndex}
                           setFocusedFieldIndex={setFocus}
                           onUpdateFieldOption={handleUpdateFieldOption}
                           onAddFieldOption={handleAddFieldOption}
@@ -1760,6 +1892,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                           quizMode={quizMode}
                           onUpdateFieldCorrectAnswer={handleUpdateFieldCorrectAnswer as any}
                           onUpdateFieldPoints={handleUpdateFieldPoints}
+                          onUpdateFieldScoring={handleUpdateFieldScoring}
                           // Grid + range
                           onUpdateGridRow={handleUpdateGridRow}
                           onUpdateGridColumn={handleUpdateGridColumn}
@@ -1770,6 +1903,9 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                           onUpdateGridColumnPoints={handleUpdateGridColumnPoints}
                           onUpdateRangeBounds={handleUpdateRangeBounds}
                           onUpdateSectionSubtitle={handleUpdateSectionSubtitle}
+                          // Macro-level "Suggest with AI"
+                          onSuggestWithAI={handleSuggestWithAI}
+                          suggestLoading={suggestLoading || isLoading || refactorLoading}
                         />
 
                         <AnimatePresence>

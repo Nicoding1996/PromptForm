@@ -1,5 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import type { FormData, FormField } from './FormRenderer';
+import Card from './ui/Card';
+import { calculateResult, type CalcResult } from '../utils/scoring';
 
 const baseInputClass =
   'block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-[--color-brand-600] focus:outline-none focus:ring-2 focus:ring-[--color-brand-600]';
@@ -57,6 +59,7 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
   const [error, setError] = useState<string | null>(null);
   const [lastScore, setLastScore] = useState<number | null>(null);
   const [lastMaxScore, setLastMaxScore] = useState<number | null>(null);
+  const [lastResult, setLastResult] = useState<CalcResult | null>(null);
 
   // Guard window to prevent accidental submit when navigating to last section
   const [navBlockUntil, setNavBlockUntil] = useState<number>(0);
@@ -262,6 +265,19 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
       // Merge final page answers
       const finalPagePayload = collectCurrentSectionAnswers();
       const payload = mergePayload(allAnswers, finalPagePayload);
+
+      // Central scoring (knowledge or outcome-based)
+      try {
+        const calcRes = calculateResult(formData as any, payload);
+        setLastResult(calcRes as any);
+        if ((calcRes as any).type === 'KNOWLEDGE') {
+          setLastScore((calcRes as any).score ?? null);
+          setLastMaxScore((calcRes as any).maxScore ?? null);
+        }
+      } catch {
+        // Non-fatal: if scoring fails, continue with submission
+        setLastResult(null);
+      }
 
       // Quiz scoring (local) if enabled
       let scoreToSend: number | null = null;
@@ -693,19 +709,56 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
   if (submitted) {
     if (preview) {
       return (
-        <section className="mt-8 card p-6" style={styleVars}>
-          <div className="text-center">
-            <h2 className="text-lg font-semibold text-gray-900">Preview submission simulated</h2>
-            <p className="mt-1 text-sm text-gray-600">This is a preview only. No data was saved.</p>
-          </div>
+        <section className="mt-8">
+          <Card className="p-6">
+            <div className="text-center">
+              <h2 className="text-lg font-semibold text-gray-900">Preview submission simulated</h2>
+              <p className="mt-1 text-sm text-gray-600">This is a preview only. No data was saved.</p>
+            </div>
+          </Card>
         </section>
       );
     }
     const pages = (formData as any)?.resultPages as Array<any> | undefined;
     const hasOutcomes = Array.isArray(pages) && pages.length > 0;
 
+    // Outcome-based: show the winning outcome in a clean Card
+    if (lastResult && (lastResult as any).type === 'OUTCOME') {
+      const outcomeId = (lastResult as any).outcomeId || null;
+      const outcomeTitle = (lastResult as any).outcomeTitle || null;
+
+      let matchedPage: any = null;
+      if (hasOutcomes) {
+        if (outcomeId) {
+          matchedPage = pages.find((p) => (p?.outcomeId || '') === outcomeId) || null;
+        }
+        if (!matchedPage && outcomeTitle) {
+          const t = String(outcomeTitle).trim().toLowerCase();
+          matchedPage =
+            pages.find((p) => String(p?.title || '').trim().toLowerCase() === t) || null;
+        }
+      }
+
+      const finalTitle = outcomeTitle || matchedPage?.title || 'Your Result';
+      const finalDesc = matchedPage?.description || '';
+
+      return (
+        <section className="mt-8">
+          <Card className="p-6">
+            <div className="mx-auto max-w-2xl space-y-3 text-center">
+              <h2 className="text-xl font-bold text-gray-900">{finalTitle}</h2>
+              {finalDesc ? (
+                <p className="whitespace-pre-wrap text-gray-800">{finalDesc}</p>
+              ) : null}
+            </div>
+          </Card>
+        </section>
+      );
+    }
+
+    // Knowledge quizzes: map score to result page by range if configured
     let matched: any = null;
-    if ((formData as any)?.isQuiz === true && hasOutcomes && lastScore != null) {
+    if (((formData as any)?.isQuiz === true || (formData as any)?.quizType === 'KNOWLEDGE') && hasOutcomes && lastScore != null) {
       matched =
         pages.find((p) => {
           const from = Number(p?.scoreRange?.from ?? NaN);
@@ -717,33 +770,38 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
 
     if (matched) {
       return (
-        <section className="mt-8 card p-6" style={styleVars}>
-          <div className="mx-auto max-w-2xl space-y-3 text-center">
-            <h2 className="text-xl font-bold text-gray-900">{matched.title || 'Your Result'}</h2>
-            <p className="text-sm text-gray-500">
-              Score: {lastScore}
-              {lastMaxScore != null ? ` / ${lastMaxScore}` : ''}
-            </p>
-            <p className="whitespace-pre-wrap text-gray-800">{matched.description || '—'}</p>
-          </div>
+        <section className="mt-8">
+          <Card className="p-6">
+            <div className="mx-auto max-w-2xl space-y-3 text-center">
+              <h2 className="text-xl font-bold text-gray-900">{matched.title || 'Your Result'}</h2>
+              <p className="text-sm text-gray-500">
+                Score: {lastScore}
+                {lastMaxScore != null ? ` / ${lastMaxScore}` : ''}
+              </p>
+              <p className="whitespace-pre-wrap text-gray-800">{matched.description || '—'}</p>
+            </div>
+          </Card>
         </section>
       );
     }
 
+    // Default Thank You
     return (
-      <section className="mt-8 card p-6" style={styleVars}>
-        <div className="text-center">
-          <h2 className="text-lg font-semibold text-gray-900">Thank you for your response!</h2>
-          {(formData as any)?.isQuiz === true && lastScore != null && lastMaxScore != null ? (
-            <p className="mt-2 text-base font-semibold" style={{ color: brand }}>
-              You scored {lastScore} out of {lastMaxScore}!
-            </p>
-          ) : (
-            <p className="mt-1 text-sm text-gray-600">Your submission has been recorded.</p>
-          )}
-        </div>
+      <section className="mt-8">
+        <Card className="p-6">
+          <div className="text-center">
+            <h2 className="text-lg font-semibold text-gray-900">Thank you for your response!</h2>
+            {((formData as any)?.isQuiz === true || (formData as any)?.quizType === 'KNOWLEDGE') && lastScore != null && lastMaxScore != null ? (
+              <p className="mt-2 text-base font-semibold" style={{ color: brand }}>
+                You scored {lastScore} out of {lastMaxScore}!
+              </p>
+            ) : (
+              <p className="mt-1 text-sm text-gray-600">Your submission has been recorded.</p>
+            )}
+          </div>
+        </Card>
       </section>
-      );
+    );
   }
 
   // Wizard UI

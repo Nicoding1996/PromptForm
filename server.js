@@ -115,6 +115,7 @@ All score ranges must be in ascending numerical order.
 There must be no numerical gaps between the ranges.
 There must be no numerical overlaps between the ranges.
 Every possible score must map to exactly one outcome.
+The from value of the very first score_range in the list MUST always be 0.
 ---`;
       }
       return "";
@@ -242,6 +243,14 @@ Every possible score must map to exactly one outcome.
             }
         - Provide reasonable placeholder score ranges that partition the total possible points, if inferable; otherwise set { "from": 0, "to": 0 } as placeholders.
       
+      TRAIT-BASED SCORING RULES (for personality/outcome-based assessments):
+      - Each object in "resultPages" MUST include a stable "outcomeId": a snake_case identifier (e.g., "outcome_analyst"). Keep this constant across edits.
+      - For fields that contribute to outcomes, add a "scoring" array:
+        - For "radio" | "select" | "checkbox": { "option": "Option Text", "points": 1, "outcomeId": "<existing outcomeId>" }
+        - For "radioGrid": { "column": "Column Label", "points": 1, "outcomeId": "<existing outcomeId>" }
+      - For trait scoring with "radioGrid", "columns" should be labels only (e.g., ["Rarely True","Sometimes True","Always True"]); do NOT embed "points" inside "columns".
+      - Do NOT set "correctAnswer" for personality/outcome-based assessments; "correctAnswer" is only for knowledge quizzes.
+
       User's request: "${req.body.prompt}" ${addQuizGuardrails(req.body.prompt)}
     `;
 
@@ -368,6 +377,126 @@ User prompt: "${prompt}"
     return res.json(fieldJson);
   } catch (e) {
     console.error('[assist-question] error:', e);
+    return res.status(500).json({
+      error: 'Internal server error.',
+      message: e?.message || 'Unknown error',
+    });
+  }
+});
+// AI Suggest Question endpoint (Trait-Based Scoring)
+// POST /suggest-question
+// Body: { form: CompleteFormJson }
+// Returns: Single field JSON with "scoring" entries mapping to existing outcome IDs.
+app.post('/suggest-question', async (req, res) => {
+  try {
+    const { form } = req.body ?? {};
+    if (!form || typeof form !== 'object') {
+      return res.status(400).json({ error: 'Invalid "form" object in request body.' });
+    }
+
+    // Build an outcome catalog from resultPages with stable IDs
+    const pages = Array.isArray(form?.resultPages) ? form.resultPages : [];
+    const toSnake = (s) =>
+      String(s || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '');
+    const outcomeCatalog = pages.map((p, i) => {
+      const title = String(p?.title || `Outcome ${i + 1}`);
+      const id =
+        String(p?.id || p?.outcomeId || `outcome_${toSnake(title) || i + 1}`);
+      return { id, title };
+    });
+
+    if (!outcomeCatalog.length) {
+      return res.status(400).json({
+        error:
+          'Form is missing "resultPages" with outcomes. Cannot map scoring to outcomes.',
+      });
+    }
+
+    // Compact/condense form JSON for prompt if very large
+    const formStr = JSON.stringify(form, null, 2);
+    const formBlock =
+      formStr.length > ANALYZE_JSON_CHAR_LIMIT
+        ? condenseText(formStr, ANALYZE_JSON_CHAR_LIMIT)
+        : formStr;
+    const catalogBlock = JSON.stringify(outcomeCatalog, null, 2);
+
+    const model = genAI.getGenerativeModel({
+      model: GEMINI_MODEL,
+      generationConfig: { responseMimeType: 'application/json' },
+    });
+
+    const masterPrompt = `
+You are an expert psychometrician. Based on the provided form's existing questions and outcomes (JSON), generate ONE new, relevant question that fits the assessment's theme.
+Your response must be a single, valid JSON object for the new form field. This object MUST include the new, detailed "scoring" array, correctly mapping the new question's answers to the existing outcome IDs.
+
+Rules:
+- Allowed field "type": "radio", "checkbox", "select", or "radioGrid". Prefer "radio" or "radioGrid" for trait assessments.
+- Required keys: "label", "type", "name".
+- For "radio" | "checkbox" | "select": include "options": ["..."] with 2–6 sensible values.
+- For "radioGrid": include:
+  - "rows": ["Row 1", "Row 2", ...]
+  - "columns": ["Rarely True", "Sometimes True", "Always True"]   // labels only; do NOT include points here
+- The field MUST include "scoring": an array of objects mapping specific answers to points for specific outcomes:
+  - For radio/select/checkbox:
+    { "option": "Option Text", "points": 1, "outcomeId": "<one-of-existing-outcome-ids>" }
+  - For radioGrid (applies per-row selection):
+    { "column": "Column Label", "points": 1, "outcomeId": "<one-of-existing-outcome-ids>" }
+- Use ONLY these existing outcome IDs exactly as provided (do not invent new IDs):
+${catalogBlock}
+- "name" must be a unique snake_case identifier not used elsewhere in the provided form.
+- Do not include "section" or "submit" types.
+- Do not include "correctAnswer" for this task.
+- Do NOT include any surrounding prose or markdown. Output only the JSON object.
+
+Existing form (for context):
+"""${formBlock}"""
+`;
+
+    const result = await model.generateContent(masterPrompt);
+    const response = await result.response;
+
+    // Safety handling
+    const promptFeedback = response?.promptFeedback;
+    if (promptFeedback?.blockReason) {
+      console.warn(
+        '[SAFETY] suggest-question prompt blocked:',
+        promptFeedback.blockReason,
+        promptFeedback
+      );
+      return res.status(400).json({
+        error: 'Prompt rejected for safety reasons.',
+        reason: promptFeedback.blockReason,
+      });
+    }
+
+    const text = (response?.text?.() ?? '').trim();
+    if (!text) {
+      console.error('[suggest-question] Empty model response.');
+      return res
+        .status(502)
+        .json({ error: 'Upstream model returned an empty response.' });
+    }
+
+    let fieldJson;
+    try {
+      fieldJson = JSON.parse(text);
+    } catch {
+      const start = text.indexOf('{');
+      const end = text.lastIndexOf('}');
+      if (start !== -1 && end !== -1 && end > start) {
+        const slice = text.slice(start, end + 1);
+        fieldJson = JSON.parse(slice);
+      } else {
+        throw new Error('Model response was not valid JSON.');
+      }
+    }
+
+    return res.json(fieldJson);
+  } catch (e) {
+    console.error('[suggest-question] error:', e);
     return res.status(500).json({
       error: 'Internal server error.',
       message: e?.message || 'Unknown error',
@@ -511,6 +640,14 @@ Additional user instructions (context): "${context.trim()}". Use these instructi
       
       PERSONALITY / OUTCOME-BASED ASSESSMENTS:
       - If the image/context implies a personality/typology outcome (e.g., "personality test", "enneagram", "DISC", "MBTI", "what type of", "find out your"), you MUST set "isQuiz": true and attempt to include a "resultPages" array with 2–6 placeholder objects, each with { "title", "description", "scoreRange": { "from": 0, "to": 0 } }.
+
+     TRAIT-BASED SCORING RULES (for personality/outcome-based assessments):
+     - Each object in "resultPages" MUST include a stable "outcomeId": a snake_case identifier (e.g., "outcome_analyst"). Keep this constant across edits.
+     - For fields that contribute to outcomes, add a "scoring" array:
+       - For "radio" | "select" | "checkbox": { "option": "Option Text", "points": 1, "outcomeId": "<existing outcomeId>" }
+       - For "radioGrid": { "column": "Column Label", "points": 1, "outcomeId": "<existing outcomeId>" }
+     - For trait scoring with "radioGrid", "columns" should be labels only (e.g., ["Rarely True","Sometimes True","Always True"]); do NOT embed "points" inside "columns".
+     - Do NOT set "correctAnswer" for personality/outcome-based assessments; "correctAnswer" is only for knowledge quizzes.
 
       ${extraVisionContext}
     `;
@@ -777,6 +914,14 @@ Additional user instructions (context): "${userContext}"
       PERSONALITY / OUTCOME-BASED ASSESSMENTS:
       - If the document implies a personality/typology outcome (e.g., "personality test", "enneagram", "DISC", "MBTI", "what type of", "find out your"), set "isQuiz": true and include a "resultPages" array (2–6 items) with { "title", "description", "scoreRange": { "from": 0, "to": 0 } } placeholders.
       
+     TRAIT-BASED SCORING RULES (for personality/outcome-based assessments):
+     - Each object in "resultPages" MUST include a stable "outcomeId": a snake_case identifier (e.g., "outcome_analyst"). Keep this constant across edits.
+     - For fields that contribute to outcomes, add a "scoring" array:
+       - For "radio" | "select" | "checkbox": { "option": "Option Text", "points": 1, "outcomeId": "<existing outcomeId>" }
+       - For "radioGrid": { "column": "Column Label", "points": 1, "outcomeId": "<existing outcomeId>" }
+     - For trait scoring with "radioGrid", "columns" should be labels only (e.g., ["Rarely True","Sometimes True","Always True"]); do NOT embed "points" inside "columns".
+     - Do NOT set "correctAnswer" for personality/outcome-based assessments; "correctAnswer" is only for knowledge quizzes.
+
       ${contextBlock}
       Document content to analyze and transform:
       """${extractedText}"""

@@ -24,6 +24,13 @@ import Button from './ui/Button';
 
 
 
+export type ScoringRule = {
+  option?: string;   // for radio | checkbox | select
+  column?: string;   // for radioGrid column label
+  points: number;
+  outcomeId: string; // stable outcome identifier
+};
+
 export interface FormField {
   label: string;
   type:
@@ -62,11 +69,16 @@ export interface FormField {
   
   // Quiz-related (supports single or multiple correct answers for checkbox)
   correctAnswer?: string | string[];
-  points?: number;
-  
+  points?: number; // legacy quiz scoring (knowledge quizzes)
+
+  // Trait-Based Scoring (new):
+  // Detailed mappings from specific answers to outcome trait points.
+  scoring?: ScoringRule[];
+
   // radioGrid-specific structure:
   rows?: string[]; // array of row labels/questions
-  // Supports legacy string[] and new detailed objects { label, points }
+  // Supports legacy string[] and detailed objects { label, points }
+  // In trait-based scoring mode, columns may be labels only (points optional/ignored here).
   columns?: (string | { label: string; points?: number })[]; // array of column choices
 
   // Range bounds (commonly used by 'range' type)
@@ -78,12 +90,18 @@ export interface ResultPage {
   title: string;
   description: string;
   scoreRange?: { from: number; to: number };
+  // Stable outcome identifier used by trait-based scoring rules
+  outcomeId?: string;
 }
 
 export interface FormData {
   title: string;
   description?: string;
   isQuiz?: boolean;
+  // Quiz type selector for conditional scoring UIs:
+  // 'KNOWLEDGE' = correctAnswer + points
+  // 'OUTCOME'   = trait-based scoring array
+  quizType?: 'KNOWLEDGE' | 'OUTCOME';
   fields: FormField[];
   resultPages?: ResultPage[];
 }
@@ -117,6 +135,8 @@ interface FormRendererProps {
   quizMode?: boolean;
   onUpdateFieldCorrectAnswer?: (fieldIndex: number, value: string) => void;
   onUpdateFieldPoints?: (fieldIndex: number, points: number) => void;
+  // Trait-based scoring updater
+  onUpdateFieldScoring?: (fieldIndex: number, scoring: ScoringRule[]) => void;
   
   // Remove handlers
   onRemoveFieldOption: (fieldIndex: number, optionIndex: number) => void;
@@ -140,6 +160,10 @@ interface FormRendererProps {
   highlightMap?: Record<string, 'added' | 'modified'>;
   // Set of field names currently highlighted (for fade-out control)
   highlightedSet?: Set<string>;
+
+  // "Add with AI" macro action
+  onSuggestWithAI?: () => void | Promise<void>;
+  suggestLoading?: boolean;
 }
 
 
@@ -183,6 +207,11 @@ export function resolveCorrectSet(field: any, options: string[]): Set<string> {
   }
   return set;
 }
+
+/**
+ * Utility
+ */
+const makeSnake = (s: string) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 
 /**
  * Range field with visible numeric output.
@@ -279,8 +308,10 @@ export const AdvancedEditor: React.FC<{
 
   // Quiz
   quizMode?: boolean;
+  quizType?: 'KNOWLEDGE' | 'OUTCOME';
   onUpdateFieldCorrectAnswer?: (fieldIndex: number, value: string) => void;
   onUpdateFieldPoints?: (fieldIndex: number, points: number) => void;
+  onUpdateFieldScoring?: (fieldIndex: number, scoring: ScoringRule[]) => void;
 
   // Remove handlers
   onRemoveFieldOption: (fieldIndex: number, optionIndex: number) => void;
@@ -297,6 +328,9 @@ export const AdvancedEditor: React.FC<{
 
   // Section
   onUpdateSectionSubtitle?: (fieldIndex: number, subtitle: string) => void;
+
+  // Trait-based scoring
+  outcomeOptions?: { id: string; title: string }[];
 }> = ({
   field,
   index,
@@ -309,8 +343,10 @@ export const AdvancedEditor: React.FC<{
   onDuplicateField,
   onToggleRequiredField,
   quizMode,
+  quizType,
   onUpdateFieldCorrectAnswer,
   onUpdateFieldPoints,
+  onUpdateFieldScoring,
   onRemoveFieldOption,
   onUpdateGridRow,
   onUpdateGridColumn,
@@ -321,6 +357,7 @@ export const AdvancedEditor: React.FC<{
   onRemoveGridColumn,
   onUpdateRangeBounds,
   onUpdateSectionSubtitle,
+  outcomeOptions,
 }) => {
   const optionTypes: FormField['type'][] = [
     'text',
@@ -346,6 +383,8 @@ export const AdvancedEditor: React.FC<{
 
   const correctSet = quizMode ? resolveCorrectSet(field, options) : new Set<string>();
   const isAssisting = assistingIndex === index;
+  const isKnowledge = quizType === 'KNOWLEDGE';
+  const isOutcome = quizType === 'OUTCOME';
 
   return (
     <div className="flex flex-col gap-4 rounded-md bg-indigo-50/20 p-3 ring-1 ring-indigo-100" data-adv-editor="true">
@@ -477,8 +516,8 @@ export const AdvancedEditor: React.FC<{
             + Add option
           </button>
 
-          {/* Quiz controls */}
-          {quizMode && (
+          {/* Quiz controls (knowledge quizzes) */}
+          {isKnowledge && (
             <div className="mt-3 flex flex-wrap items-center gap-3">
               {field.type !== 'checkbox' ? (
                 <>
@@ -514,6 +553,60 @@ export const AdvancedEditor: React.FC<{
               />
             </div>
           )}
+
+          {/* Trait-Based Scoring UI (outcome-based) */}
+          {isOutcome && (
+            <div className="mt-4 space-y-2">
+              <div className="text-xs font-medium text-gray-600">Trait scoring</div>
+              {options.length === 0 ? (
+                <p className="text-xs text-gray-500">Add options to configure trait scoring.</p>
+              ) : (
+                options.map((opt, i) => {
+                  const scoringArr: any[] = Array.isArray((field as any).scoring) ? ((field as any).scoring as any[]) : [];
+                  const existing = scoringArr.find((r) => r && r.option === opt) || {};
+                  const selectedOutcome: string = existing.outcomeId || '';
+                  const ptsVal: number = Number.isFinite(Number(existing.points)) ? Number(existing.points) : 1;
+                  return (
+                    <div key={`${field.name}-score-opt-${i}`} className="flex items-center gap-2">
+                      <span className="text-xs text-gray-600 w-28 truncate" title={opt}>{opt}</span>
+                      <select
+                        className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs"
+                        value={selectedOutcome}
+                        onChange={(e) => {
+                          const outcomeId = e.target.value;
+                          const prev: any[] = Array.isArray((field as any).scoring) ? [...(field as any).scoring] : [];
+                          const idx = prev.findIndex((r: any) => r && r.option === opt);
+                          const rule = { option: opt, points: ptsVal, outcomeId };
+                          if (idx >= 0) prev[idx] = rule; else prev.push(rule);
+                          onUpdateFieldScoring?.(index, prev as any);
+                        }}
+                      >
+                        <option value="">Select outcome</option>
+                        {(outcomeOptions ?? []).map((o) => (
+                          <option key={o.id} value={o.id}>{o.title || o.id}</option>
+                        ))}
+                      </select>
+                      <label className="text-xs text-gray-600">pts</label>
+                      <input
+                        type="number"
+                        min={0}
+                        className="w-16 rounded-md border border-gray-300 px-2 py-1 text-xs"
+                        value={ptsVal}
+                        onChange={(e) => {
+                          const pts = Math.max(0, Math.floor(Number(e.target.value) || 0));
+                          const prev: any[] = Array.isArray((field as any).scoring) ? [...(field as any).scoring] : [];
+                          const idx = prev.findIndex((r: any) => r && r.option === opt);
+                          const rule = { option: opt, points: pts, outcomeId: selectedOutcome || '' };
+                          if (idx >= 0) prev[idx] = rule; else prev.push(rule);
+                          onUpdateFieldScoring?.(index, prev as any);
+                        }}
+                      />
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -533,7 +626,7 @@ export const AdvancedEditor: React.FC<{
                       value={label}
                       onChange={(e) => onUpdateGridColumn(index, cIdx, e.target.value)}
                     />
-                    {quizMode && (
+                    {isKnowledge && (
                       <>
                         <label className="text-xs text-gray-600">pts</label>
                         <input
@@ -547,6 +640,59 @@ export const AdvancedEditor: React.FC<{
                           }}
                         />
                       </>
+                    )}
+                    {isOutcome && (
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-gray-600">outcome</label>
+                        <select
+                          className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs"
+                          value={
+                            (() => {
+                              const scoringArr: any[] = Array.isArray((field as any).scoring) ? ((field as any).scoring as any[]) : [];
+                              const existing = scoringArr.find((r) => r && r.column === label) || {};
+                              return existing.outcomeId || '';
+                            })()
+                          }
+                          onChange={(e) => {
+                            const outcomeId = e.target.value;
+                            const scoringArr: any[] = Array.isArray((field as any).scoring) ? [...(field as any).scoring] : [];
+                            const idx = scoringArr.findIndex((r: any) => r && r.column === label);
+                            const existing = idx >= 0 ? scoringArr[idx] : {};
+                            const nextPts = Number.isFinite(Number(existing.points)) ? Number(existing.points) : 1;
+                            const rule = { column: label, points: nextPts, outcomeId };
+                            if (idx >= 0) scoringArr[idx] = rule; else scoringArr.push(rule);
+                            onUpdateFieldScoring?.(index, scoringArr as any);
+                          }}
+                        >
+                          <option value="">Select outcome</option>
+                          {(outcomeOptions ?? []).map((o) => (
+                            <option key={o.id} value={o.id}>{o.title || o.id}</option>
+                          ))}
+                        </select>
+                        <label className="text-xs text-gray-600">pts</label>
+                        <input
+                          type="number"
+                          min={0}
+                          className="w-16 rounded-md border border-gray-300 px-2 py-1 text-xs"
+                          value={
+                            (() => {
+                              const scoringArr: any[] = Array.isArray((field as any).scoring) ? ((field as any).scoring as any[]) : [];
+                              const existing = scoringArr.find((r) => r && r.column === label) || {};
+                              return Number.isFinite(Number(existing.points)) ? Number(existing.points) : 1;
+                            })()
+                          }
+                          onChange={(e) => {
+                            const pts = Math.max(0, Math.floor(Number(e.target.value) || 0));
+                            const scoringArr: any[] = Array.isArray((field as any).scoring) ? [...(field as any).scoring] : [];
+                            const idx = scoringArr.findIndex((r: any) => r && r.column === label);
+                            const existing = idx >= 0 ? scoringArr[idx] : {};
+                            const outcomeId = (existing as any).outcomeId || '';
+                            const rule = { column: label, points: pts, outcomeId };
+                            if (idx >= 0) scoringArr[idx] = rule; else scoringArr.push(rule);
+                            onUpdateFieldScoring?.(index, scoringArr as any);
+                          }}
+                        />
+                      </div>
                     )}
                     <button
                       type="button"
@@ -696,7 +842,9 @@ const TYPE_TILES: { key: FormField['type']; label: string; Icon: React.Component
 const TypePalette: React.FC<{
   onPick: (t: FormField['type']) => void;
   onClose: () => void;
-}> = ({ onPick, onClose }) => {
+  onSuggestWithAI?: () => void;
+  suggestLoading?: boolean;
+}> = ({ onPick, onClose, onSuggestWithAI, suggestLoading }) => {
   return (
     <div
       className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3"
@@ -714,6 +862,35 @@ const TypePalette: React.FC<{
         e.stopPropagation();
       }}
     >
+      {/* Distinct AI suggestion action at top */}
+      <button
+        type="button"
+        className="col-span-full flex items-start gap-3 rounded-md border-2 border-indigo-300 bg-indigo-50 px-3 py-3 text-left shadow-sm transition hover:bg-indigo-100"
+        onMouseDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!suggestLoading) {
+            onSuggestWithAI?.();
+            onClose();
+          }
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (!suggestLoading) {
+            onSuggestWithAI?.();
+            onClose();
+          }
+        }}
+        disabled={suggestLoading}
+        title="Let the AI generate a new question for you."
+      >
+        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-white text-sm">✨</span>
+        <span className="flex flex-col">
+          <span className="text-sm font-semibold text-indigo-900">{suggestLoading ? 'Suggesting…' : 'Suggest with AI'}</span>
+          <span className="text-xs text-indigo-800 opacity-90">Let the AI generate a new question for you.</span>
+        </span>
+      </button>
+
       {TYPE_TILES.map(({ key, label, Icon }) => (
         <button
           key={key}
@@ -783,6 +960,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
   quizMode,
   onUpdateFieldCorrectAnswer,
   onUpdateFieldPoints,
+  onUpdateFieldScoring,
   // Grid/range
   onUpdateGridRow,
   onUpdateGridColumn,
@@ -796,6 +974,8 @@ const FormRenderer: React.FC<FormRendererProps> = ({
   onUpdateSectionSubtitle,
   highlightMap,
   highlightedSet,
+  onSuggestWithAI,
+  suggestLoading,
 }) => {
   // Ensure the submit field (if any) always renders last
   const rawFields: FormField[] = (formData?.fields ?? []) as FormField[];
@@ -841,6 +1021,14 @@ const FormRenderer: React.FC<FormRendererProps> = ({
 
   if (!formData) return null;
 
+  const quizType = (formData as any).quizType as ('KNOWLEDGE' | 'OUTCOME' | undefined);
+  const outcomeOptions = Array.isArray(formData.resultPages)
+    ? (formData.resultPages as ResultPage[]).map((p) => ({
+        id: (p as any).outcomeId || makeSnake(p.title),
+        title: p.title,
+      }))
+    : [];
+
   return (
     <section id="form-editor-sheet" className="mt-8 rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
       <div className="mb-6">
@@ -862,9 +1050,41 @@ const FormRenderer: React.FC<FormRendererProps> = ({
 
       {fields.length === 0 && (
         <div className="mb-4 rounded-lg border border-dashed border-neutral-300 p-6 text-center">
-          <Button type="button" variant="primary" icon={PlusCircle} onClick={() => onAddField()}>
-            Add your first question
-          </Button>
+          <div className="inline-flex items-center gap-2">
+            <Button
+              type="button"
+              variant="primary"
+              icon={PlusCircle}
+              onClick={() => setChooserAfter(-1)}
+            >
+              Add new question
+            </Button>
+          </div>
+
+          {chooserAfter === -1 && (
+            <div
+              ref={paletteRef}
+              data-type-palette="true"
+              className="mt-3"
+              onMouseDown={(e) => {
+                e.stopPropagation();
+              }}
+            >
+              <TypePalette
+                onPick={(t) => {
+                  if (t === 'section') {
+                    (onAddSection as any)?.({ afterIndex: -1, afterName: null });
+                  } else {
+                    (onAddField as any)?.({ afterIndex: -1, afterName: null, type: t });
+                  }
+                  setChooserAfter(null);
+                }}
+                onClose={() => setChooserAfter(null)}
+                onSuggestWithAI={() => onSuggestWithAI?.()}
+                suggestLoading={suggestLoading}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -917,6 +1137,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                     quizMode,
                     onUpdateFieldCorrectAnswer,
                     onUpdateFieldPoints,
+                    onUpdateFieldScoring,
                     onUpdateGridRow,
                     onUpdateGridColumn,
                     onAddGridRow,
@@ -926,21 +1147,26 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                     onUpdateGridColumnPoints,
                     onUpdateRangeBounds,
                     onUpdateSectionSubtitle,
+                    // trait scoring context
+                    quizType,
+                    outcomeOptions,
                   }}
                 />
 
                 {/* Inline "Add question here" CTA under the focused question */}
                 {focusedFieldIndex === idx && field.type !== 'submit' && (
                   <div className="mt-2">
-                    <Button
-                      type="button"
-                      onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                      onClick={() => setChooserAfter(idx)}
-                      variant="primary"
-                      icon={PlusCircle}
-                    >
-                      Add new question
-                    </Button>
+                    <div className="inline-flex items-center gap-2">
+                      <Button
+                        type="button"
+                        onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                        onClick={() => setChooserAfter(idx)}
+                        variant="primary"
+                        icon={PlusCircle}
+                      >
+                        Add new question
+                      </Button>
+                    </div>
                     {chooserAfter === idx && (
                       <div
                         ref={paletteRef}
@@ -962,6 +1188,8 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                             setChooserAfter(null);
                           }}
                           onClose={() => setChooserAfter(null)}
+                          onSuggestWithAI={() => onSuggestWithAI?.()}
+                          suggestLoading={suggestLoading}
                         />
                       </div>
                     )}
@@ -999,15 +1227,17 @@ const FormRenderer: React.FC<FormRendererProps> = ({
 
                   return (
                     <div className="mt-4">
-                      <Button
-                        type="button"
-                        onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                        onClick={() => setChooserAfter(idx)}
-                        variant="primary"
-                        icon={PlusCircle}
-                      >
-                        Add new question
-                      </Button>
+                      <div className="inline-flex items-center gap-2">
+                        <Button
+                          type="button"
+                          onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                          onClick={() => setChooserAfter(idx)}
+                          variant="primary"
+                          icon={PlusCircle}
+                        >
+                          Add new question
+                        </Button>
+                      </div>
                       {chooserAfter === idx && (
                         <div
                           ref={paletteRef}
@@ -1028,6 +1258,8 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                               setChooserAfter(null);
                             }}
                             onClose={() => setChooserAfter(null)}
+                            onSuggestWithAI={() => onSuggestWithAI?.()}
+                            suggestLoading={suggestLoading}
                           />
                         </div>
                       )}

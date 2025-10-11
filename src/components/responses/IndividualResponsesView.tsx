@@ -4,6 +4,8 @@ import type { StoredResponse } from '../../services/forms';
 import { Download, Loader2 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import GridResponseDisplay from './GridResponseDisplay';
+import Card from '../ui/Card';
+import { calculateResult } from '../../utils/scoring';
 
 export type Column = { key: string; label: string; field: FormField };
 
@@ -38,6 +40,17 @@ const IndividualResponsesView: React.FC<Props> = ({ form, responses, columns = [
       field: { name: k, label: k, type: 'text' } as FormField,
     }));
   }, [columns, form, responses]);
+
+  const selectedResponse = responses[selectedResponseIndex];
+
+  const submissionResult = useMemo(() => {
+    if (!form || !selectedResponse) return null;
+    try {
+      return calculateResult(form, selectedResponse.payload || {});
+    } catch {
+      return null;
+    }
+  }, [form, selectedResponse]);
 
   if (!responses || responses.length === 0) {
     return (
@@ -210,6 +223,26 @@ const IndividualResponsesView: React.FC<Props> = ({ form, responses, columns = [
 
         {/* Main Content: Selected response details */}
         <main className="flex-1 overflow-y-auto p-6">
+          {submissionResult && (
+            <Card className="mb-4 p-4">
+              <h3 className="text-base font-semibold text-gray-900">Submission Result</h3>
+              {(() => {
+                const r: any = submissionResult;
+                if (r?.type === 'OUTCOME') {
+                  return (
+                    <p className="mt-1 text-primary-700 font-semibold">
+                      {r.outcomeTitle || r.outcomeId || '—'}
+                    </p>
+                  );
+                }
+                return (
+                  <p className="mt-1 text-gray-700">
+                    Score: {r?.score ?? 0}{typeof r?.maxScore === 'number' ? ` / ${r.maxScore}` : ''}
+                  </p>
+                );
+              })()}
+            </Card>
+          )}
           {/* Toolbar */}
           <div className="mb-3 flex items-center justify-end">
             <button

@@ -20,6 +20,7 @@ import Papa from 'papaparse';
 import { Download, Loader2 } from 'lucide-react';
 import colors from 'tailwindcss/colors';
 import Card from '../ui/Card';
+import { calculateResult } from '../../utils/scoring';
 import ConfirmModal from '../common/ConfirmModal';
 import { toast } from 'react-hot-toast';
 import { updateFormAiSummary } from '../../services/forms';
@@ -192,6 +193,60 @@ function calcAverage(nums: number[]) {
 
 const SummaryView: React.FC<Props> = ({ formId, aiSummaryInitial, form, responses, height = '70vh' }) => {
   const fields = useMemo(() => (form?.fields ?? []).filter((f) => f.type !== 'submit'), [form]);
+
+  const outcomeDistribution = useMemo(() => {
+    if (!form || !responses || responses.length === 0) return null;
+    const qt = (form as any)?.quizType as ('KNOWLEDGE' | 'OUTCOME' | undefined);
+    if (qt !== 'OUTCOME') return null;
+
+    const snake = (s: string) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    const pages = Array.isArray(form.resultPages) ? form.resultPages : [];
+    const orderedIds: string[] = pages.map((p) => (p as any).outcomeId || snake(p.title));
+    const titleById: Record<string, string> = {};
+    pages.forEach((p) => {
+      const id = (p as any).outcomeId || snake(p.title);
+      titleById[id] = p.title;
+    });
+
+    const counts: Record<string, number> = {};
+    orderedIds.forEach((id) => (counts[id] = 0));
+
+    for (const r of responses) {
+      try {
+        const res: any = calculateResult(form, r.payload || {});
+        if (res?.type === 'OUTCOME') {
+          let id: string | null = res.outcomeId || null;
+          if (!id && res.outcomeTitle) {
+            // fallback: map title -> id
+            const t = String(res.outcomeTitle).trim().toLowerCase();
+            const found = pages.find((p) => String(p?.title || '').trim().toLowerCase() === t);
+            if (found) id = (found as any).outcomeId || snake(found.title);
+          }
+          if (id) {
+            counts[id] = (counts[id] ?? 0) + 1;
+            if (!titleById[id]) {
+              titleById[id] = res.outcomeTitle || id;
+            }
+          }
+        }
+      } catch {
+        // ignore scoring failures in summary
+      }
+    }
+
+    const data: { name: string; value: number }[] = [];
+    // push in configured order first
+    for (const id of orderedIds) {
+      data.push({ name: titleById[id] || id, value: counts[id] ?? 0 });
+    }
+    // include any extra ids that appeared but weren't configured
+    for (const id of Object.keys(counts)) {
+      if (!orderedIds.includes(id)) {
+        data.push({ name: titleById[id] || id, value: counts[id] ?? 0 });
+      }
+    }
+    return data;
+  }, [form, responses]);
 
   // AI Report state
   const [isReportLoading, setIsReportLoading] = useState(false);
@@ -425,6 +480,27 @@ const SummaryView: React.FC<Props> = ({ formId, aiSummaryInitial, form, response
         <div className="mb-3 rounded-md border-l-4 border-red-400 bg-red-50 p-3 text-sm text-red-700">
           {reportError}
         </div>
+      )}
+
+      {outcomeDistribution && outcomeDistribution.length > 0 && (
+        <Card className="mb-4 p-4">
+          <h3 className="mb-2 text-base font-semibold text-neutral-900">Overall Outcome Distribution</h3>
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={outcomeDistribution} margin={{ top: 8, right: 8, left: 8, bottom: 28 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" interval={0} tickMargin={8} />
+                <YAxis allowDecimals={false} />
+                <Tooltip />
+                <Bar dataKey="value">
+                  {outcomeDistribution.map((_, idx) => (
+                    <Cell key={`outcome-bar-${idx}`} fill={THEME.primary[500]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
       )}
 
       {fields.length === 0 ? (

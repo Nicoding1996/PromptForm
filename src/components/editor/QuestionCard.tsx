@@ -41,9 +41,19 @@ type Props = {
   onChangeFieldType: (fieldIndex: number, newType: FormField['type']) => void;
   onDuplicateField: (fieldIndex: number) => void;
   onToggleRequiredField: (fieldIndex: number) => void;
+
+  // Quiz mode and types
   quizMode?: boolean;
+  quizType?: 'KNOWLEDGE' | 'OUTCOME';
+
+  // Knowledge quiz scoring
   onUpdateFieldCorrectAnswer?: (fieldIndex: number, value: string) => void;
   onUpdateFieldPoints?: (fieldIndex: number, points: number) => void;
+
+  // Trait-based scoring (OUTCOME)
+  onUpdateFieldScoring?: (fieldIndex: number, scoring: any[]) => void;
+  outcomeOptions?: { id: string; title: string }[];
+
   onRemoveFieldOption: (fieldIndex: number, optionIndex: number) => void;
   onUpdateGridRow: (
     fieldIndex: number,
