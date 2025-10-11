@@ -132,7 +132,7 @@ const CommandBar: React.FC<CommandBarProps> = ({
         onClick={onSend}
         disabled={!canSend}
         className={`absolute right-3 ${isCreation ? 'bottom-3' : 'top-1/2 -translate-y-1/2'} transform inline-flex items-center justify-center rounded-full text-white disabled:cursor-not-allowed disabled:opacity-60 ${
-          isCreation ? 'h-11 w-11 bg-primary-600 hover:bg-primary-700 shadow-md' : 'h-8 w-8 bg-indigo-600 hover:bg-indigo-500 shadow-sm'
+          isCreation ? 'h-11 w-11 bg-[var(--pf-brand,#4F46E5)] hover:bg-[var(--pf-brand-hover,#4338CA)] shadow-md' : 'h-8 w-8 bg-[var(--pf-brand,#4F46E5)] hover:bg-[var(--pf-brand-hover,#4338CA)] shadow-sm'
         }`}
         animate={isCreation && !isLoading ? { scale: [1, 1.05, 1] } : undefined}
         transition={isCreation && !isLoading ? { duration: 1.6, repeat: Infinity, ease: 'easeInOut' } : undefined}

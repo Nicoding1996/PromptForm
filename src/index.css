@@ -87,6 +87,11 @@
   --color-warning: var(--color-amber-600);
 }
 
+/* Brand override: match logo color */
+:root {
+  --pf-brand: #03184a;
+  --pf-brand-hover: #02235f; /* slightly lighter/darker hover fallback */
+}
 /* Visual Foundation: Global base styles */
 @layer base {
   html {
