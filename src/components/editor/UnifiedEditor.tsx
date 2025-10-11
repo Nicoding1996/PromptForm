@@ -1714,6 +1714,10 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                           onFileChange={setSelectedFile}
                           isLoading={isLoading || refactorLoading}
                           mode={formId ? 'editing' : 'creation'}
+                          getApi={(api) => {
+                            // Allow external buttons (suggestion chips) to paste text and focus the input
+                            cmdApiRef.current = api;
+                          }}
                           onSend={() => {
                             if (formId) {
                               const cmd = promptText.trim();
@@ -1729,7 +1733,12 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                         {formId && (
                           <div className="pl-12 pr-12 mt-2 mb-3">
                             <SuggestionChips
-                              onSelect={(cmd) => handleRefactorRequest(cmd)}
+                              onSelect={(cmd) => {
+                                // Paste the suggestion into the AI prompt bar for user review instead of executing immediately
+                                setPromptText(cmd);
+                                // Focus the input so the user can edit or press Send
+                                cmdApiRef.current?.focus();
+                              }}
                               disabled={refactorLoading || isLoading}
                             />
                             {refactorError && (
