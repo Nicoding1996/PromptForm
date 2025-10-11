@@ -85,13 +85,17 @@ type Props = {
 const QuestionCard: React.FC<Props> = (props) => {
   const { field, index, isFocused, onFocus } = props;
 
+  const isRequired = ((field as any)?.validation?.required === true) || ((field as any)?.required === true);
   const labelNode = (
-    <EditableLabel
-      label={field.label}
-      htmlFor={field.name}
-      className={baseLabelClass}
-      onCommit={(newLabel: string) => props.onUpdateFieldLabel(index, newLabel)}
-    />
+    <span className="inline-flex items-center">
+      <EditableLabel
+        label={field.label}
+        htmlFor={field.name}
+        className={baseLabelClass}
+        onCommit={(newLabel: string) => props.onUpdateFieldLabel(index, newLabel)}
+      />
+      {isRequired ? <span className="ml-1 text-red-600">*</span> : null}
+    </span>
   );
 
   const content = (() => {

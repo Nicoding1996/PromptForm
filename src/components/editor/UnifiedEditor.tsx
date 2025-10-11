@@ -756,10 +756,19 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
     setFormJson((prev) => {
       if (!prev) return prev;
       const fields = [...prev.fields];
-      const f = fields[fieldIndex];
+      const f: any = fields[fieldIndex];
       if (!f) return prev;
-      const required = !(f as any).required;
-      fields[fieldIndex] = { ...f, required } as FormField & { required?: boolean };
+  
+      // Determine current effective "required" from either legacy flag or validation.required
+      const currentRequired = (f?.validation?.required === true) || (f?.required === true);
+      const nextRequired = !currentRequired;
+  
+      // Write to both places for full compatibility with existing renderers
+      const next: any = { ...f };
+      next.required = nextRequired; // legacy/simple flag
+      next.validation = { ...(f.validation || {}), required: nextRequired }; // canonical location
+  
+      fields[fieldIndex] = next as FormField;
       return { ...prev, fields };
     });
   };

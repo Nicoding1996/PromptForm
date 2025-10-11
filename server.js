@@ -198,8 +198,9 @@ The from value of the very first score_range in the list MUST always be 0.
       - If the user's request implies a longer introduction or context, include a helpful summary in the "description" field.
  
       VALIDATION & UX RULES:
-      - Based on the context, add a "validation" object where appropriate.
-        - If a field seems mandatory (e.g., Name, Email, Subject), set "validation": { "required": true }.
+      - CRITICAL VALIDATION RULE: You MUST analyze the context of each field to determine if it is essential for the form's purpose.
+        - If a field is objectively mandatory (e.g., Name, Email, Subject, Phone Number), you MUST set "validation": { "required": true }.
+        - Do NOT make subjective, demographic, or convenience-only questions required unless the user's prompt explicitly instructs it.
         - For email fields, prefer type "email"; also set validation.pattern = "email".
         - For text-like fields, use "validation.minLength" and/or "validation.maxLength" when reasonable.
       - Add a helpful "placeholder" string for fields where an example would be useful.
@@ -230,7 +231,7 @@ The from value of the very first score_range in the list MUST always be 0.
         - For "checkbox", if multiple options are correct, set "correctAnswer" to an array of all correct option values (e.g., ["A","C"]). If only one is correct, you may still use a single string.
         - Always add a "points" key with value 1 on that field.
       - Only set "correctAnswer" on fields that actually have options (radio/checkbox/select). Do NOT add it for text-like or radioGrid fields.
-      
+      - CRITICAL REQUIREMENT FOR ALL QUIZZES/ASSESSMENTS: For any question that contributes to a score (i.e., fields with a "points" key or a "scoring" array), you MUST set "validation": { "required": true } so that submissions cannot omit scored items. For personality or opinion-based questions (e.g., Likert scales), you MUST also include a neutral or opt-out choice such as "Neutral", "I don't know", or "Not Applicable" to avoid forcing biased answers.
       PERSONALITY / OUTCOME-BASED ASSESSMENTS:
       - If the prompt implies a personality/typology outcome (e.g., contains phrases like "personality test", "assessment" with outcomes, "enneagram", "DISC", "MBTI", "what type of", "find out your", "which kind of"), you MUST:
         - Set "isQuiz": true.
@@ -706,8 +707,9 @@ Additional user instructions (context): "${context.trim()}". Use these instructi
       - If the user's request implies a longer introduction or context, include a helpful summary in the "description" field.
  
       VALIDATION & UX RULES:
-      - Based on the context, add a "validation" object where appropriate.
-        - If a field seems mandatory (e.g., Name, Email, Subject), set "validation": { "required": true }.
+      - CRITICAL VALIDATION RULE: You MUST analyze the context of each field to determine if it is essential for the form's purpose.
+        - If a field is objectively mandatory (e.g., Name, Email, Subject, Phone Number), you MUST set "validation": { "required": true }.
+        - Do NOT make subjective, demographic, or convenience-only questions required unless the user's context explicitly instructs it.
         - For email fields, prefer type "email"; also set validation.pattern = "email".
         - For text-like fields, use "validation.minLength" and/or "validation.maxLength" when reasonable.
       - Add a helpful "placeholder" string for fields where an example would be useful.
@@ -733,6 +735,7 @@ Additional user instructions (context): "${context.trim()}". Use these instructi
         - For "checkbox", if multiple options are correct, set "correctAnswer" to an array of all correct option values (e.g., ["A","C"]). If only one is correct, you may still use a single string.
         - Always add a "points" key with value 1 on that field.
       - Only set "correctAnswer" on fields that actually have options (radio/checkbox/select). Do NOT add it for text-like or radioGrid fields.
+      - CRITICAL REQUIREMENT FOR ALL QUIZZES/ASSESSMENTS: For any question that contributes to a score (i.e., fields with a "points" key or a "scoring" array), you MUST set "validation": { "required": true } so that submissions cannot omit scored items. For personality or opinion-based questions (e.g., Likert scales), you MUST also include a neutral or opt-out choice such as "Neutral", "I don't know", or "Not Applicable" to avoid forcing biased answers.
       
       PERSONALITY / OUTCOME-BASED ASSESSMENTS:
       - If the image/context implies a personality/typology outcome (e.g., "personality test", "enneagram", "DISC", "MBTI", "what type of", "find out your"), you MUST set "isQuiz": true and attempt to include a "resultPages" array with 2–6 placeholder objects, each with { "title", "description", "scoreRange": { "from": 0, "to": 0 } }.
@@ -979,8 +982,9 @@ Additional user instructions (context): "${userContext}"
       - If the user's request implies a longer introduction or context, include a helpful summary in the "description" field.
  
       VALIDATION & UX RULES:
-      - Based on the context, add a "validation" object where appropriate.
-        - If a field seems mandatory (e.g., Name, Email, Subject), set "validation": { "required": true }.
+      - CRITICAL VALIDATION RULE: You MUST analyze the context of each field to determine if it is essential for the form's purpose.
+        - If a field is objectively mandatory (e.g., Name, Email, Subject, Phone Number), you MUST set "validation": { "required": true }.
+        - Do NOT make subjective, demographic, or convenience-only questions required unless the user's context explicitly instructs it.
         - For email fields, prefer type "email"; also set validation.pattern = "email".
         - For text-like fields, use "validation.minLength" and/or "validation.maxLength" when reasonable.
       - Add a helpful "placeholder" string for fields where an example would be useful.
@@ -1006,6 +1010,7 @@ Additional user instructions (context): "${userContext}"
         - For "checkbox", if multiple options are correct, set "correctAnswer" to an array of all correct option values (e.g., ["A","C"]). If only one is correct, you may still use a single string.
         - Always add a "points" key with value 1 on that field.
       - Only set "correctAnswer" on fields that actually have options (radio/checkbox/select). Do NOT add it for text-like or radioGrid fields.
+      - CRITICAL REQUIREMENT FOR ALL QUIZZES/ASSESSMENTS: For any question that contributes to a score (i.e., fields with a "points" key or a "scoring" array), you MUST set "validation": { "required": true } so that submissions cannot omit scored items. For personality or opinion-based questions (e.g., Likert scales), you MUST also include a neutral or opt-out choice such as "Neutral", "I don't know", or "Not Applicable" to avoid forcing biased answers.
       
       PERSONALITY / OUTCOME-BASED ASSESSMENTS:
       - If the document implies a personality/typology outcome (e.g., "personality test", "enneagram", "DISC", "MBTI", "what type of", "find out your"), set "isQuiz": true and include a "resultPages" array (2–6 items) with { "title", "description", "scoreRange": { "from": 0, "to": 0 } } placeholders.

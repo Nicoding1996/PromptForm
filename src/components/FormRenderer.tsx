@@ -385,16 +385,20 @@ export const AdvancedEditor: React.FC<{
   const isAssisting = assistingIndex === index;
   const isKnowledge = quizType === 'KNOWLEDGE';
   const isOutcome = quizType === 'OUTCOME';
+  const isRequired = ((field as any)?.validation?.required === true) || ((field as any)?.required === true);
 
   return (
     <div className="flex flex-col gap-4 rounded-md bg-indigo-50/20 p-3 ring-1 ring-indigo-100" data-adv-editor="true">
       {/* Label editor (WYSIWYG-like) + AI Assist */}
       <div className="flex items-center gap-2">
-        <EditableLabel
-          label={field.label}
-          htmlFor={field.name}
-          onCommit={(txt) => onUpdateFieldLabel(index, txt)}
-        />
+        <span className="inline-flex items-center">
+          <EditableLabel
+            label={field.label}
+            htmlFor={field.name}
+            onCommit={(txt) => onUpdateFieldLabel(index, txt)}
+          />
+          {isRequired ? <span className="ml-1 text-red-600">*</span> : null}
+        </span>
         <button
           type="button"
           title={isAssisting ? 'Generating…' : 'AI Assist'}
@@ -451,7 +455,7 @@ export const AdvancedEditor: React.FC<{
           <label className="inline-flex items-center gap-2 text-sm text-gray-700">
             <input
               type="checkbox"
-              checked={(field as any).required === true}
+              checked={((field as any)?.validation?.required === true) || ((field as any)?.required === true)}
               onChange={() => onToggleRequiredField(index)}
               className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
             />
