@@ -192,7 +192,10 @@ function calcAverage(nums: number[]) {
 }
 
 const SummaryView: React.FC<Props> = ({ formId, aiSummaryInitial, form, responses, height = '70vh' }) => {
-  const fields = useMemo(() => (form?.fields ?? []).filter((f) => f.type !== 'submit'), [form]);
+  const fields = useMemo(
+    () => (form?.fields ?? []).filter((f) => f.type !== 'submit' && f.type !== 'section'),
+    [form]
+  );
 
   const outcomeDistribution = useMemo(() => {
     if (!form || !responses || responses.length === 0) return null;
@@ -333,7 +336,7 @@ const SummaryView: React.FC<Props> = ({ formId, aiSummaryInitial, form, response
   const handleExportCsv = () => {
     if (!form || !responses || responses.length === 0) return;
 
-    const fields = (form.fields ?? []).filter((f) => f.type !== 'submit');
+    const fields = (form.fields ?? []).filter((f) => f.type !== 'submit' && f.type !== 'section');
 
     type ColDesc = {
       header: string;
