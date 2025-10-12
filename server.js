@@ -462,26 +462,77 @@ If total_possible_score is not explicitly provided, ESTIMATE it (assume ~1 point
 
       const catalogBlock = JSON.stringify(outcomeCatalog, null, 2);
 
+      // Analyze existing fields to enforce format matching for suggestions
+      const radioOptionSets = fieldsArr
+        .filter((f) => String(f?.type || '').toLowerCase() === 'radio' && Array.isArray(f?.options) && f.options.length > 0)
+        .map((f) =>
+          (f.options || [])
+            .map((o) => (typeof o === 'string' ? o : (o && typeof o.label === 'string' ? o.label : '')))
+            .filter((s) => typeof s === 'string' && s.length > 0)
+        );
+
+      const optionSetCounts = new Map();
+      let canonicalOptions = null;
+      for (const arr of radioOptionSets) {
+        const key = JSON.stringify(arr.map((s) => String(s).trim()));
+        optionSetCounts.set(key, (optionSetCounts.get(key) || 0) + 1);
+      }
+      if (optionSetCounts.size > 0) {
+        const bestKey = Array.from(optionSetCounts.entries()).sort((a, b) => b[1] - a[1])[0][0];
+        canonicalOptions = JSON.parse(bestKey);
+      }
+
+      const radioGridColumnSets = fieldsArr
+        .filter((f) => String(f?.type || '').toLowerCase() === 'radiogrid' && Array.isArray(f?.columns) && f.columns.length > 0)
+        .map((f) =>
+          (f.columns || [])
+            .map((c) => (typeof c === 'string' ? c : (c && typeof c.label === 'string' ? c.label : '')))
+            .filter((s) => typeof s === 'string' && s.length > 0)
+        );
+
+      const canonicalColumns = radioGridColumnSets && radioGridColumnSets.length > 0 ? radioGridColumnSets[0] : null;
+
+      const COLUMNS_HINT = canonicalColumns
+        ? `RadioGrid columns to REUSE EXACTLY (copy verbatim; order/spelling/count must match): ${JSON.stringify(canonicalColumns)}`
+        : '';
+      const OPTIONS_HINT = canonicalOptions
+        ? `Radio options to REUSE EXACTLY (copy verbatim; order/spelling/count must match): ${JSON.stringify(canonicalOptions)}`
+        : '';
+
       masterPrompt = `
-You are an expert psychometrician. Based on the provided form's existing questions and outcomes (JSON), generate ONE new, relevant question that fits the assessment's theme.
+You are an expert psychometrician. Based on the provided form's existing questions and outcomes (JSON), generate ONE new, relevant question that fits the assessment's theme AND matches the existing presentation style.
 Your response must be a single, valid JSON object for the new form field. This object MUST include the new, detailed "scoring" array, correctly mapping the new question's answers to the existing outcome IDs.
 
 ${ANTI_DUP_CLAUSE}
 
-Rules:
+FORMAT MATCHING RULES:
+- If the existing form contains any "radioGrid" fields, you MUST output a "radioGrid" question.
+${COLUMNS_HINT || '- If radioGrid columns exist in the form, reuse them exactly (order/spelling/count).'}
+- Otherwise, if the existing form predominantly uses "radio" questions with a shared option set, you MUST output a "radio" question.
+${OPTIONS_HINT || '- If a dominant radio option set exists, reuse it exactly (order/spelling/count).'}
+- Do NOT invent new columns/options when hints are provided.
+
+Field requirements:
 - Allowed field "type": "radio", "checkbox", "select", or "radioGrid". Prefer "radio" or "radioGrid" for trait assessments.
 - Required keys: "label", "type", "name".
-- For "radio" | "checkbox" | "select": include "options": ["..."] with 2–6 sensible values.
+- For "radio": include "options": ["..."] and when an options hint is provided, use it EXACTLY.
 - For "radioGrid": include:
-  - "rows": ["Row 1", "Row 2", ...]
-  - "columns": ["Rarely True", "Sometimes True", "Always True"]   // labels only; do NOT include points here
-- The field MUST include "scoring": an array of objects mapping specific answers to points for specific outcomes:
-  - For radio/select/checkbox: { "option": "Option Text", "points": 1, "outcomeId": "<one-of-existing-outcome-ids>" }
-  - For radioGrid (applies per-row selection): { "column": "Column Label", "points": 1, "outcomeId": "<one-of-existing-outcome-ids>" }
-- Use ONLY these existing outcome IDs exactly as provided (do not invent new IDs):
+  - "rows": ["One concise statement"]               // generate ONE new statement row
+  - "columns": ${canonicalColumns ? JSON.stringify(canonicalColumns) : '["Rarely True","Sometimes True","Always True"]'}   // labels only; do NOT include points here
+
+Scoring (mandatory):
+- Include a "scoring" array mapping each selectable answer to an existing outcome ID:
+  - radio/select/checkbox: { "option": "Option Text", "points": 1, "outcomeId": "<one-of-existing-outcome-ids>" }
+  - radioGrid: { "column": "Column Label", "points": 1, "outcomeId": "<one-of-existing-outcome-ids>" }  // applies per selected row
+- Use points = 1 for each selectable answer for consistency with existing items.
+- Choose the single most relevant outcomeId for the new statement (do not invent new IDs).
+
+- Use ONLY these existing outcome IDs exactly as provided:
 ${catalogBlock}
-- Do not include "section" or "submit" types.
-- Do not include "correctAnswer" for this task.
+
+Constraints:
+- Do NOT include "section" or "submit" types.
+- Do NOT include "correctAnswer" (this is not a knowledge quiz).
 - Do NOT include any surrounding prose or markdown. Output only the JSON object.
 
 Existing form (for context):
