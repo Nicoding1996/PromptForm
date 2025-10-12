@@ -436,6 +436,9 @@ There must be no numerical gaps between the ranges.
 There must be no numerical overlaps between the ranges.
 Every possible score must map to exactly one outcome.
 The from value of the very first score_range in the list MUST always be 0.
+Each subsequent range's "from" MUST be exactly previous "to" + 1.
+The final range's "to" MUST equal the total_possible_score (inclusive).
+If total_possible_score is not explicitly provided, ESTIMATE it (assume ~1 point per gradable question) and partition ranges to exactly cover 0..total_possible_score without gaps/overlaps.
 ---`;
 
     let masterPrompt = '';
@@ -736,6 +739,11 @@ Additional user instructions (context): "${context.trim()}". Use these instructi
         - Always add a "points" key with value 1 on that field.
       - Only set "correctAnswer" on fields that actually have options (radio/checkbox/select). Do NOT add it for text-like or radioGrid fields.
       - CRITICAL REQUIREMENT FOR ALL QUIZZES/ASSESSMENTS: For any question that contributes to a score (i.e., fields with a "points" key or a "scoring" array), you MUST set "validation": { "required": true } so that submissions cannot omit scored items. For personality or opinion-based questions (e.g., Likert scales), you MUST also include a neutral or opt-out choice such as "Neutral", "I don't know", or "Not Applicable" to avoid forcing biased answers.
+
+      CRITICAL OUTCOME RANGE RULE:
+      - When generating outcomes with scoreRange, ranges MUST be contiguous and non-overlapping, starting at 0 and ending at total_possible_score (inclusive).
+      - Each next range.from MUST equal previous range.to + 1.
+      - If total_possible_score is not explicit, estimate 1 point per gradable question and set ranges to exactly cover 0..total_possible_score.
       
       PERSONALITY / OUTCOME-BASED ASSESSMENTS:
       - If the image/context implies a personality/typology outcome (e.g., "personality test", "enneagram", "DISC", "MBTI", "what type of", "find out your"), you MUST set "isQuiz": true and attempt to include a "resultPages" array with 2–6 placeholder objects, each with { "title", "description", "scoreRange": { "from": 0, "to": 0 } }.
@@ -1011,6 +1019,11 @@ Additional user instructions (context): "${userContext}"
         - Always add a "points" key with value 1 on that field.
       - Only set "correctAnswer" on fields that actually have options (radio/checkbox/select). Do NOT add it for text-like or radioGrid fields.
       - CRITICAL REQUIREMENT FOR ALL QUIZZES/ASSESSMENTS: For any question that contributes to a score (i.e., fields with a "points" key or a "scoring" array), you MUST set "validation": { "required": true } so that submissions cannot omit scored items. For personality or opinion-based questions (e.g., Likert scales), you MUST also include a neutral or opt-out choice such as "Neutral", "I don't know", or "Not Applicable" to avoid forcing biased answers.
+
+      CRITICAL OUTCOME RANGE RULE:
+      - When generating outcomes with scoreRange, ranges MUST be contiguous and non-overlapping, starting at 0 and ending at total_possible_score (inclusive).
+      - Each next range.from MUST equal previous range.to + 1.
+      - If total_possible_score is not explicit, estimate 1 point per gradable question and set ranges to exactly cover 0..total_possible_score.
       
       PERSONALITY / OUTCOME-BASED ASSESSMENTS:
       - If the document implies a personality/typology outcome (e.g., "personality test", "enneagram", "DISC", "MBTI", "what type of", "find out your"), set "isQuiz": true and include a "resultPages" array (2–6 items) with { "title", "description", "scoreRange": { "from": 0, "to": 0 } } placeholders.

@@ -10,8 +10,7 @@ const baseLabelClass = 'text-sm font-medium text-slate-700';
 // Helpers for deterministic grading of text and choice answers
 const normalize = (v: any) => String(v ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
 const toArray = (v: any): string[] => (Array.isArray(v) ? v.map(String) : v != null ? [String(v)] : []);
-const setFrom = (arr: string[]) => new Set(arr.map(normalize));
-const setsEqual = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].every((x) => b.has(x));
+/* removed unused helpers: setFrom, setsEqual */
 
 type Props = {
   formData: FormData | null;
@@ -270,121 +269,16 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
       try {
         const calcRes = calculateResult(formData as any, payload);
         setLastResult(calcRes as any);
-        if ((calcRes as any).type === 'KNOWLEDGE') {
-          setLastScore((calcRes as any).score ?? null);
-          setLastMaxScore((calcRes as any).maxScore ?? null);
-        }
+        setLastScore((calcRes as any).score ?? null);
+        setLastMaxScore((calcRes as any).maxScore ?? null);
       } catch {
         // Non-fatal: if scoring fails, continue with submission
         setLastResult(null);
       }
 
-      // Quiz scoring (local) if enabled
-      let scoreToSend: number | null = null;
-      let maxToSend: number | null = null;
-      if ((formData as any)?.isQuiz === true) {
-        let score = 0;
-        let max = 0;
-
-        for (const f of formData.fields ?? []) {
-          const pointsRaw = Number((f as any).points ?? 1);
-          const points = Number.isFinite(pointsRaw) ? pointsRaw : 1;
-          const userVal = payload[f.name];
-
-          // Optional regex support for deterministic grading
-          const patternStr = (f as any).answerPattern as string | undefined;
-          let regex: RegExp | null = null;
-          if (typeof patternStr === 'string' && patternStr.length > 0) {
-            try {
-              regex = new RegExp(patternStr, 'i');
-            } catch {
-              regex = null;
-            }
-          }
-
-          let ok: boolean | null = null; // null = not gradable, don't add to max
-
-          // RadioGrid scoring using selected labels in payload (no direct index available)
-          if (f.type === 'radioGrid') {
-            const rows = (f as any).rows ?? [];
-            const cols = (f as any).columns ?? [];
-
-            const rawPoints: number[] = cols.map((c: any) => {
-              if (typeof c === 'string') return NaN;
-              const p = Number(c?.points);
-              return Number.isFinite(p) ? p : NaN;
-            });
-
-            const allMissing = rawPoints.every((p) => !Number.isFinite(p));
-            const allEqualFinite =
-              rawPoints.every((p) => Number.isFinite(p)) &&
-              rawPoints.every((p) => p === rawPoints[0]);
-
-            const fallbackOrdinal = allMissing || allEqualFinite;
-            const effectivePoints = (idx: number): number => {
-              if (fallbackOrdinal) return idx + 1;
-              const p = rawPoints[idx];
-              return Number.isFinite(p) ? p : 1;
-            };
-            const labelOf = (c: any) => (typeof c === 'string' ? c : c?.label ?? '');
-            const maxColPts =
-              cols.length > 0
-                ? Math.max(...cols.map((_: any, i: number) => effectivePoints(i)))
-                : 0;
-
-            rows.forEach((rowLabel: string) => {
-              max += maxColPts;
-              const selectedLabel =
-                payload?.[f.name]?.[rowLabel] ?? payload?.[`${f.name}.${rowLabel}`] ?? null;
-              if (selectedLabel != null) {
-                const idx = cols.findIndex((c: any) => normalize(labelOf(c)) === normalize(selectedLabel));
-                if (idx >= 0) {
-                  score += effectivePoints(idx);
-                }
-              }
-            });
-            continue;
-          }
-
-          const norm = (v: any) => String(v ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
-          if (f.type === 'radio' || f.type === 'select') {
-            const correct = (f as any).correctAnswer as string | undefined;
-            if (regex) ok = regex.test(String(userVal ?? ''));
-            else if (typeof correct === 'string' && correct.length > 0) {
-              ok = norm(userVal) === norm(correct);
-            }
-          } else if (f.type === 'checkbox') {
-            const correctRaw = (f as any).correctAnswer;
-            if (Array.isArray(correctRaw)) {
-              const userSet = setFrom(toArray(userVal));
-              const correctSet = setFrom(correctRaw);
-              ok = setsEqual(userSet, correctSet);
-            } else if (typeof correctRaw === 'string' && correctRaw.length > 0) {
-              const userSet = setFrom(toArray(userVal));
-              ok = userSet.has(norm(correctRaw));
-            }
-          } else if (f.type === 'text' || f.type === 'textarea') {
-            const correct = (f as any).correctAnswer as string | undefined;
-            if (regex) ok = regex.test(String(userVal ?? ''));
-            else if (typeof correct === 'string' && correct.length > 0) {
-              ok = norm(userVal) === norm(correct);
-            }
-          }
-
-          if (ok !== null) {
-            max += points;
-            if (ok) score += points;
-          }
-        }
-
-        scoreToSend = score;
-        maxToSend = max;
-        setLastScore(score);
-        setLastMaxScore(max);
-      } else {
-        setLastScore(null);
-        setLastMaxScore(null);
-      }
+      // Use score/maxScore from the calculated result
+      const scoreToSend = (lastResult as any)?.score ?? null;
+      const maxToSend = (lastResult as any)?.maxScore ?? null;
 
       // In preview mode, simulate success without sending anything to the server.
       if (preview) {
@@ -744,9 +638,9 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
       );
     }
 
-    // Knowledge quizzes: map score to result page by range if configured
+    // Map score to result page by range if configured (for knowledge or outcome quizzes)
     let matched: any = null;
-    if (((formData as any)?.isQuiz === true || (formData as any)?.quizType === 'KNOWLEDGE') && hasOutcomes && lastScore != null) {
+    if (hasOutcomes && lastScore != null) {
       matched =
         pages.find((p) => {
           const from = Number(p?.scoreRange?.from ?? NaN);
@@ -779,7 +673,7 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
         <Card className="p-6">
           <div className="text-center">
             <h2 className="text-lg font-semibold text-gray-900">Thank you for your response!</h2>
-            {((formData as any)?.isQuiz === true || (formData as any)?.quizType === 'KNOWLEDGE') && lastScore != null && lastMaxScore != null ? (
+            {lastScore != null && lastMaxScore != null ? (
               <p className="mt-2 text-base font-semibold" style={{ color: brand }}>
                 You scored {lastScore} out of {lastMaxScore}!
               </p>

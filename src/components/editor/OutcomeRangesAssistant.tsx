@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { ResultPage } from '../FormRenderer';
-import { distributeEvenly, cascadeAutoAdjust } from './outcomesUtils';
+import { distributeEvenly } from './outcomesUtils';
 
 type Range = { from: number; to: number };
 
@@ -22,7 +22,8 @@ const OutcomeRangesAssistant: React.FC<Props> = ({ open, oldMax, newMax, pages, 
     const safeOld = oldMax > 0 ? oldMax : pages.reduce((acc, p) => Math.max(acc, p?.scoreRange?.to ?? 0), 0);
     const safeNew = newMax > 0 ? newMax : safeOld;
 
-    return pages.map((p) => {
+    // Proportionally map previous ranges (no auto-shift). Users can click "Auto-fix Ranges".
+    const mapped = pages.map((p) => {
       const from = int(p?.scoreRange?.from ?? 0);
       const to = int(p?.scoreRange?.to ?? 0);
       if (safeOld <= 0) {
@@ -33,11 +34,12 @@ const OutcomeRangesAssistant: React.FC<Props> = ({ open, oldMax, newMax, pages, 
       const ordered = nFrom <= nTo ? { from: nFrom, to: nTo } : { from: nTo, to: nFrom };
       return ordered;
     });
+
+    return mapped;
   }, [pages, oldMax, newMax]);
 
   // Draft editable state
   const [draft, setDraft] = useState<Range[]>(suggested);
-  const [autoAdjust, setAutoAdjust] = useState(true);
 
   useEffect(() => {
     // Reset when modal re-opens or inputs change meaningfully
@@ -91,13 +93,7 @@ const OutcomeRangesAssistant: React.FC<Props> = ({ open, oldMax, newMax, pages, 
   }, [draft, newMax]);
 
   const updateDraft = (index: number, patch: Partial<Range>) => {
-    setDraft((prev) => {
-      const changed = prev.map((r, i) => (i === index ? { ...r, ...patch } : r));
-      if (autoAdjust) {
-        return cascadeAutoAdjust(changed, index, newMax);
-      }
-      return changed;
-    });
+    setDraft((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)));
   };
 
   if (!open) return null;
@@ -127,20 +123,10 @@ const OutcomeRangesAssistant: React.FC<Props> = ({ open, oldMax, newMax, pages, 
             type="button"
             onClick={() => setDraft(distributeEvenly(newMax, pages.length))}
             className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500"
-            title="Auto-distribute ranges evenly across the total score"
+            title="Fix ranges to contiguous 0..max without gaps/overlaps"
           >
-            Distribute Ranges Evenly
+            Auto-fix Ranges
           </button>
-
-          <label className="ml-auto inline-flex items-center gap-2 text-xs text-gray-600">
-            <input
-              type="checkbox"
-              checked={autoAdjust}
-              onChange={(e) => setAutoAdjust(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-            />
-            Auto-adjust subsequent ranges
-          </label>
         </div>
 
         {overallIssues.length > 0 && (

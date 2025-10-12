@@ -325,10 +325,24 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
     });
   }, [formJson]);
  
-  const quizMode =
-    (formJson?.isQuiz === true) ||
-    ((formJson as any)?.quizType === 'KNOWLEDGE') ||
-    anyKnowledgeIndicators;
+  // Detect quiz contexts explicitly and heuristically
+  const hasTraitScoring = useMemo(() => {
+    const fields = (formJson?.fields ?? []) as any[];
+    return fields.some((f) => Array.isArray((f as any)?.scoring) && (f as any).scoring.length > 0);
+  }, [formJson]);
+
+  const hasOutcomeIds = useMemo(() => {
+    const pages = (formJson as any)?.resultPages as any[] | undefined;
+    return Array.isArray(pages) && pages.some((p) => typeof (p as any)?.outcomeId === 'string' && (p as any).outcomeId.length > 0);
+  }, [formJson]);
+
+  const isOutcomeContext =
+    ((formJson as any)?.quizType === 'OUTCOME') || hasTraitScoring || hasOutcomeIds;
+
+  const isKnowledgeContext =
+    ((((formJson as any)?.quizType === 'KNOWLEDGE') || anyKnowledgeIndicators || (formJson?.isQuiz === true))) && !isOutcomeContext;
+
+  const quizMode = isOutcomeContext || isKnowledgeContext;
 
   // Compute rendered field order (non-submit first, then submit) to match FormRenderer
   const getDisplayFields = (form: FormData | null): FormField[] => {
@@ -365,74 +379,131 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
   // Step 0: Compute current max and outcome validity (independent of change)
   const currentMaxScore = useMemo(() => computeMaxPossibleScore(formJson), [formJson]);
   const outcomeValidity = useMemo(() => {
+    // Validate contiguous score ranges ONLY for knowledge-style quizzes.
+    // Outcome-style (trait) quizzes do not rely on numeric ranges.
+    const qt = (formJson as any)?.quizType as ('KNOWLEDGE' | 'OUTCOME' | undefined);
+    const isKnowledge =
+      qt === 'KNOWLEDGE' ||
+      (((formJson as any)?.isQuiz === true) && qt !== 'OUTCOME') ||
+      anyKnowledgeIndicators;
+
+    if (!isKnowledge) return { valid: true, issues: [] as string[] };
+
     const pages = (formJson as any)?.resultPages as ResultPage[] | undefined;
     return validateOutcomeRanges(pages ?? [], currentMaxScore);
-  }, [formJson, currentMaxScore]);
+  }, [formJson, currentMaxScore, anyKnowledgeIndicators]);
 
   // Step 1: Detect total possible score changes (mirrors PublicFormRenderer scoring rules)
   function computeMaxPossibleScore(form: FormData | null): number {
-    if (!form || form.isQuiz !== true) return 0;
+    if (!form) return 0;
 
-    let max = 0;
+    const qt = (form as any)?.quizType as ('KNOWLEDGE' | 'OUTCOME' | undefined);
+    const isOutcome = qt === 'OUTCOME' || Array.isArray((form as any)?.resultPages);
+    const isKnowledge = qt === 'KNOWLEDGE' || ((form as any)?.isQuiz === true && !isOutcome);
 
-    for (const f of form.fields ?? []) {
-      const anyF: any = f;
+    if (isOutcome) {
+      // For outcome-based: max score is the maximum possible total points for any outcome
+      const outcomeMaxes: Record<string, number> = {};
 
-      // RadioGrid: per-row maximum based on column points with ordinal fallback
-      if (f.type === 'radioGrid') {
-        const rows = anyF.rows ?? [];
-        const cols = anyF.columns ?? [];
+      for (const f of form.fields ?? []) {
+        const scoringArr = Array.isArray((f as any).scoring) ? ((f as any).scoring as any[]) : [];
+        if (scoringArr.length === 0) continue;
 
-        const rawPoints: number[] = cols.map((c: any) => {
-          if (typeof c === 'string') return NaN;
-          const p = Number(c?.points);
-          return Number.isFinite(p) ? p : NaN;
-        });
+        // Group max points by outcomeId for this field
+        const fieldMaxes: Record<string, number> = {};
+        for (const r of scoringArr) {
+          if (!r || !r.outcomeId) continue;
+          const pts = Number.isFinite(Number(r.points)) ? Number(r.points) : 1;
+          fieldMaxes[r.outcomeId] = Math.max(fieldMaxes[r.outcomeId] || 0, pts);
+        }
 
-        const allMissing = rawPoints.every((p) => !Number.isFinite(p));
-        const allEqualFinite =
-          rawPoints.every((p) => Number.isFinite(p)) &&
-          rawPoints.every((p) => p === rawPoints[0]);
-
-        const fallbackOrdinal = allMissing || allEqualFinite;
-        const effectivePoints = (idx: number): number => {
-          if (fallbackOrdinal) return idx + 1;
-          const p = rawPoints[idx];
-          return Number.isFinite(p) ? p : 1;
-        };
-
-        const maxColPts =
-          cols.length > 0
-            ? Math.max(...cols.map((_: any, i: number) => effectivePoints(i)))
-            : 0;
-
-        max += rows.length * maxColPts;
-        continue;
+        // Add field maxes to global outcome maxes
+        for (const [outcomeId, pts] of Object.entries(fieldMaxes)) {
+          outcomeMaxes[outcomeId] = (outcomeMaxes[outcomeId] || 0) + pts;
+        }
       }
 
-      // Gradable standard fields: include only if they have a defined correct answer/pattern
-      const pointsRaw = Number(anyF.points ?? 1);
-      const points = Number.isFinite(pointsRaw) ? pointsRaw : 1;
-
-      const patternStr = anyF.answerPattern;
-      const hasPattern = typeof patternStr === 'string' && patternStr.length > 0;
-
-      let gradable = false;
-      if (f.type === 'radio' || f.type === 'select') {
-        gradable = hasPattern || (typeof anyF.correctAnswer === 'string' && anyF.correctAnswer.length > 0);
-      } else if (f.type === 'checkbox') {
-        gradable =
-          hasPattern ||
-          (Array.isArray(anyF.correctAnswer) && anyF.correctAnswer.length > 0) ||
-          (typeof anyF.correctAnswer === 'string' && anyF.correctAnswer.length > 0);
-      } else if (f.type === 'text' || f.type === 'textarea') {
-        gradable = hasPattern || (typeof anyF.correctAnswer === 'string' && anyF.correctAnswer.length > 0);
-      }
-
-      if (gradable) max += points;
+      // The overall max is the highest possible score for any outcome
+      return Math.max(0, ...Object.values(outcomeMaxes));
     }
 
-    return max;
+    if (isKnowledge) {
+      // Knowledge scoring: sum of max points for gradable fields
+      let max = 0;
+
+      for (const f of form.fields ?? []) {
+        const anyF: any = f;
+
+        // Range fields: contribute their span (max - min)
+        if (f.type === 'range') {
+          const minRaw = Number(anyF.min ?? 0);
+          const maxRaw = Number(anyF.max ?? 10);
+          const minV = Number.isFinite(minRaw) ? Math.floor(minRaw) : 0;
+          const maxV = Number.isFinite(maxRaw) ? Math.floor(maxRaw) : 10;
+          const span = Math.max(0, maxV - minV);
+          max += span;
+          continue;
+        }
+
+        // RadioGrid: per-row maximum based on column points with ordinal fallback
+        if (f.type === 'radioGrid') {
+          const rows = anyF.rows ?? [];
+          const cols = anyF.columns ?? [];
+
+          const rawPoints: number[] = cols.map((c: any) => {
+            if (typeof c === 'string') return NaN;
+            const p = Number(c?.points);
+            return Number.isFinite(p) ? p : NaN;
+          });
+
+          const allMissing = rawPoints.every((p) => !Number.isFinite(p));
+          const allEqualFinite =
+            rawPoints.every((p) => Number.isFinite(p)) &&
+            rawPoints.every((p) => p === rawPoints[0]);
+
+          const fallbackOrdinal = allMissing || allEqualFinite;
+          const effectivePoints = (idx: number): number => {
+            if (fallbackOrdinal) return idx + 1;
+            const p = rawPoints[idx];
+            return Number.isFinite(p) ? p : 1;
+          };
+
+          const maxColPts =
+            cols.length > 0
+              ? Math.max(...cols.map((_: any, i: number) => effectivePoints(i)))
+              : 0;
+
+          max += rows.length * maxColPts;
+          continue;
+        }
+
+        // Gradable standard fields: include only if they have a defined correct answer/pattern
+        const pointsRaw = Number(anyF.points ?? 1);
+        const points = Number.isFinite(pointsRaw) ? pointsRaw : 1;
+
+        const patternStr = anyF.answerPattern;
+        const hasPattern = typeof patternStr === 'string' && patternStr.length > 0;
+
+        let gradable = false;
+        if (f.type === 'radio' || f.type === 'select') {
+          gradable = hasPattern || (typeof anyF.correctAnswer === 'string' && anyF.correctAnswer.length > 0);
+        } else if (f.type === 'checkbox') {
+          gradable =
+            hasPattern ||
+            (Array.isArray(anyF.correctAnswer) && anyF.correctAnswer.length > 0) ||
+            (typeof anyF.correctAnswer === 'string' && anyF.correctAnswer.length > 0);
+        } else if (f.type === 'text' || f.type === 'textarea') {
+          gradable = hasPattern || (typeof anyF.correctAnswer === 'string' && anyF.correctAnswer.length > 0);
+        }
+
+        if (gradable) max += points;
+      }
+
+      return max;
+    }
+
+    // No scoring configured
+    return 0;
   }
 
   // Holds previous (baseline) and current computed max score
@@ -2184,7 +2255,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                     </div>
                   )}
 
-                  {quizMode && scoreChange.changed && (
+                  {isKnowledgeContext && scoreChange.changed && (
                     <div className="rounded-md border border-amber-200 bg-amber-50 p-3 mb-3 text-sm text-amber-900 flex items-center justify-between">
                       <div className="mr-2">
                         Total possible score changed from <strong>{scoreChange.old ?? 0}</strong> to <strong>{scoreChange.current}</strong>. Your outcome ranges may need updates.
@@ -2209,7 +2280,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                     </div>
                   )}
                   {/* Proactive invalid-ranges banner (even if total score did not just change) */}
-                  {quizMode && !outcomeValidity.valid && (
+                  {isKnowledgeContext && !outcomeValidity.valid && (
                     <div className="rounded-md border border-red-200 bg-red-50 p-3 mb-3 text-sm text-red-900">
                       <div className="flex items-start justify-between gap-3">
                         <div className="mr-2">
@@ -2413,8 +2484,8 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
         )}
       </main>
 
-      {/* Outcome Ranges Assistant Modal */}
-      {quizMode && (
+      {/* Outcome Ranges Assistant Modal (knowledge quizzes only) */}
+      {isKnowledgeContext && (
         <OutcomeRangesAssistant
           open={rangesAssistantOpen}
           oldMax={scoreChange.old ?? scoreChange.current}

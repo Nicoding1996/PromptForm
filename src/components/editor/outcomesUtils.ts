@@ -74,34 +74,4 @@ export function distributeEvenly(maxScore: number, count: number): Range[] {
   return out;
 }
 
-/**
- * Cascade forward auto-adjustment after a change at index.
- * - Ensures next.from = prev.to + 1
- * - Ensures next.to ≥ next.from
- * - First.from forced to 0
- * - Final last.to clamped to newMax
- */
-export function cascadeAutoAdjust(draft: Range[], changedIndex: number, newMax: number): Range[] {
-  const out = draft.map((r) => ({ from: normalizeInt(r.from), to: normalizeInt(r.to) }));
-  // Force first start
-  if (out.length > 0 && out[0].from !== 0) {
-    out[0].from = 0;
-    if (out[0].to < out[0].from) out[0].to = out[0].from;
-  }
-  // Forward pass
-  for (let i = Math.max(1, changedIndex + 1); i < out.length; i++) {
-    const prev = out[i - 1];
-    const cur = out[i];
-    if (cur.from !== prev.to + 1) {
-      cur.from = prev.to + 1;
-      if (cur.to < cur.from) cur.to = cur.from;
-    }
-  }
-  // Clamp end to max
-  if (out.length > 0) {
-    const last = out[out.length - 1];
-    if (last.to > newMax) last.to = newMax;
-    if (last.from > last.to) last.from = Math.min(last.from, newMax);
-  }
-  return out;
-}
+/* cascadeAutoAdjust removed per simplification; manual editing + auto-fix button are now the only paths */

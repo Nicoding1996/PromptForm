@@ -11,6 +11,8 @@ export type OutcomeResult = {
   outcomeId: string | null;
   outcomeTitle: string | null;
   totals: Record<string, number>;
+  score: number;
+  maxScore: number;
 };
 
 export type CalcResult = KnowledgeResult | OutcomeResult;
@@ -135,7 +137,22 @@ function calculateKnowledge(form: FormData, submission: Record<string, any>): Kn
       continue;
     }
 
-    if (f.type === 'radio' || f.type === 'select') {
+    // Range fields contribute their selected value normalized to 0..(max-min)
+    if (f.type === 'range') {
+      const minRaw = Number((f as any).min ?? 0);
+      const maxRaw = Number((f as any).max ?? 10);
+      const minV = Number.isFinite(minRaw) ? Math.floor(minRaw) : 0;
+      const maxV = Number.isFinite(maxRaw) ? Math.floor(maxRaw) : 10;
+      const lo = Math.min(minV, maxV);
+      const hi = Math.max(minV, maxV);
+      const span = Math.max(0, hi - lo);
+      const vNum = Number(userVal);
+      const selected = Number.isFinite(vNum) ? Math.floor(vNum) : lo;
+      const clamped = Math.max(lo, Math.min(hi, selected));
+      max += span;
+      score += clamped - lo;
+      continue;
+    } else if (f.type === 'radio' || f.type === 'select') {
       const correct = (f as any).correctAnswer as string | undefined;
       if (regex) ok = regex.test(String(userVal ?? ''));
       else if (typeof correct === 'string' && correct.length > 0) ok = nrm(userVal) === nrm(correct);
@@ -171,6 +188,24 @@ function calculateKnowledge(form: FormData, submission: Record<string, any>): Kn
  * - For radioGrid: per-row selected column label -> rule { column, points, outcomeId }
  */
 function calculateOutcome(form: FormData, submission: Record<string, any>): OutcomeResult {
+  // Compute maxScore: maximum possible winning total
+  const outcomeMaxes: Record<string, number> = {};
+  for (const f of form.fields ?? []) {
+    const scoringArr = Array.isArray((f as any).scoring) ? ((f as any).scoring as any[]) : [];
+    if (scoringArr.length === 0) continue;
+
+    const fieldMaxes: Record<string, number> = {};
+    for (const r of scoringArr) {
+      if (!r || !r.outcomeId) continue;
+      const pts = Number.isFinite(Number(r.points)) ? Number(r.points) : 1;
+      fieldMaxes[r.outcomeId] = Math.max(fieldMaxes[r.outcomeId] || 0, pts);
+    }
+
+    for (const [outcomeId, pts] of Object.entries(fieldMaxes)) {
+      outcomeMaxes[outcomeId] = (outcomeMaxes[outcomeId] || 0) + pts;
+    }
+  }
+  const maxScore = Math.max(0, ...Object.values(outcomeMaxes));
   const pages: ResultPage[] = Array.isArray(form.resultPages) ? (form.resultPages as ResultPage[]) : [];
   const orderedOutcomeIds: string[] = pages.map((p) => (p as any).outcomeId || snake(p.title));
   const titleById: Record<string, string> = {};
@@ -281,7 +316,7 @@ function calculateOutcome(form: FormData, submission: Record<string, any>): Outc
   }
   const bestTitle = bestId ? (titleById[bestId] ?? null) : null;
 
-  return { type: 'OUTCOME', outcomeId: bestId, outcomeTitle: bestTitle, totals };
+  return { type: 'OUTCOME', outcomeId: bestId, outcomeTitle: bestTitle, totals, score: bestPoints, maxScore };
 }
 
 /**
