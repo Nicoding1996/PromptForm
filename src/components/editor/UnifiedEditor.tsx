@@ -41,11 +41,13 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
   const setFocus = (index: number | null) => setFocusedFieldIndex(index);
 
   // Auth + Save state
-  const { user } = useAuth();
+  const { user, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [lastSavedId, setLastSavedId] = useState<string | null>(null);
+  // LocalStorage key for anonymous "save-to-login" workflow
+  const UNSAVED_FORM_LOCAL_KEY = 'instantform:unsavedForm';
 
   // Re-enable Save button when there are unsaved changes.
   // Any mutation to formJson means the current in-memory form differs from the last persisted version.
@@ -1423,6 +1425,25 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
         // Mark AI-first generated forms for default visibility in future sessions
         const withMeta = { ...(data as any), meta: { ...((data as any)?.meta), aiGenerated: true } } as FormData;
         setFormJson(withMeta as FormData);
+        // Immediately reflect theme from generated JSON for anonymous users (and logged-in users too)
+        setThemeName(
+          (withMeta as any)?.theme_name ??
+          (withMeta as any)?.themeName ??
+          (withMeta as any)?.theme?.name ??
+          null
+        );
+        setThemePrimary(
+          (withMeta as any)?.theme_primary_color ??
+          (withMeta as any)?.themePrimaryColor ??
+          (withMeta as any)?.theme?.primaryColor ??
+          null
+        );
+        setThemeBackground(
+          (withMeta as any)?.theme_background_color ??
+          (withMeta as any)?.themeBackgroundColor ??
+          (withMeta as any)?.theme?.backgroundColor ??
+          null
+        );
         setLastSavedId(null);
 
         // Seamless Creation-to-Edit Flow:
@@ -1665,6 +1686,27 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
     }
   };
 
+  // Anonymous "Sign Up & Save" flow:
+  // 1) Persist current formJson to localStorage
+  // 2) Trigger Google sign-in (popup). The AuthContext post-login effect will finish the save and redirect.
+  const handleSignUpAndSave = async () => {
+    try {
+      if (!formJson) {
+        toast.error('Generate or start a form first.');
+        return;
+      }
+      try {
+        localStorage.setItem(UNSAVED_FORM_LOCAL_KEY, JSON.stringify(formJson));
+      } catch {
+        // If storage is unavailable, still proceed to login; the draft won't be auto-restored.
+      }
+      await loginWithGoogle();
+      // After successful login, AuthContext will detect the draft and save it.
+    } catch (e: any) {
+      toast.error(e?.message || 'Sign in failed.');
+    }
+  };
+
   // Quick start templates and helpers
   const templates = [
     { icon: ClipboardList, label: 'Customer Feedback', prompt: 'A comprehensive customer feedback form for a business. Include satisfaction rating (1–5), visit frequency, and open-ended comments.' },
@@ -1733,92 +1775,106 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
             </div>
 
             <div className="justify-self-center col-span-2 md:col-span-1 order-3 md:order-none w-full flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
-            {user && formJson && formId && (
+            {user ? (
+              <>
+                {formJson && formId && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleSaveForm}
+                      disabled={saving || !!lastSavedId}
+                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 md:px-3 md:py-1.5 text-xs md:text-sm text-neutral-700 hover:bg-neutral-100 transition-colors"
+                      title="Save this form"
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        {!saving ? <Save className="h-4 w-4" /> : null} Save
+                      </span>
+                    </button>
+                    <span aria-live="polite" className="ml-2 text-xs md:text-sm text-neutral-600">
+                      {saving ? 'Saving...' : lastSavedId ? '✓ Saved!' : 'Unsaved changes'}
+                    </span>
+                  </>
+                )}
+
+                {lastSavedId && (
+                  <Link
+                    to={`/form/${lastSavedId}`}
+                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 md:px-3 md:py-1.5 text-xs md:text-sm text-neutral-700 hover:bg-neutral-100 transition-colors"
+                    title="Open the public link for this form"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      <ExternalLink className="h-4 w-4" /> View
+                    </span>
+                  </Link>
+                )}
+
+                {(formId || lastSavedId) && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleSharePublicLink}
+                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 md:px-3 md:py-1.5 text-xs md:text-sm text-neutral-700 hover:bg-neutral-100 transition-colors"
+                      title="Copy public link"
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        <Share2 className="h-4 w-4" /> Share
+                      </span>
+                    </button>
+
+                    <Link
+                      to={`/form/${formId || lastSavedId}?preview=true`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 md:px-3 md:py-1.5 text-xs md:text-sm text-neutral-700 hover:bg-neutral-100 transition-colors"
+                      title="Open public preview in a new tab"
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        <Eye className="h-4 w-4" /> Preview
+                      </span>
+                    </Link>
+                  </>
+                )}
+
+                {(formId || formJson) && (
+                  <button
+                    type="button"
+                    onClick={() => setAiBarVisible((v) => !v)}
+                    className={aiButtonClass}
+                    title={aiBarVisible ? 'Hide AI bar' : 'Show AI bar'}
+                    aria-pressed={aiBarVisible}
+                  >
+                    <Sparkles className={aiIconClass} />
+                  </button>
+                )}
+
+                {formId ? (
+                  <button
+                    type="button"
+                    onClick={() => setStyleOpen(true)}
+                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 md:px-3 md:py-1.5 text-xs md:text-sm text-neutral-700 hover:bg-neutral-100 transition-colors"
+                    title="Style"
+                    aria-label="Style panel"
+                  >
+                    <Palette className="h-4 w-4 text-indigo-600" />
+                    <span>Style</span>
+                  </button>
+                ) : null}
+              </>
+            ) : ((formId || formJson) ? (
               <>
                 <button
                   type="button"
-                  onClick={handleSaveForm}
-                  disabled={saving || !!lastSavedId}
-                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 md:px-3 md:py-1.5 text-xs md:text-sm text-neutral-700 hover:bg-neutral-100 transition-colors"
-                  title="Save this form"
+                  onClick={handleSignUpAndSave}
+                  className="inline-flex items-center gap-2 rounded-md bg-primary-600 px-3 py-1.5 text-xs md:text-sm font-medium text-white hover:bg-primary-700"
+                  title="Create an account to save this form"
                 >
-                  <span className="inline-flex items-center gap-1">
-                    {!saving ? <Save className="h-4 w-4" /> : null} Save
-                  </span>
+                  <Save className="h-4 w-4" />
+                  <span>Sign Up & Save</span>
                 </button>
-                <span aria-live="polite" className="ml-2 text-xs md:text-sm text-neutral-600">
-                  {saving ? 'Saving...' : lastSavedId ? '✓ Saved!' : 'Unsaved changes'}
-                </span>
               </>
-            )}
-
-            {lastSavedId && (
-              <Link
-                to={`/form/${lastSavedId}`}
-                className="inline-flex items-center gap-1 rounded-md px-2 py-1 md:px-3 md:py-1.5 text-xs md:text-sm text-neutral-700 hover:bg-neutral-100 transition-colors"
-                title="Open the public link for this form"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <span className="inline-flex items-center gap-1">
-                  <ExternalLink className="h-4 w-4" /> View
-                </span>
-              </Link>
-            )}
-
-            {(formId || lastSavedId) && (
-              <>
-                <button
-                  type="button"
-                  onClick={handleSharePublicLink}
-                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 md:px-3 md:py-1.5 text-xs md:text-sm text-neutral-700 hover:bg-neutral-100 transition-colors"
-                  title="Copy public link"
-                >
-                  <span className="inline-flex items-center gap-1">
-                    <Share2 className="h-4 w-4" /> Share
-                  </span>
-                </button>
-
-                <Link
-                  to={`/form/${formId || lastSavedId}?preview=true`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 md:px-3 md:py-1.5 text-xs md:text-sm text-neutral-700 hover:bg-neutral-100 transition-colors"
-                  title="Open public preview in a new tab"
-                >
-                  <span className="inline-flex items-center gap-1">
-                    <Eye className="h-4 w-4" /> Preview
-                  </span>
-                </Link>
-              </>
-            )}
-
-            {(formId || formJson) && (
-              <button
-                type="button"
-                onClick={() => setAiBarVisible((v) => !v)}
-                className={aiButtonClass}
-                title={aiBarVisible ? 'Hide AI bar' : 'Show AI bar'}
-                aria-pressed={aiBarVisible}
-              >
-                <Sparkles className={aiIconClass} />
-              </button>
-            )}
-
-            {/* Style (theme) button */}
-            {formId ? (
-              <button
-                type="button"
-                onClick={() => setStyleOpen(true)}
-                className="inline-flex items-center gap-1 rounded-md px-2 py-1 md:px-3 md:py-1.5 text-xs md:text-sm text-neutral-700 hover:bg-neutral-100 transition-colors"
-                title="Style"
-                aria-label="Style panel"
-              >
-                <Palette className="h-4 w-4 text-indigo-600" />
-                <span>Style</span>
-              </button>
-            ) : null}
-
+            ) : null)}
           </div>
           <div className="justify-self-end order-2 md:order-none flex items-center gap-2 sm:gap-3">
             {user && <Link to="/dashboard" className="text-sm font-medium text-neutral-700 hover:text-primary-600">Forms</Link>}
