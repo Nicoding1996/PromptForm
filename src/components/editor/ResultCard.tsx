@@ -14,7 +14,6 @@ type Props = {
 const ResultCard: React.FC<Props> = ({ index, page, quizType, onChange, onDelete }) => {
   const fromVal = page.scoreRange?.from ?? 0;
   const toVal = page.scoreRange?.to ?? 0;
-  const outcomeIdVal = (page as any)?.outcomeId ?? '';
 
   return (
     <div className="flex flex-col gap-3 rounded-md bg-white p-3 ring-1 ring-gray-200">
@@ -46,26 +45,8 @@ const ResultCard: React.FC<Props> = ({ index, page, quizType, onChange, onDelete
       </div>
 
       {quizType === 'OUTCOME' ? (
-        <div className="grid grid-cols-1 gap-3">
-          <div>
-            <label className="text-xs font-medium text-gray-600" htmlFor={`outcome-id-${index}`}>
-              Outcome ID
-            </label>
-            <input
-              id={`outcome-id-${index}`}
-              type="text"
-              className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm"
-              value={outcomeIdVal}
-              onChange={(e) => {
-                const v = e.target.value;
-                onChange(index, { ...(page as any), outcomeId: v });
-              }}
-              placeholder="e.g., the_commander"
-            />
-            <p className="mt-1 text-[11px] text-gray-500">
-              Internal identifier used by trait scoring (scoring[].outcomeId). Not shown to respondents. Keep it stable after collecting responses.
-            </p>
-          </div>
+        <div className="text-xs text-gray-500">
+          Outcome ID is managed automatically. Scoring rules reference it behind the scenes.
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3">
