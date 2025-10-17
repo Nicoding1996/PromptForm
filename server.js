@@ -481,6 +481,33 @@ The from value of the very first score_range in the list MUST always be 0.
       }
     } catch {}
 
+    // Final sanitize: if quizType is "KNOWLEDGE" but there are no gradable questions,
+    // strip quiz flags so normal forms are not scored accidentally.
+    try {
+      const obj = (jsonResponse && typeof jsonResponse === 'object') ? jsonResponse : null;
+      if (obj) {
+        const fieldsArr = Array.isArray(obj.fields) ? obj.fields : [];
+
+        const hasCorrect = fieldsArr.some((f) => {
+          const t = String((f?.type || '')).toLowerCase();
+          const isChoice = t === 'radio' || t === 'checkbox' || t === 'select';
+          const ca = (f || {}).correctAnswer;
+          return isChoice && ((typeof ca === 'string' && ca.length > 0) || (Array.isArray(ca) && ca.length > 0));
+        });
+
+        const declared = String(obj?.quizType || '').toUpperCase();
+        const hasOutcomeIds =
+          Array.isArray(obj?.resultPages) &&
+          (obj.resultPages || []).some((p) => typeof (p || {}).outcomeId === 'string' && (p || {}).outcomeId.length > 0);
+        const hasTraitScoring = fieldsArr.some((f) => Array.isArray((f || {}).scoring) && (f.scoring || []).length > 0);
+
+        if (declared === 'KNOWLEDGE' && !hasCorrect && !hasTraitScoring && !hasOutcomeIds) {
+          delete obj.quizType;
+          delete obj.isQuiz;
+        }
+      }
+    } catch {}
+
     // Send the valid JSON back to the client
     console.log('[SUCCESS]: Sending valid JSON to client.');
     res.json(jsonResponse);
@@ -1160,6 +1187,30 @@ Additional user instructions (context): "${context.trim()}". Use these instructi
       }
     } catch {}
 
+    // Final sanitize: downgrade accidental knowledge quiz flags when no gradable questions exist
+    try {
+      const obj = (jsonResponse && typeof jsonResponse === 'object') ? jsonResponse : null;
+      if (obj) {
+        const fieldsArr = Array.isArray(obj.fields) ? obj.fields : [];
+        const hasCorrect = fieldsArr.some((f) => {
+          const t = String((f?.type || '')).toLowerCase();
+          const isChoice = t === 'radio' || t === 'checkbox' || t === 'select';
+          const ca = (f || {}).correctAnswer;
+          return isChoice && ((typeof ca === 'string' && ca.length > 0) || (Array.isArray(ca) && ca.length > 0));
+        });
+        const declared = String(obj?.quizType || '').toUpperCase();
+        const hasOutcomeIds =
+          Array.isArray(obj?.resultPages) &&
+          (obj.resultPages || []).some((p) => typeof (p || {}).outcomeId === 'string' && (p || {}).outcomeId.length > 0);
+        const hasTraitScoring = fieldsArr.some((f) => Array.isArray((f || {}).scoring) && (f.scoring || []).length > 0);
+
+        if (declared === 'KNOWLEDGE' && !hasCorrect && !hasTraitScoring && !hasOutcomeIds) {
+          delete obj.quizType;
+          delete obj.isQuiz;
+        }
+      }
+    } catch {}
+
     console.log('[SUCCESS]: Sending vision JSON to client.');
     res.json(jsonResponse);
   } catch (error) {
@@ -1538,6 +1589,30 @@ Additional user instructions (context): "${userContext}"
             }
             return f;
           });
+        }
+      }
+    } catch {}
+
+    // Final sanitize: downgrade accidental knowledge quiz flags when no gradable questions exist
+    try {
+      const obj = (jsonResponse && typeof jsonResponse === 'object') ? jsonResponse : null;
+      if (obj) {
+        const fieldsArr = Array.isArray(obj.fields) ? obj.fields : [];
+        const hasCorrect = fieldsArr.some((f) => {
+          const t = String((f?.type || '')).toLowerCase();
+          const isChoice = t === 'radio' || t === 'checkbox' || t === 'select';
+          const ca = (f || {}).correctAnswer;
+          return isChoice && ((typeof ca === 'string' && ca.length > 0) || (Array.isArray(ca) && ca.length > 0));
+        });
+        const declared = String(obj?.quizType || '').toUpperCase();
+        const hasOutcomeIds =
+          Array.isArray(obj?.resultPages) &&
+          (obj.resultPages || []).some((p) => typeof (p || {}).outcomeId === 'string' && (p || {}).outcomeId.length > 0);
+        const hasTraitScoring = fieldsArr.some((f) => Array.isArray((f || {}).scoring) && (f.scoring || []).length > 0);
+
+        if (declared === 'KNOWLEDGE' && !hasCorrect && !hasTraitScoring && !hasOutcomeIds) {
+          delete obj.quizType;
+          delete obj.isQuiz;
         }
       }
     } catch {}
