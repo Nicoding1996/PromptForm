@@ -1635,6 +1635,17 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
   const handleGenerate = async (promptOverride?: string) => {
     setError(null);
     const effectivePrompt = (promptOverride ?? promptText).trim();
+    try {
+      // DEBUG: Trace event flow and resolved base
+      console.log('[DEBUG] handleGenerate()', {
+        effectivePromptLen: effectivePrompt.length,
+        hasFile: !!selectedFile,
+        online: typeof navigator !== 'undefined' ? navigator.onLine : null,
+        base: ((): string | null => {
+          try { return resolveServerBase(); } catch (e: any) { return `ERR:${e?.message || String(e)}`; }
+        })(),
+      });
+    } catch {}
     if (!effectivePrompt && !selectedFile) {
       setError('Please enter a prompt or attach a file.');
       return;
@@ -1642,10 +1653,11 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
 
     setIsLoading(true);
     try {
+      const base = resolveServerBase();
       const data = await generateFormHybrid({
         prompt: effectivePrompt,
         file: selectedFile || null,
-        serverBase: resolveServerBase(),
+        serverBase: base,
       });
 
       // Mark AI-first generated forms for default visibility in future sessions
@@ -1957,10 +1969,10 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
   ];
 
   const handleTemplateClick = (p: string) => {
+    try { console.log('[DEBUG] handleTemplateClick()', { pLen: (p || '').length }); } catch {}
     setSelectedFile(null);
     setPromptText(p);
-    // Focus the prompt bar so the user can continue typing immediately
-    cmdApiRef.current?.focus();
+    handleGenerate(p);
   };
 
   const createBlankCanvas = async () => {
@@ -2160,6 +2172,12 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                   mode="creation"
                   getApi={(api) => { cmdApiRef.current = api; }}
                   onSend={() => {
+                    try {
+                      console.log('[DEBUG] CommandBar.onSend (homepage)', {
+                        promptLen: promptText.trim().length,
+                        hasFile: !!selectedFile,
+                      });
+                    } catch {}
                     handleGenerate();
                   }}
                 />
@@ -2276,6 +2294,13 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                             cmdApiRef.current = api;
                           }}
                           onSend={() => {
+                            try {
+                              console.log('[DEBUG] CommandBar.onSend (editor)', {
+                                mode: formId ? 'editing' : 'creation',
+                                promptLen: promptText.trim().length,
+                                hasFile: !!selectedFile,
+                              });
+                            } catch {}
                             if (formId) {
                               const cmd = promptText.trim();
                               if (cmd) {

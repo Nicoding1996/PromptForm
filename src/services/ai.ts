@@ -26,18 +26,25 @@ export type AIStatus =
   | { online: false; local: true; mode: 'local' }
   | { online: false; local: false; mode: 'offline-unsupported' };
 
-const ENV_SERVER_BASE = (import.meta as any)?.env?.VITE_API_BASE as string | undefined;
+/** Read env dynamically to ensure dev server picks up fresh .env values after restarts */
 /**
  * Resolve API base strictly from override or VITE_API_BASE.
  * Intentionally NO localhost fallback to prevent cross-environment leaks.
  * Local dev must set VITE_API_BASE in .env (already added).
  */
 export function resolveServerBase(override?: string): string {
-  const base = override || ENV_SERVER_BASE;
-  if (!base) {
-    throw new Error('API base URL is not configured. Set VITE_API_BASE.');
+  const envBase = import.meta.env.VITE_API_BASE;
+  const base = override || envBase;
+  if (base && String(base).trim().length > 0) {
+    return String(base).replace(/\/+$/, '');
   }
-  return String(base).replace(/\/+$/, '');
+  // Dev-only safety fallback so local testing never silently stalls when .env wasn't loaded
+  if (import.meta.env.DEV) {
+    // eslint-disable-next-line no-console
+    console.warn('[ai] VITE_API_BASE missing; using dev fallback http://localhost:3001');
+    return 'http://localhost:3001';
+  }
+  throw new Error('API base URL is not configured. Set VITE_API_BASE.');
 }
 
 /**

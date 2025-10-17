@@ -74,7 +74,9 @@ const prodOrigins = parseOrigins(process.env.FRONTEND_ORIGIN || DEFAULT_PROD_ORI
 const devOrigins = DEFAULT_DEV_ORIGINS.map((s) => s.replace(/\/+$/, ''));
 
 // Final allowlist by env
-const ALLOWLIST = new Set(NODE_ENV === 'production' ? prodOrigins : [...prodOrigins, ...devOrigins]);
+// The allowlist must *always* include both prod and dev origins.
+// The NODE_ENV check was incorrectly locking local servers into prod-only mode.
+const ALLOWLIST = new Set([...prodOrigins, ...devOrigins]);
 
 const isAllowedOrigin = (origin) => {
   if (!origin) return true; // same-origin/non-browser
