@@ -90,31 +90,14 @@ app.use(
       return cb(new Error('Not allowed by CORS'));
     },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: false,
+    optionsSuccessStatus: 204,
   })
 );
 
-// Preflight for all routes (express-safe, validates Origin)
-app.use((req, res, next) => {
- if (req.method === 'OPTIONS') {
-   const origin = req.header('Origin') || '';
-   if (!isAllowedOrigin(origin)) {
-     return res.status(403).type('text/plain').send('CORS origin denied');
-   }
-   res.header('Access-Control-Allow-Origin', origin || ALLOWED_ORIGIN);
-   res.header('Vary', 'Origin');
-   res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-   res.header(
-     'Access-Control-Allow-Headers',
-     req.header('Access-Control-Request-Headers') || 'Content-Type, Authorization'
-   );
-   // If you need cookies, flip to true and align with cors() config above
-   res.header('Access-Control-Allow-Credentials', 'false');
-   return res.sendStatus(204);
- }
- next();
-});
+// Let the cors() middleware handle preflight automatically.
+// The previous custom handler duplicated logic and could omit required headers,
+// causing browsers to report "CORS Missing Allow Origin".
 // Increase JSON body limit to handle base64 images safely (adjust as needed)
 app.use(express.json({ limit: '10mb' }));
 // Enable multipart handling for file uploads (TXT, PDF, DOCX)
