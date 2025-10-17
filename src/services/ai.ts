@@ -26,6 +26,13 @@ export type AIStatus =
   | { online: false; local: false; mode: 'offline-unsupported' };
 
 const DEFAULT_SERVER_BASE = 'http://localhost:3001';
+// Resolve server base URL from param override, Vite env, or localhost default
+const ENV_SERVER_BASE = (import.meta as any)?.env?.VITE_API_BASE as string | undefined;
+function resolveServerBase(override?: string): string {
+  const base = override || ENV_SERVER_BASE || DEFAULT_SERVER_BASE;
+  // normalize: remove trailing slash to avoid double slashes in fetch URLs
+  return String(base).replace(/\/+$/, '');
+}
 
 /**
  * Returns true when the current browser exposes window.ai.prompt()
@@ -92,14 +99,15 @@ export async function generateFormLocal(userPrompt: string): Promise<FormData> {
  *  - TXT/PDF/DOCX -> POST /generate-form-from-document (multipart)
  */
 export async function generateFormCloud(params: GenerateFormParams): Promise<FormData> {
-  const { prompt = '', file = null, serverBase = DEFAULT_SERVER_BASE } = params;
+  const { prompt = '', file = null, serverBase } = params;
+  const base = resolveServerBase(serverBase);
 
   let resp: Response | null = null;
 
   if (file) {
     if (file.type && file.type.startsWith('image/')) {
       const { base64, mimeType } = await fileToBase64(file);
-      resp = await fetch(`${serverBase}/generate-form-from-image`, {
+      resp = await fetch(`${base}/generate-form-from-image`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -112,13 +120,13 @@ export async function generateFormCloud(params: GenerateFormParams): Promise<For
       const form = new FormData();
       form.append('file', file, file.name);
       if (prompt) form.append('prompt', prompt);
-      resp = await fetch(`${serverBase}/generate-form-from-document`, {
+      resp = await fetch(`${base}/generate-form-from-document`, {
         method: 'POST',
         body: form,
       });
     }
   } else {
-    resp = await fetch(`${serverBase}/generate-form`, {
+    resp = await fetch(`${base}/generate-form`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt }),
