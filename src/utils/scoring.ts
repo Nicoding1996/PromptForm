@@ -17,7 +17,13 @@ export type OutcomeResult = {
 
 export type CalcResult = KnowledgeResult | OutcomeResult;
 
-const normalizeLoose = (v: any) => String(v ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+const normalizeLoose = (v: any) => {
+  // Lowercase, strip cosmetic parenthetical numbers like "(1)", "( 2 )", then collapse whitespace.
+  // This makes "Sometimes Applies (2)" match "Sometimes Applies" in trait scoring.
+  const s = String(v ?? '').toLowerCase();
+  const noParensNums = s.replace(/\(\s*\d+\s*\)/g, '');
+  return noParensNums.trim().replace(/\s+/g, ' ');
+};
 const toArray = (v: any): string[] => (Array.isArray(v) ? v.map(String) : v != null ? [String(v)] : []);
 const setFrom = (arr: string[]) => new Set(arr.map(normalizeLoose));
 const setsEqual = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].every((x) => b.has(x));

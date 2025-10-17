@@ -1000,8 +1000,8 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
     });
   };
 
-  // "Suggest with AI" (macro-level: append a brand new question at the end/before submit)
-  const handleSuggestWithAI = async () => {
+  // "Suggest with AI" (macro-level): add a brand new question near the current palette anchor (fallback: before submit)
+  const handleSuggestWithAI = async (opts?: { afterIndex?: number | null; afterName?: string | null }) => {
     if (!formJson || suggestLoading) return;
     setError(null);
     setSuggestLoading(true);
@@ -1022,15 +1022,15 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
       if (!data || typeof data !== 'object') {
         throw new Error('Suggest returned invalid data.');
       }
-
+  
       // Normalize and append
       const makeSnake = (s: string) =>
         String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-
+  
       setFormJson((prev) => {
         if (!prev) return prev;
         const fields = [...(prev.fields ?? [])];
-
+  
         // Generate unique name
         let name =
           (typeof data.name === 'string' && data.name.trim().length
@@ -1043,25 +1043,12 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
           while (used.has(`${base}_${i}`)) i++;
           name = `${base}_${i}`;
         }
-
+  
         const allowedTypes = new Set([
-          'text',
-          'email',
-          'password',
-          'textarea',
-          'radio',
-          'checkbox',
-          'select',
-          'date',
-          'time',
-          'file',
-          'range',
-          'radioGrid',
-          'section',
-          'submit',
+          'text','email','password','textarea','radio','checkbox','select','date','time','file','range','radioGrid','section','submit',
         ]);
         const type = typeof data.type === 'string' && allowedTypes.has(data.type) ? data.type : 'text';
-
+  
         const next: any = {
           label: String(data.label || 'New Question'),
           type,
@@ -1081,7 +1068,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
               }
             : {}),
         };
-
+  
         // Preserve trait-based scoring array when provided (sanitized: no undefined keys)
         if (Array.isArray((data as any).scoring)) {
           const sanitized = (data as any).scoring
@@ -1093,12 +1080,11 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
               if (typeof r?.column === 'string' && r.column) rule.column = String(r.column);
               return rule;
             })
-            // keep only rules that target a concrete selectable (option or column)
             .filter((ru: any) => typeof ru.option === 'string' || typeof ru.column === 'string');
           if (sanitized.length > 0) next.scoring = sanitized;
         }
-
-        // Ensure required structural arrays exist to avoid `undefined` in Firestore
+  
+        // Ensure required structural arrays exist
         if ((next as any).type === 'radio' || (next as any).type === 'checkbox' || (next as any).type === 'select') {
           if (!Array.isArray((next as any).options)) (next as any).options = [];
         }
@@ -1106,25 +1092,25 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
           if (!Array.isArray((next as any).rows)) (next as any).rows = [];
           if (!Array.isArray((next as any).columns)) (next as any).columns = [];
         }
-        // Carry over knowledge attributes only if present in response
+        // Carry over knowledge quiz attributes when present
         if (typeof (data as any).correctAnswer === 'string' || Array.isArray((data as any).correctAnswer)) {
-          next.correctAnswer = (data as any).correctAnswer;
+          (next as any).correctAnswer = (data as any).correctAnswer as any;
         }
         if (Number.isFinite(Number((data as any).points))) {
-          next.points = Math.max(0, Math.floor(Number((data as any).points)));
+          (next as any).points = Math.max(0, Math.floor(Number((data as any).points)));
         }
-
-        // Determine context (do NOT auto-switch a normal form into quiz mode)
+  
+        // Determine context from existing form + AI response
         const prevQuizType = (prev as any)?.quizType;
         const wasKnowledge = prevQuizType === 'KNOWLEDGE' || ((prev as any)?.isQuiz === true && prevQuizType === 'KNOWLEDGE');
         const wasOutcome = prevQuizType === 'OUTCOME' || Array.isArray((prev as any)?.resultPages);
         const aiSuggestsOutcome = Array.isArray((next as any)?.scoring) && (next as any).scoring.length > 0;
         const aiSuggestsKnowledge = typeof (data as any).correctAnswer !== 'undefined' || typeof (data as any).answerPattern === 'string';
-
+  
         const isOutcomeContext = wasOutcome || aiSuggestsOutcome;
         const isKnowledgeContext = wasKnowledge || (!wasOutcome && aiSuggestsKnowledge);
-
-        // In normal forms, strip any quiz-only keys the AI might have added
+  
+        // If not a quiz context, strip quiz-only keys to avoid flipping the editor into quiz mode
         if (!isOutcomeContext && !isKnowledgeContext) {
           delete (next as any).correctAnswer;
           delete (next as any).points;
@@ -1135,7 +1121,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
               .filter((s: any) => typeof s === 'string' && s.length > 0);
           }
         }
-
+  
         // Knowledge fallback only when truly in knowledge context
         if (isKnowledgeContext && (next.type === 'radio' || next.type === 'select' || next.type === 'checkbox')) {
           const opts = Array.isArray((next as any).options) ? (next as any).options : [];
@@ -1148,8 +1134,6 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
           if ((next as any).points == null || !Number.isFinite((next as any).points)) {
             (next as any).points = 1;
           }
-
-          // Snap correctAnswer to exact option labels for highlighting and scoring
           try {
             const norm = (s: any) => String(s ?? '').trim().toLowerCase();
             const options: string[] = Array.isArray((next as any).options) ? (next as any).options.map(String) : [];
@@ -1161,7 +1145,6 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
               const hit = options.find((o) => norm(o) === n || norm(o).includes(n) || n.includes(norm(o)));
               return hit || null;
             };
-
             if (next.type === 'checkbox') {
               const raw = (next as any).correctAnswer;
               const arr = Array.isArray(raw) ? raw : (typeof raw === 'string' ? [raw] : []);
@@ -1174,33 +1157,48 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                 if (snapped) (next as any).correctAnswer = snapped;
               }
             }
-
-            // Ensure required for gradable knowledge items
             (next as any).validation = { ...((next as any).validation || {}), required: true };
-          } catch {
-            // non-fatal sanitation
-          }
+          } catch {}
         }
-
-        // Insert before submit if present, otherwise push to end
-        const submitIdx = fields.findIndex((f: any) => f.type === 'submit');
-        const insertAt = submitIdx >= 0 ? submitIdx : fields.length;
+  
+        // Compute insertion index from context
+        const afterIndex = (opts && typeof opts.afterIndex === 'number') ? opts.afterIndex : null;
+        const afterName = (opts && typeof opts.afterName === 'string') ? opts.afterName : null;
+        let insertAt: number | null = null;
+  
+        if (afterName) {
+          const idxByName = fields.findIndex((f) => f?.name === afterName);
+          if (idxByName >= 0) insertAt = idxByName + 1;
+        } else if (afterIndex != null && afterIndex >= 0) {
+          // Map display index (which renders submit last) to raw array index by counting non-submit items
+          let nonSubmitSeen = -1;
+          let mapped = -1;
+          for (let k = 0; k < fields.length; k++) {
+            if (fields[k]?.type === 'submit') continue;
+            nonSubmitSeen++;
+            if (nonSubmitSeen === afterIndex) {
+              mapped = k + 1;
+              break;
+            }
+          }
+          if (mapped >= 0) insertAt = mapped;
+        }
+        if (insertAt == null) {
+          const submitIdx = fields.findIndex((f: any) => f.type === 'submit');
+          insertAt = submitIdx >= 0 ? submitIdx : fields.length;
+        }
+  
         fields.splice(insertAt, 0, next);
-
-        // Focus newly appended field
         setFocusedFieldIndex(insertAt);
-
+  
         // Promote quiz mode ONLY when actually in quiz contexts
         const topLevelPatch =
           isOutcomeContext
             ? { isQuiz: true, quizType: 'OUTCOME' as any }
             : isKnowledgeContext
-            ? {
-                isQuiz: true,
-                quizType: (prev as any)?.quizType === 'OUTCOME' ? 'OUTCOME' : ('KNOWLEDGE' as any),
-              }
+            ? { isQuiz: true, quizType: (prev as any)?.quizType === 'OUTCOME' ? 'OUTCOME' : ('KNOWLEDGE' as any) }
             : {};
-
+  
         return { ...prev, ...topLevelPatch, fields };
       });
     } catch (e: any) {
@@ -2023,12 +2021,42 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
 
   // Quick start templates and helpers
   const templates = [
-    { icon: ClipboardList, label: 'Customer Feedback', prompt: 'A comprehensive customer feedback form for a business. Include satisfaction rating (1–5), visit frequency, and open-ended comments.' },
-    { icon: UserPlus, label: 'Event Registration', prompt: 'An event registration form with Name, Email, Phone, Ticket Type, Dietary Restrictions, and Terms consent.' },
-    { icon: MessageSquare, label: 'Contact Us', prompt: 'A concise contact form with Name, Email (required), Subject, and Message (textarea).' },
-    { icon: HelpCircle, label: 'Quiz', prompt: 'Create a 5-question multiple-choice quiz about a topic with scoring enabled.' },
-    { icon: ClipboardList, label: 'Assessment', prompt: 'An assessment form with several rating-scale questions and optional long-answer sections.' },
-    { icon: HelpCircle, label: 'Personality Test', prompt: 'A personality test (Enneagram-style) that maps results to outcomes with descriptions.' },
+    {
+      icon: ClipboardList,
+      label: 'Customer Feedback',
+      prompt:
+        'Make a simple customer feedback form for my shop.'
+    },
+    {
+      icon: UserPlus,
+      label: 'Event Registration',
+      prompt:
+        'Register people for my event. Collect name, email, phone, ticket type, and dietary notes.'
+    },
+    {
+      icon: MessageSquare,
+      label: 'Contact Us',
+      prompt:
+        'A clean contact form with name, email, subject, and message.'
+    },
+    {
+      icon: HelpCircle,
+      label: 'Quiz',
+      prompt:
+        'Create a 5-question multiple-choice quiz about coffee.'
+    },
+    {
+      icon: ClipboardList,
+      label: 'Assessment',
+      prompt:
+        'Create a short self-assessment with a simple rating grid (Rarely to Always).'
+    },
+    {
+      icon: HelpCircle,
+      label: 'Personality Test',
+      prompt:
+        'Create a friendly personality test with 6 result types and short descriptions.'
+    },
   ];
 
   const handleTemplateClick = (p: string) => {
@@ -2511,8 +2539,8 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                           onUpdateGridColumnPoints={handleUpdateGridColumnPoints}
                           onUpdateRangeBounds={handleUpdateRangeBounds}
                           onUpdateSectionSubtitle={handleUpdateSectionSubtitle}
-                          // Macro-level "Suggest with AI"
-                          onSuggestWithAI={handleSuggestWithAI}
+                          // Macro-level "Suggest with AI" (in-place insertion)
+                          onSuggestWithAI={handleSuggestWithAI as any}
                           suggestLoading={suggestLoading || isLoading || refactorLoading}
                         />
 

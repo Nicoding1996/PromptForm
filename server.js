@@ -230,11 +230,16 @@ The from value of the very first score_range in the list MUST always be 0.
       - **IF the form is an Outcome Assessment:**
         - You MUST add the top-level properties: \`"isQuiz": true\` and \`"quizType": "OUTCOME"\`.
         - You MUST generate a \`resultPages\` array. Each object in this array MUST contain a \`title\`, \`description\`, and a unique, snake_case \`outcomeId\`.
+          - outcomeId NAMING RULE: Use the snake_case version of the outcome title (strip numerals/prefixes). Example: "Type 1: The Reformer" -> "the_reformer". Do NOT use generic ids like "outcome_type_1".
         - You MUST NOT include \`scoreRange\` inside \`resultPages\`.
         - For EVERY question that contributes to the outcome (e.g., "radio", "checkbox", "radioGrid"), you MUST add a \`scoring\` array.
         - Each entry in the \`scoring\` array maps an answer to an outcome:
           - For "radio", "checkbox", "select": \`{ "option": "Option Text", "points": 1, "outcomeId": "<one_of_the_outcome_ids>" }\`
-          - For "radioGrid": \`{ "column": "Column Label", "points": 1, "outcomeId": "<one_of_the_outcome_ids>" }\`
+          - For "radioGrid": You MUST provide a scoring rule for EACH column. The rule MUST ONLY contain "column", "points", and "outcomeId". Do NOT use "row" or create nested objects like "scoring_map".
+            - Correct format: { "column": "Agree", "points": 2, "outcomeId": "outcome_b" }
+            - INCORRECT: { "row": "...", "column": "..." }
+            - INCORRECT: { "scoring_map": [{...}] }
+          - Within a single "radioGrid" question, all "scoring" rules must reference exactly one "outcomeId". Do NOT repeat the column rules for different outcomes. If multiple traits need to be measured, create multiple "radioGrid" questions, one per trait.
         - For \`radioGrid\` in an Outcome Assessment, the \`columns\` array MUST contain only strings (labels), not objects with points.
         - You MUST intelligently assign different \`outcomeId\`s to different answers to create a meaningful assessment. Do not assign all answers to the same outcome.
         - You MUST NOT include \`correctAnswer\` or a top-level \`points\` key on any field.
@@ -304,6 +309,126 @@ The from value of the very first score_range in the list MUST always be 0.
         } else if (obj.isQuiz === true) {
           // Knowledge test: ensure flag is set when not outcome-based
           obj.quizType = 'KNOWLEDGE';
+        }
+      }
+    } catch {}
+
+    // Post-sanitize: enforce outcomeId naming (+ align scoring refs) and radioGrid constraints
+    try {
+      const toSnake = (s) =>
+        String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+      const isOutcome =
+        String((jsonResponse || {}).quizType || '').toUpperCase() === 'OUTCOME' ||
+        (Array.isArray((jsonResponse || {}).fields) &&
+          (jsonResponse.fields || []).some(
+            (f) => Array.isArray((f || {}).scoring) && (f.scoring || []).length > 0
+          ));
+
+      if (isOutcome) {
+        // 1) Normalize resultPages outcomeIds and build mapping from old -> new
+        const idMap = new Map();
+        if (Array.isArray((jsonResponse || {}).resultPages)) {
+          jsonResponse.resultPages = (jsonResponse.resultPages || []).map((p, i) => {
+            const title = String((p || {}).title || `Outcome ${i + 1}`);
+            const cleaned = title.replace(/^type\s*\d+\s*:\s*/i, '');
+            const desired = toSnake(cleaned) || `outcome_${i + 1}`;
+            const oldIdRaw = (p || {}).outcomeId;
+            const generic = typeof oldIdRaw === 'string' && /^outcome_type_\d+$/i.test(oldIdRaw);
+            const missing = typeof oldIdRaw !== 'string' || oldIdRaw.trim().length === 0;
+            const newId = missing || generic ? desired : oldIdRaw;
+            if (typeof oldIdRaw === 'string' && oldIdRaw !== newId) {
+              idMap.set(String(oldIdRaw), newId);
+            }
+            return { ...p, outcomeId: newId };
+          });
+        }
+
+        // Helper to rewrite scoring outcomeIds using idMap and sanitize shape
+        const rewriteScoring = (arr) =>
+          Array.isArray(arr)
+            ? arr
+                .map((r) => {
+                  let oid = String((r || {}).outcomeId || '');
+                  if (idMap.has(oid)) oid = idMap.get(oid);
+                  const pts = Number.isFinite(Number((r || {}).points)) ? Number(r.points) : 1;
+                  const out = { points: pts, outcomeId: oid };
+                  if (typeof (r || {}).option === 'string') out.option = String(r.option);
+                  if (typeof (r || {}).column === 'string') out.column = String(r.column);
+                  return out;
+                })
+                .filter((ru) => typeof ru.outcomeId === 'string' && (ru.option || ru.column))
+            : arr;
+
+        // 2) Sanitize fields: align scoring outcomeIds, radioGrid columns, and enforce single outcome per grid
+        if (Array.isArray((jsonResponse || {}).fields)) {
+          jsonResponse.fields = (jsonResponse.fields || []).map((f) => {
+            if (Array.isArray((f || {}).scoring)) {
+              f.scoring = rewriteScoring(f.scoring);
+            }
+
+            const t = String((f || {}).type || '').toLowerCase();
+            if (t === 'radiogrid') {
+              // Normalize columns to labels only
+              if (Array.isArray((f || {}).columns)) {
+                f.columns = (f.columns || [])
+                  .map((c) =>
+                    typeof c === 'string' ? c : c && typeof c.label === 'string' ? c.label : ''
+                  )
+                  .filter((s) => typeof s === 'string' && s.length > 0);
+              }
+
+              // Enforce single outcomeId across scoring rules
+              if (Array.isArray((f || {}).scoring)) {
+                // Recount after rewrite
+                const counts = new Map();
+                for (const r of f.scoring) {
+                  const id = String((r || {}).outcomeId || '');
+                  if (!id) continue;
+                  counts.set(id, (counts.get(id) || 0) + 1);
+                }
+
+                if (counts.size > 1) {
+                  const top = Array.from(counts.entries()).sort((a, b) => b[1] - a[1])[0][0];
+                  const seen = new Set();
+                  f.scoring = (f.scoring || [])
+                    .filter(
+                      (r) =>
+                        String((r || {}).outcomeId || '') === top &&
+                        typeof (r || {}).column === 'string'
+                    )
+                    .filter((r) => {
+                      const key = String(r.column).toLowerCase();
+                      if (seen.has(key)) return false;
+                      seen.add(key);
+                      return true;
+                    })
+                    .map((r) => ({
+                      column: String(r.column),
+                      points: Number.isFinite(Number(r.points)) ? Number(r.points) : 1,
+                      outcomeId: top,
+                    }));
+                  console.warn(
+                    '[sanitize] radioGrid scoring used multiple outcomeIds; coerced to single outcomeId:',
+                    top
+                  );
+                } else {
+                  // Ensure allowed keys only
+                  f.scoring = (f.scoring || [])
+                    .filter(
+                      (r) =>
+                        typeof (r || {}).column === 'string' &&
+                        typeof (r || {}).outcomeId === 'string'
+                    )
+                    .map((r) => ({
+                      column: String(r.column),
+                      points: Number.isFinite(Number(r.points)) ? Number(r.points) : 1,
+                      outcomeId: String(r.outcomeId),
+                    }));
+                }
+              }
+            }
+            return f;
+          });
         }
       }
     } catch {}
@@ -549,7 +674,10 @@ Field requirements:
 Scoring (mandatory):
 - Include a "scoring" array mapping each selectable answer to an existing outcome ID:
   - radio/select/checkbox: { "option": "Option Text", "points": 1, "outcomeId": "<one-of-existing-outcome-ids>" }
-  - radioGrid: { "column": "Column Label", "points": 1, "outcomeId": "<one-of-existing-outcome-ids>" }  // applies per selected row
+  - radioGrid: You MUST provide a scoring rule for EACH column. The rule MUST ONLY contain "column", "points", and "outcomeId". Do NOT use "row" or nested objects like "scoring_map". Applies per selected row.
+    - Correct format: { "column": "Agree", "points": 1, "outcomeId": "<one-of-existing-outcome-ids>" }
+    - INCORRECT: { "row": "...", "column": "..." }
+    - INCORRECT: { "scoring_map": [{...}] }
 - Use points = 1 for each selectable answer for consistency with existing items.
 - Choose the single most relevant outcomeId for the new statement (do not invent new IDs).
 
@@ -822,10 +950,14 @@ Additional user instructions (context): "${context.trim()}". Use these instructi
       - If the image/context implies a personality/typology outcome (e.g., "personality test", "enneagram", "DISC", "MBTI", "what type of", "find out your"), you MUST set "isQuiz": true and attempt to include a "resultPages" array with 2–6 placeholder objects, each with { "title", "description", "scoreRange": { "from": 0, "to": 0 } }.
 
      TRAIT-BASED SCORING RULES (for personality/outcome-based assessments):
-     - Each object in "resultPages" MUST include a stable "outcomeId": a snake_case identifier (e.g., "outcome_analyst"). Keep this constant across edits.
+     - Each object in "resultPages" MUST include a stable "outcomeId": the snake_case version of its "title" (e.g., "The Reformer" -> "the_reformer"). Do NOT use generic ids like "outcome_type_1". Keep this constant across edits.
      - For fields that contribute to outcomes, add a "scoring" array:
        - For "radio" | "select" | "checkbox": { "option": "Option Text", "points": 1, "outcomeId": "<existing outcomeId>" }
-       - For "radioGrid": { "column": "Column Label", "points": 1, "outcomeId": "<existing outcomeId>" }
+       - For "radioGrid": You MUST provide a scoring rule for EACH column. The rule MUST ONLY contain "column", "points", and "outcomeId". Do NOT use "row" or create nested objects like "scoring_map".
+         - Correct format: { "column": "Agree", "points": 1, "outcomeId": "<existing outcomeId>" }
+         - INCORRECT: { "row": "...", "column": "..." }
+         - INCORRECT: { "scoring_map": [{...}] }
+     - Within a single "radioGrid" question, all "scoring" rules must reference exactly one "outcomeId". Do NOT repeat the column rules for different outcomes. If multiple traits need to be measured, create multiple "radioGrid" questions, one per trait.
      - For trait scoring with "radioGrid", "columns" should be labels only (e.g., ["Rarely True","Sometimes True","Always True"]); do NOT embed "points" inside "columns".
      - Do NOT set "correctAnswer" for personality/outcome-based assessments; "correctAnswer" is only for knowledge quizzes.
 
@@ -876,6 +1008,109 @@ Additional user instructions (context): "${context.trim()}". Use these instructi
         throw new Error('Model response was not valid JSON.');
       }
     }
+
+    // Post-sanitize for vision: outcomeId naming + align scoring refs + radioGrid hygiene
+    try {
+      const toSnake = (s) =>
+        String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+      const isOutcome =
+        String((jsonResponse || {}).quizType || '').toUpperCase() === 'OUTCOME' ||
+        (Array.isArray((jsonResponse || {}).fields) &&
+          (jsonResponse.fields || []).some(
+            (f) => Array.isArray((f || {}).scoring) && (f.scoring || []).length > 0
+          ));
+
+      if (isOutcome) {
+        const idMap = new Map();
+        if (Array.isArray((jsonResponse || {}).resultPages)) {
+          jsonResponse.resultPages = (jsonResponse.resultPages || []).map((p, i) => {
+            const title = String((p || {}).title || `Outcome ${i + 1}`);
+            const cleaned = title.replace(/^type\s*\d+\s*:\s*/i, '');
+            const desired = toSnake(cleaned) || `outcome_${i + 1}`;
+            const oldId = (p || {}).outcomeId;
+            const generic = typeof oldId === 'string' && /^outcome_type_\d+$/i.test(oldId);
+            const missing = typeof oldId !== 'string' || oldId.trim().length === 0;
+            const newId = missing || generic ? desired : oldId;
+            if (typeof oldId === 'string' && oldId !== newId) idMap.set(String(oldId), newId);
+            return { ...p, outcomeId: newId };
+          });
+        }
+
+        const rewriteScoring = (arr) =>
+          Array.isArray(arr)
+            ? arr
+                .map((r) => {
+                  let oid = String((r || {}).outcomeId || '');
+                  if (idMap.has(oid)) oid = idMap.get(oid);
+                  const pts = Number.isFinite(Number((r || {}).points)) ? Number(r.points) : 1;
+                  const out = { points: pts, outcomeId: oid };
+                  if (typeof (r || {}).option === 'string') out.option = String(r.option);
+                  if (typeof (r || {}).column === 'string') out.column = String(r.column);
+                  return out;
+                })
+                .filter((ru) => typeof ru.outcomeId === 'string' && (ru.option || ru.column))
+            : arr;
+
+        if (Array.isArray((jsonResponse || {}).fields)) {
+          jsonResponse.fields = (jsonResponse.fields || []).map((f) => {
+            if (Array.isArray((f || {}).scoring)) f.scoring = rewriteScoring(f.scoring);
+
+            const t = String((f || {}).type || '').toLowerCase();
+            if (t === 'radiogrid') {
+              if (Array.isArray((f || {}).columns)) {
+                f.columns = (f.columns || [])
+                  .map((c) =>
+                    typeof c === 'string' ? c : c && typeof c.label === 'string' ? c.label : ''
+                  )
+                  .filter((s) => typeof s === 'string' && s.length > 0);
+              }
+              if (Array.isArray((f || {}).scoring)) {
+                const counts = new Map();
+                for (const r of f.scoring) {
+                  const id = String((r || {}).outcomeId || '');
+                  if (!id) continue;
+                  counts.set(id, (counts.get(id) || 0) + 1);
+                }
+                if (counts.size > 1) {
+                  const top = Array.from(counts.entries()).sort((a, b) => b[1] - a[1])[0][0];
+                  const seen = new Set();
+                  f.scoring = (f.scoring || [])
+                    .filter(
+                      (r) =>
+                        String((r || {}).outcomeId || '') === top &&
+                        typeof (r || {}).column === 'string'
+                    )
+                    .filter((r) => {
+                      const key = String(r.column).toLowerCase();
+                      if (seen.has(key)) return false;
+                      seen.add(key);
+                      return true;
+                    })
+                    .map((r) => ({
+                      column: String(r.column),
+                      points: Number.isFinite(Number(r.points)) ? Number(r.points) : 1,
+                      outcomeId: top,
+                    }));
+                } else {
+                  f.scoring = (f.scoring || [])
+                    .filter(
+                      (r) =>
+                        typeof (r || {}).column === 'string' &&
+                        typeof (r || {}).outcomeId === 'string'
+                    )
+                    .map((r) => ({
+                      column: String(r.column),
+                      points: Number.isFinite(Number(r.points)) ? Number(r.points) : 1,
+                      outcomeId: String(r.outcomeId),
+                    }));
+                }
+              }
+            }
+            return f;
+          });
+        }
+      }
+    } catch {}
 
     console.log('[SUCCESS]: Sending vision JSON to client.');
     res.json(jsonResponse);
@@ -1102,10 +1337,14 @@ Additional user instructions (context): "${userContext}"
       - If the document implies a personality/typology outcome (e.g., "personality test", "enneagram", "DISC", "MBTI", "what type of", "find out your"), set "isQuiz": true and include a "resultPages" array (2–6 items) with { "title", "description", "scoreRange": { "from": 0, "to": 0 } } placeholders.
       
      TRAIT-BASED SCORING RULES (for personality/outcome-based assessments):
-     - Each object in "resultPages" MUST include a stable "outcomeId": a snake_case identifier (e.g., "outcome_analyst"). Keep this constant across edits.
+     - Each object in "resultPages" MUST include a stable "outcomeId": the snake_case version of its "title" (e.g., "The Reformer" -> "the_reformer"). Do NOT use generic ids like "outcome_type_1". Keep this constant across edits.
      - For fields that contribute to outcomes, add a "scoring" array:
        - For "radio" | "select" | "checkbox": { "option": "Option Text", "points": 1, "outcomeId": "<existing outcomeId>" }
-       - For "radioGrid": { "column": "Column Label", "points": 1, "outcomeId": "<existing outcomeId>" }
+       - For "radioGrid": You MUST provide a scoring rule for EACH column. The rule MUST ONLY contain "column", "points", and "outcomeId". Do NOT use "row" or create nested objects like "scoring_map".
+         - Correct format: { "column": "Agree", "points": 1, "outcomeId": "<existing outcomeId>" }
+         - INCORRECT: { "row": "...", "column": "..." }
+         - INCORRECT: { "scoring_map": [{...}] }
+     - Within a single "radioGrid" question, all "scoring" rules must reference exactly one "outcomeId". Do NOT repeat the column rules for different outcomes. If multiple traits need to be measured, create multiple "radioGrid" questions, one per trait.
      - For trait scoring with "radioGrid", "columns" should be labels only (e.g., ["Rarely True","Sometimes True","Always True"]); do NOT embed "points" inside "columns".
      - Do NOT set "correctAnswer" for personality/outcome-based assessments; "correctAnswer" is only for knowledge quizzes.
 
@@ -1151,6 +1390,109 @@ Additional user instructions (context): "${userContext}"
         throw new Error('Model response was not valid JSON.');
       }
     }
+
+    // Post-sanitize for document: outcomeId naming + align scoring refs + radioGrid hygiene
+    try {
+      const toSnake = (s) =>
+        String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+      const isOutcome =
+        String((jsonResponse || {}).quizType || '').toUpperCase() === 'OUTCOME' ||
+        (Array.isArray((jsonResponse || {}).fields) &&
+          (jsonResponse.fields || []).some(
+            (f) => Array.isArray((f || {}).scoring) && (f.scoring || []).length > 0
+          ));
+
+      if (isOutcome) {
+        const idMap = new Map();
+        if (Array.isArray((jsonResponse || {}).resultPages)) {
+          jsonResponse.resultPages = (jsonResponse.resultPages || []).map((p, i) => {
+            const title = String((p || {}).title || `Outcome ${i + 1}`);
+            const cleaned = title.replace(/^type\s*\d+\s*:\s*/i, '');
+            const desired = toSnake(cleaned) || `outcome_${i + 1}`;
+            const oldId = (p || {}).outcomeId;
+            const generic = typeof oldId === 'string' && /^outcome_type_\d+$/i.test(oldId);
+            const missing = typeof oldId !== 'string' || oldId.trim().length === 0;
+            const newId = missing || generic ? desired : oldId;
+            if (typeof oldId === 'string' && oldId !== newId) idMap.set(String(oldId), newId);
+            return { ...p, outcomeId: newId };
+          });
+        }
+
+        const rewriteScoring = (arr) =>
+          Array.isArray(arr)
+            ? arr
+                .map((r) => {
+                  let oid = String((r || {}).outcomeId || '');
+                  if (idMap.has(oid)) oid = idMap.get(oid);
+                  const pts = Number.isFinite(Number((r || {}).points)) ? Number(r.points) : 1;
+                  const out = { points: pts, outcomeId: oid };
+                  if (typeof (r || {}).option === 'string') out.option = String(r.option);
+                  if (typeof (r || {}).column === 'string') out.column = String(r.column);
+                  return out;
+                })
+                .filter((ru) => typeof ru.outcomeId === 'string' && (ru.option || ru.column))
+            : arr;
+
+        if (Array.isArray((jsonResponse || {}).fields)) {
+          jsonResponse.fields = (jsonResponse.fields || []).map((f) => {
+            if (Array.isArray((f || {}).scoring)) f.scoring = rewriteScoring(f.scoring);
+
+            const t = String((f || {}).type || '').toLowerCase();
+            if (t === 'radiogrid') {
+              if (Array.isArray((f || {}).columns)) {
+                f.columns = (f.columns || [])
+                  .map((c) =>
+                    typeof c === 'string' ? c : c && typeof c.label === 'string' ? c.label : ''
+                  )
+                  .filter((s) => typeof s === 'string' && s.length > 0);
+              }
+              if (Array.isArray((f || {}).scoring)) {
+                const counts = new Map();
+                for (const r of f.scoring) {
+                  const id = String((r || {}).outcomeId || '');
+                  if (!id) continue;
+                  counts.set(id, (counts.get(id) || 0) + 1);
+                }
+                if (counts.size > 1) {
+                  const top = Array.from(counts.entries()).sort((a, b) => b[1] - a[1])[0][0];
+                  const seen = new Set();
+                  f.scoring = (f.scoring || [])
+                    .filter(
+                      (r) =>
+                        String((r || {}).outcomeId || '') === top &&
+                        typeof (r || {}).column === 'string'
+                    )
+                    .filter((r) => {
+                      const key = String(r.column).toLowerCase();
+                      if (seen.has(key)) return false;
+                      seen.add(key);
+                      return true;
+                    })
+                    .map((r) => ({
+                      column: String(r.column),
+                      points: Number.isFinite(Number(r.points)) ? Number(r.points) : 1,
+                      outcomeId: top,
+                    }));
+                } else {
+                  f.scoring = (f.scoring || [])
+                    .filter(
+                      (r) =>
+                        typeof (r || {}).column === 'string' &&
+                        typeof (r || {}).outcomeId === 'string'
+                    )
+                    .map((r) => ({
+                      column: String(r.column),
+                      points: Number.isFinite(Number(r.points)) ? Number(r.points) : 1,
+                      outcomeId: String(r.outcomeId),
+                    }));
+                }
+              }
+            }
+            return f;
+          });
+        }
+      }
+    } catch {}
 
     console.log('[SUCCESS]: Sending document-derived JSON to client.');
     res.json(jsonResponse);

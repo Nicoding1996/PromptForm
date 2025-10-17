@@ -161,8 +161,8 @@ interface FormRendererProps {
   // Set of field names currently highlighted (for fade-out control)
   highlightedSet?: Set<string>;
 
-  // "Add with AI" macro action
-  onSuggestWithAI?: () => void | Promise<void>;
+  // "Add with AI" macro action - can suggest at a specific location
+  onSuggestWithAI?: (opts?: { afterIndex?: number | null; afterName?: string | null }) => void | Promise<void>;
   suggestLoading?: boolean;
 }
 
@@ -1093,7 +1093,7 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                   setChooserAfter(null);
                 }}
                 onClose={() => setChooserAfter(null)}
-                onSuggestWithAI={() => onSuggestWithAI?.()}
+                onSuggestWithAI={() => onSuggestWithAI?.({ afterIndex: -1, afterName: null })}
                 suggestLoading={suggestLoading}
               />
             </div>
@@ -1201,7 +1201,10 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                             setChooserAfter(null);
                           }}
                           onClose={() => setChooserAfter(null)}
-                          onSuggestWithAI={() => onSuggestWithAI?.()}
+                          onSuggestWithAI={() => {
+                            const anchorName = fields[idx]?.name;
+                            onSuggestWithAI?.({ afterIndex: idx, afterName: anchorName });
+                          }}
                           suggestLoading={suggestLoading}
                         />
                       </div>
@@ -1271,7 +1274,10 @@ const FormRenderer: React.FC<FormRendererProps> = ({
                               setChooserAfter(null);
                             }}
                             onClose={() => setChooserAfter(null)}
-                            onSuggestWithAI={() => onSuggestWithAI?.()}
+                            onSuggestWithAI={() => {
+                              const anchorName = fields[idx]?.name;
+                              onSuggestWithAI?.({ afterIndex: idx, afterName: anchorName });
+                            }}
                             suggestLoading={suggestLoading}
                           />
                         </div>
