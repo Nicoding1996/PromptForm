@@ -394,10 +394,10 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
   
 
   const isOutcomeContext =
-    ((formJson as any)?.quizType === 'OUTCOME') || hasTraitScoring;
+    (formJson?.isQuiz === true) && (((formJson as any)?.quizType === 'OUTCOME') || hasTraitScoring);
 
   const isKnowledgeContext =
-    ((((formJson as any)?.quizType === 'KNOWLEDGE') || anyKnowledgeIndicators || (formJson?.isQuiz === true))) && !isOutcomeContext;
+    (formJson?.isQuiz === true) && (((formJson as any)?.quizType === 'KNOWLEDGE') || anyKnowledgeIndicators) && !isOutcomeContext;
 
   const quizMode = isOutcomeContext || isKnowledgeContext;
 
@@ -440,9 +440,8 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
     // Outcome-style (trait) quizzes do not rely on numeric ranges.
     const qt = (formJson as any)?.quizType as ('KNOWLEDGE' | 'OUTCOME' | undefined);
     const isKnowledge =
-      qt === 'KNOWLEDGE' ||
-      (((formJson as any)?.isQuiz === true) && qt !== 'OUTCOME') ||
-      anyKnowledgeIndicators;
+      ((formJson as any)?.isQuiz === true) &&
+      (qt === 'KNOWLEDGE' || qt !== 'OUTCOME');
 
     if (!isKnowledge) return { valid: true, issues: [] as string[] };
 
@@ -455,8 +454,8 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
     if (!form) return 0;
 
     const qt = (form as any)?.quizType as ('KNOWLEDGE' | 'OUTCOME' | undefined);
-    const isOutcome = qt === 'OUTCOME';
-    const isKnowledge = qt === 'KNOWLEDGE' || (((form as any)?.isQuiz === true) && !isOutcome);
+    const isOutcome = ((form as any)?.isQuiz === true) && qt === 'OUTCOME';
+    const isKnowledge = ((form as any)?.isQuiz === true) && !isOutcome;
 
     if (isOutcome) {
       // For outcome-based: max score is the maximum possible total points for any outcome
