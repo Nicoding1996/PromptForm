@@ -2009,7 +2009,28 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
         >
           <div className="px-4 sm:px-8 lg:px-10 grid grid-cols-2 md:grid-cols-[1fr_auto_1fr] items-center gap-x-3 gap-y-2">
             <div className="justify-self-start flex items-center gap-4">
-              <Link to="/" aria-label="Home" className="inline-flex items-center">
+              <Link
+                to="/"
+                aria-label="Home"
+                className="inline-flex items-center"
+                onClick={() => {
+                  try {
+                    if (!user && formJson) {
+                      // Reset in-memory editor state for logged-out users
+                      setFormJson(null);
+                      setPromptText('');
+                      setSelectedFile(null);
+                      // Clear any theme that might be applied from the generated form
+                      setThemeName(null);
+                      setThemePrimary(null);
+                      setThemeBackground(null);
+                      // Reset UI affordances back to homepage defaults
+                      setAiBarVisible(defaultAiVisible);
+                      setActiveTab('questions');
+                    }
+                  } catch {}
+                }}
+              >
                 <Logo className="h-10 w-auto sm:h-12" />
               </Link>
             </div>
