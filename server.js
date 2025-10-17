@@ -56,7 +56,32 @@ function condenseText(input, limit = DOC_TEXT_CHAR_LIMIT) {
   return `${start}\n\n...[omitted ${input.length - (head + Math.max(tail, 0))} chars]...\n\n${end}`;
 }
 
-app.use(cors());
+const ALLOWED_ORIGIN = process.env.FRONTEND_ORIGIN || 'https://instant-form.vercel.app';
+
+// Explicit CORS for Vercel frontend + robust preflight handling
+app.use(
+  cors({
+    origin: (origin, cb) => {
+      // Allow same-origin requests (no Origin header) and our configured frontend
+      if (!origin || origin === ALLOWED_ORIGIN) return cb(null, true);
+      return cb(new Error('Not allowed by CORS'));
+    },
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: false,
+  })
+);
+
+// Preflight for all routes
+app.options(
+  '*',
+  cors({
+    origin: ALLOWED_ORIGIN,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: false,
+  })
+);
 // Increase JSON body limit to handle base64 images safely (adjust as needed)
 app.use(express.json({ limit: '10mb' }));
 // Enable multipart handling for file uploads (TXT, PDF, DOCX)
