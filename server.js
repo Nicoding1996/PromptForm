@@ -25,7 +25,7 @@ import {
 dotenv.config();
 
 const app = express();
-const port = 3001;
+const PORT = Number(process.env.PORT || 3001);
 
 // Limit for including extracted document text in prompts (characters)
 const DOC_TEXT_CHAR_LIMIT = parseInt(process.env.DOC_TEXT_CHAR_LIMIT || '15000', 10);
@@ -69,6 +69,11 @@ app.use(
     createParentPath: false,
   })
 );
+
+// Lightweight health check/root route for platform probes
+app.get('/', (_req, res) => {
+  res.type('text/plain').send('OK');
+});
 
 // Check for API Key
 if (!process.env.GEMINI_API_KEY) {
@@ -1795,6 +1800,6 @@ Current form JSON:
   }
 });
 
-app.listen(port, () => {
- console.log(`[startup] Server listening on port ${port}`);
+app.listen(PORT, () => {
+ console.log(`[startup] Server listening on port ${PORT}`);
 });
