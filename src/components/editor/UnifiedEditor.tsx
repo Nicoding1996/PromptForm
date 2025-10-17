@@ -1972,7 +1972,8 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
     try { console.log('[DEBUG] handleTemplateClick()', { pLen: (p || '').length }); } catch {}
     setSelectedFile(null);
     setPromptText(p);
-    handleGenerate(p);
+    // Do NOT auto-generate. Only populate the textbox and focus it.
+    try { cmdApiRef.current?.focus(); } catch {}
   };
 
   const createBlankCanvas = async () => {
