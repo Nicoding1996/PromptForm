@@ -13,10 +13,11 @@ import { Logo } from '../ui/Logo';
 import { getFormById, saveFormForUser, listResponsesForForm, type StoredResponse, updateFormTheme } from '../../services/forms';
 import IndividualResponsesView from '../responses/IndividualResponsesView';
 import SummaryView from '../responses/SummaryView';
-import { Save, ExternalLink, Loader2, Share2, Eye, ClipboardList, UserPlus, MessageSquare, HelpCircle, Sparkles, Palette } from 'lucide-react';
+import { Save, ExternalLink, Loader2, Share2, Eye, ClipboardList, UserPlus, MessageSquare, HelpCircle, Sparkles, Palette, Beaker } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { AnimatePresence, motion } from 'framer-motion';
 import Card from '../ui/Card';
+import Toast from '../ui/Toast';
 import StylePanel from './StylePanel';
 
 type UnifiedEditorProps = {
@@ -191,6 +192,8 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
   }, [location.search]);
   const [aiBarVisible, setAiBarVisible] = useState<boolean>(defaultAiVisible);
   const [aiInitDone, setAiInitDone] = useState(false);
+  // Ensure the AI-generation toast is shown only once per mount
+  const aiToastShownRef = useRef<boolean>(false);
 
   // Online/offline + Local AI availability (Chrome Prompt API)
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
@@ -254,6 +257,30 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
     // Default: leave as-is from defaultAiVisible memo
     setAiInitDone(true);
   }, [formJson, location.search, aiInitDone]);
+
+  // One-time AI generation toast when ?ai=1 or ?ai=true is present
+  useEffect(() => {
+    if (aiToastShownRef.current) return;
+    const q = new URLSearchParams(location.search);
+    const aiParam = q.get('ai');
+    const shouldShow = aiParam === '1' || aiParam === 'true';
+    if (!shouldShow) return;
+
+    aiToastShownRef.current = true;
+
+    toast.custom((t) => (
+      <Toast
+        title="Your form has been generated! (Beta)"
+        message="The AI is still learning. Please review the questions and settings for accuracy before saving or sharing."
+        icon={<Beaker className="h-5 w-5 text-amber-700" />}
+        onClose={() => toast.dismiss((t as any).id)}
+        autoCloseMs={12000}
+        role="status"
+      />
+    ), { duration: 12000, position: 'top-right' });
+    // only react to initial presence of ?ai param
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search]);
 
   // Load responses when entering Responses tab
   useEffect(() => {
