@@ -331,13 +331,10 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
     return fields.some((f) => Array.isArray((f as any)?.scoring) && (f as any).scoring.length > 0);
   }, [formJson]);
 
-  const hasOutcomeIds = useMemo(() => {
-    const pages = (formJson as any)?.resultPages as any[] | undefined;
-    return Array.isArray(pages) && pages.some((p) => typeof (p as any)?.outcomeId === 'string' && (p as any).outcomeId.length > 0);
-  }, [formJson]);
+  
 
   const isOutcomeContext =
-    ((formJson as any)?.quizType === 'OUTCOME') || hasTraitScoring || hasOutcomeIds;
+    ((formJson as any)?.quizType === 'OUTCOME') || hasTraitScoring;
 
   const isKnowledgeContext =
     ((((formJson as any)?.quizType === 'KNOWLEDGE') || anyKnowledgeIndicators || (formJson?.isQuiz === true))) && !isOutcomeContext;
@@ -398,8 +395,8 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
     if (!form) return 0;
 
     const qt = (form as any)?.quizType as ('KNOWLEDGE' | 'OUTCOME' | undefined);
-    const isOutcome = qt === 'OUTCOME' || Array.isArray((form as any)?.resultPages);
-    const isKnowledge = qt === 'KNOWLEDGE' || ((form as any)?.isQuiz === true && !isOutcome);
+    const isOutcome = qt === 'OUTCOME';
+    const isKnowledge = qt === 'KNOWLEDGE' || (((form as any)?.isQuiz === true) && !isOutcome);
 
     if (isOutcome) {
       // For outcome-based: max score is the maximum possible total points for any outcome
@@ -1085,14 +1082,29 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
             : {}),
         };
 
-        // Preserve trait-based scoring array when provided
+        // Preserve trait-based scoring array when provided (sanitized: no undefined keys)
         if (Array.isArray((data as any).scoring)) {
-          next.scoring = (data as any).scoring.map((r: any) => ({
-            option: typeof r?.option === 'string' ? r.option : undefined,
-            column: typeof r?.column === 'string' ? r.column : undefined,
-            points: Number.isFinite(Number(r?.points)) ? Math.floor(Number(r.points)) : 1,
-            outcomeId: String(r?.outcomeId || ''),
-          }));
+          const sanitized = (data as any).scoring
+            .map((r: any) => {
+              const pts = Number.isFinite(Number(r?.points)) ? Math.floor(Number(r.points)) : 1;
+              const outcomeId = String(r?.outcomeId || '');
+              const rule: any = { points: pts, outcomeId };
+              if (typeof r?.option === 'string' && r.option) rule.option = String(r.option);
+              if (typeof r?.column === 'string' && r.column) rule.column = String(r.column);
+              return rule;
+            })
+            // keep only rules that target a concrete selectable (option or column)
+            .filter((ru: any) => typeof ru.option === 'string' || typeof ru.column === 'string');
+          if (sanitized.length > 0) next.scoring = sanitized;
+        }
+
+        // Ensure required structural arrays exist to avoid `undefined` in Firestore
+        if ((next as any).type === 'radio' || (next as any).type === 'checkbox' || (next as any).type === 'select') {
+          if (!Array.isArray((next as any).options)) (next as any).options = [];
+        }
+        if ((next as any).type === 'radioGrid') {
+          if (!Array.isArray((next as any).rows)) (next as any).rows = [];
+          if (!Array.isArray((next as any).columns)) (next as any).columns = [];
         }
         // Carry over knowledge attributes only if present in response
         if (typeof (data as any).correctAnswer === 'string' || Array.isArray((data as any).correctAnswer)) {
@@ -1135,6 +1147,38 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
           }
           if ((next as any).points == null || !Number.isFinite((next as any).points)) {
             (next as any).points = 1;
+          }
+
+          // Snap correctAnswer to exact option labels for highlighting and scoring
+          try {
+            const norm = (s: any) => String(s ?? '').trim().toLowerCase();
+            const options: string[] = Array.isArray((next as any).options) ? (next as any).options.map(String) : [];
+            const canon: Record<string, string> = {};
+            options.forEach((o) => { canon[norm(o)] = o; });
+            const snapOne = (val: string): string | null => {
+              const n = norm(val);
+              if (canon[n]) return canon[n];
+              const hit = options.find((o) => norm(o) === n || norm(o).includes(n) || n.includes(norm(o)));
+              return hit || null;
+            };
+
+            if (next.type === 'checkbox') {
+              const raw = (next as any).correctAnswer;
+              const arr = Array.isArray(raw) ? raw : (typeof raw === 'string' ? [raw] : []);
+              const snapped = Array.from(new Set(arr.map((x: string) => snapOne(x) || '').filter(Boolean)));
+              if (snapped.length > 0) (next as any).correctAnswer = snapped;
+            } else {
+              const raw = (next as any).correctAnswer;
+              if (typeof raw === 'string' && raw.length > 0) {
+                const snapped = snapOne(raw);
+                if (snapped) (next as any).correctAnswer = snapped;
+              }
+            }
+
+            // Ensure required for gradable knowledge items
+            (next as any).validation = { ...((next as any).validation || {}), required: true };
+          } catch {
+            // non-fatal sanitation
           }
         }
 
@@ -1229,6 +1273,31 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
               }
             : {}),
         };
+
+        // Sanitize optional scoring (if AI returned it) to avoid `undefined` keys
+        if (Array.isArray((data as any).scoring)) {
+          const sanitized = (data as any).scoring
+            .map((r: any) => {
+              const pts = Number.isFinite(Number(r?.points)) ? Math.floor(Number(r.points)) : 1;
+              const outcomeId = String(r?.outcomeId || '');
+              const rule: any = { points: pts, outcomeId };
+              if (typeof r?.option === 'string' && r.option) rule.option = String(r.option);
+              if (typeof r?.column === 'string' && r.column) rule.column = String(r.column);
+              return rule;
+            })
+            .filter((ru: any) => typeof ru.option === 'string' || typeof ru.column === 'string');
+          if (sanitized.length > 0) (next as any).scoring = sanitized as any;
+        }
+
+        // Ensure structural arrays exist
+        if ((next as any).type === 'radio' || (next as any).type === 'checkbox' || (next as any).type === 'select') {
+          if (!Array.isArray((next as any).options)) (next as any).options = [];
+        }
+        if ((next as any).type === 'radioGrid') {
+          if (!Array.isArray((next as any).rows)) (next as any).rows = [];
+          if (!Array.isArray((next as any).columns)) (next as any).columns = [];
+        }
+
         // Carry over knowledge quiz attributes when present
         if (typeof (data as any).correctAnswer === 'string' || Array.isArray((data as any).correctAnswer)) {
           (next as any).correctAnswer = (data as any).correctAnswer as any;
@@ -1270,6 +1339,34 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
           }
           if ((next as any).points == null || !Number.isFinite((next as any).points)) {
             (next as any).points = 1;
+          }
+          // Snap correctAnswer to an exact option for highlighting/scoring and enforce required
+          try {
+            const norm = (s: any) => String(s ?? '').trim().toLowerCase();
+            const options: string[] = Array.isArray((next as any).options) ? (next as any).options.map(String) : [];
+            const canon: Record<string, string> = {};
+            options.forEach((o) => { canon[norm(o)] = o; });
+            const snapOne = (val: string): string | null => {
+              const n = norm(val);
+              if (canon[n]) return canon[n];
+              const hit = options.find((o) => norm(o) === n || norm(o).includes(n) || n.includes(norm(o)));
+              return hit || null;
+            };
+            if (next.type === 'checkbox') {
+              const raw = (next as any).correctAnswer;
+              const arr = Array.isArray(raw) ? raw : (typeof raw === 'string' ? [raw] : []);
+              const snapped = Array.from(new Set(arr.map((x: string) => snapOne(x) || '').filter(Boolean)));
+              if (snapped.length > 0) (next as any).correctAnswer = snapped;
+            } else {
+              const raw = (next as any).correctAnswer;
+              if (typeof raw === 'string' && raw.length > 0) {
+                const snapped = snapOne(raw);
+                if (snapped) (next as any).correctAnswer = snapped;
+              }
+            }
+            (next as any).validation = { ...((next as any).validation || {}), required: true };
+          } catch {
+            // non-fatal sanitation
           }
         }
  
@@ -1416,11 +1513,25 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
     setFormJson((prev) => {
       if (!prev) return prev;
       const pages = Array.isArray((prev as any).resultPages) ? [...((prev as any).resultPages as ResultPage[])] : [];
-      pages.push({
-        title: 'New Outcome',
-        description: 'Describe this outcome...',
-        scoreRange: { from: 0, to: 0 },
-      });
+      const toSnake = (s: string) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+      const baseTitle = `New Outcome`;
+      if (isOutcomeContext) {
+        // Outcome-based: create with a stable outcomeId and no scoreRange
+        const newId = `outcome_${toSnake(String(pages.length + 1))}`;
+        pages.push({
+          title: baseTitle,
+          description: 'Describe this outcome...',
+          // @ts-ignore allow outcomeId on ResultPage
+          outcomeId: newId,
+        } as any);
+      } else {
+        // Knowledge/range-based
+        pages.push({
+          title: baseTitle,
+          description: 'Describe this outcome...',
+          scoreRange: { from: 0, to: 0 },
+        });
+      }
       return { ...prev, resultPages: pages };
     });
   };
@@ -1429,17 +1540,26 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
     setFormJson((prev) => {
       if (!prev) return prev;
       const pages = Array.isArray((prev as any).resultPages) ? [...((prev as any).resultPages as ResultPage[])] : [];
-      if (!pages[index]) return prev;
-      const current = pages[index];
-      const next: ResultPage = {
-        title: patch.title ?? current.title,
-        description: patch.description ?? current.description,
-        scoreRange: {
-          from: patch.scoreRange?.from ?? current.scoreRange?.from ?? 0,
-          to: patch.scoreRange?.to ?? current.scoreRange?.to ?? 0,
-        },
-      };
-      pages[index] = next;
+      if (index < 0 || index >= pages.length) return prev;
+      const current: any = pages[index] as any;
+      const next: any = { ...current, ...patch };
+      if (isOutcomeContext) {
+        // In outcome-based mode, do not keep score ranges
+        if ('scoreRange' in next) delete next.scoreRange;
+        // Ensure outcomeId exists (stable identifier)
+        if (typeof next.outcomeId !== 'string' || next.outcomeId.trim().length === 0) {
+          const toSnake = (s: string) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+          next.outcomeId = current?.outcomeId || `outcome_${toSnake(next.title || 'type')}`;
+        }
+      } else {
+        // Knowledge: ensure scoreRange structure preserved
+        const from = Number((next as any)?.scoreRange?.from ?? (current as any)?.scoreRange?.from ?? 0);
+        const to = Number((next as any)?.scoreRange?.to ?? (current as any)?.scoreRange?.to ?? 0);
+        next.scoreRange = { from, to };
+        // Remove outcomeId to avoid confusion in pure range mode
+        if ('outcomeId' in next) delete next.outcomeId;
+      }
+      pages[index] = next as ResultPage;
       return { ...prev, resultPages: pages };
     });
   };
@@ -2318,8 +2438,9 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                       </div>
 
                       <p className="mb-3 text-xs text-gray-600">
-                        Outcomes map total quiz score ranges to a result page (e.g., personality type). You can define a title,
-                        description, and a score range for each outcome.
+                        {isOutcomeContext
+                          ? 'Outcomes define your result types for trait-based scoring. Each outcome should have a stable outcomeId that your scoring rules (option/column → outcomeId) reference.'
+                          : 'Outcomes map total quiz score ranges to a result page (e.g., personality type). Define title, description, and the score range for each outcome.'}
                       </p>
 
                       <div className="grid gap-3 md:grid-cols-2">
@@ -2329,6 +2450,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
                               key={`result-page-${i}`}
                               index={i}
                               page={page}
+                              quizType={isOutcomeContext ? 'OUTCOME' : (isKnowledgeContext ? 'KNOWLEDGE' : undefined)}
                               onChange={handleUpdateResultPage}
                               onDelete={handleDeleteResultPage}
                             />

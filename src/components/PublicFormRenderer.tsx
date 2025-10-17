@@ -260,6 +260,8 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
     setError(null);
     if (!preview && !formRef.current?.reportValidity()) return;
     setSubmitting(true);
+    let scoreToSend: number | null = null;
+    let maxToSend: number | null = null;
     try {
       // Merge final page answers
       const finalPagePayload = collectCurrentSectionAnswers();
@@ -271,14 +273,14 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
         setLastResult(calcRes as any);
         setLastScore((calcRes as any).score ?? null);
         setLastMaxScore((calcRes as any).maxScore ?? null);
+        scoreToSend = (calcRes as any).score ?? null;
+        maxToSend = (calcRes as any).maxScore ?? null;
       } catch {
         // Non-fatal: if scoring fails, continue with submission
         setLastResult(null);
       }
 
-      // Use score/maxScore from the calculated result
-      const scoreToSend = (lastResult as any)?.score ?? null;
-      const maxToSend = (lastResult as any)?.maxScore ?? null;
+      // Use score/maxScore from the calculated result (using local vars set above)
 
       // In preview mode, simulate success without sending anything to the server.
       if (preview) {

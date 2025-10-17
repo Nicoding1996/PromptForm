@@ -129,40 +129,32 @@ The from value of the very first score_range in the list MUST always be 0.
       {
         "title": "A String for the Form Title",
         "description": "An optional string for the form's introduction.",
-        "isQuiz": false, // when applicable, set to true (see rules below)
+        "isQuiz": false,
+        "quizType": "KNOWLEDGE | OUTCOME", // CRITICAL: Set based on QUIZ/ASSESSMENT rules below
         "fields": [
           {
             "label": "Field Label",
             "type": "text | email | password | textarea | radio | checkbox | select | date | time | file | range | radioGrid | section | submit",
             "name": "lowercase_field_label_with_underscores",
-            "placeholder": "Optional placeholder text",
-            "helperText": "Optional helper text below the field",
-            "validation": {                      // optional; include when helpful
-              "required": true,
-              "minLength": 2,
-              "maxLength": 50,
-              "pattern": "email"                 // e.g., for email fields
-            },
-            "options": ["Option 1", "Option 2"],
-            "rows": ["Row 1", "Row 2"],       // only for radioGrid
-            "columns": [                      // only for radioGrid; per-column scoring objects
-              { "label": "Col A", "points": 1 },
-              { "label": "Col B", "points": 1 }
-            ],
-            "correctAnswer": "Option 1",      // when isQuiz is true and applicable (radio/checkbox/select)
-            "points": 1                       // when isQuiz is true; default to 1 if not specified
+            "options": ["Option 1", "Option 2"], // For radio, checkbox, select
+            "rows": ["Row 1", "Row 2"],          // For radioGrid
+            "columns": ["Column 1", "Column 2"], // For radioGrid (labels only for OUTCOME type)
+            // --- QUIZ-SPECIFIC KEYS (See rules below) ---
+            "correctAnswer": "Option 1", // For KNOWLEDGE quizzes
+            "points": 1,                 // For KNOWLEDGE quizzes
+            "scoring": [                 // For OUTCOME assessments
+              { "option": "Option 1", "points": 1, "outcomeId": "outcome_a" },
+              { "column": "Column 1", "points": 1, "outcomeId": "outcome_a" }
+            ]
           }
         ],
-        // Optional for personality/typology assessments when isQuiz is true:
-        // Each outcome page covers a score range; the client can edit these.
-        "resultPages": [
+        "resultPages": [ // For OUTCOME assessments
           {
             "title": "Outcome A",
             "description": "A short description for this result.",
-            "scoreRange": { "from": 0, "to": 0 }
+            "outcomeId": "outcome_a" // CRITICAL: snake_case stable identifier
           }
         ],
- 
         // Adaptive Theming (required):
         // Name must be one of: Indigo | Slate | Rose | Amber | Emerald | Sky
         "theme_name": "Indigo",
@@ -224,33 +216,32 @@ The from value of the very first score_range in the list MUST always be 0.
         Emerald-> primary #10B981, background #D1FAE5
         Sky    -> primary #0EA5E9, background #E0F2FE
 
-      QUIZ/ASSESSMENT RULES:
-      - If the user's prompt contains keywords that imply a knowledge test—such as "quiz", "test", "exam", "true or false", or "knowledge check"—you MUST add a new top-level property "isQuiz": true on the main JSON object. Do NOT trigger quiz mode for generic workplace/self "assessment" or "evaluation" forms.
-      - When "isQuiz" is true, you MUST do your best to analyze the prompt/context to identify the correct answer for option-based questions (types "radio", "checkbox", or "select"):
-        - For "radio" or "select", set "correctAnswer" to the single correct option value if it can be identified.
-        - For "checkbox", if multiple options are correct, set "correctAnswer" to an array of all correct option values (e.g., ["A","C"]). If only one is correct, you may still use a single string.
-        - Always add a "points" key with value 1 on that field.
-      - Only set "correctAnswer" on fields that actually have options (radio/checkbox/select). Do NOT add it for text-like or radioGrid fields.
-      - CRITICAL REQUIREMENT FOR ALL QUIZZES/ASSESSMENTS: For any question that contributes to a score (i.e., fields with a "points" key or a "scoring" array), you MUST set "validation": { "required": true } so that submissions cannot omit scored items. For personality or opinion-based questions (e.g., Likert scales), you MUST also include a neutral or opt-out choice such as "Neutral", "I don't know", or "Not Applicable" to avoid forcing biased answers.
-      PERSONALITY / OUTCOME-BASED ASSESSMENTS:
-      - If the prompt implies a personality/typology outcome (e.g., contains phrases like "personality test", "assessment" with outcomes, "enneagram", "DISC", "MBTI", "what type of", "find out your", "which kind of"), you MUST:
-        - Set "isQuiz": true.
-        - Attempt to pre-populate a top-level "resultPages" array with 2–6 placeholder outcomes.
-          Each object MUST include:
-            {
-              "title": "Result Name",
-              "description": "Short description of this personality/result",
-              "scoreRange": { "from": 0, "to": 0 }
-            }
-        - Provide reasonable placeholder score ranges that partition the total possible points, if inferable; otherwise set { "from": 0, "to": 0 } as placeholders.
-      
-      TRAIT-BASED SCORING RULES (for personality/outcome-based assessments):
-      - Each object in "resultPages" MUST include a stable "outcomeId": a snake_case identifier (e.g., "outcome_analyst"). Keep this constant across edits.
-      - For fields that contribute to outcomes, add a "scoring" array:
-        - For "radio" | "select" | "checkbox": { "option": "Option Text", "points": 1, "outcomeId": "<existing outcomeId>" }
-        - For "radioGrid": { "column": "Column Label", "points": 1, "outcomeId": "<existing outcomeId>" }
-      - For trait scoring with "radioGrid", "columns" should be labels only (e.g., ["Rarely True","Sometimes True","Always True"]); do NOT embed "points" inside "columns".
-      - Do NOT set "correctAnswer" for personality/outcome-based assessments; "correctAnswer" is only for knowledge quizzes.
+      QUIZ & ASSESSMENT RULES:
+      - First, determine the type of form. This is the most important step.
+        - **Normal Form:** (Default) For feedback, registration, contact forms, etc. Do not use any quiz keys.
+        - **Knowledge Quiz:** If the prompt implies a knowledge test (e.g., "quiz", "test", "exam", "trivia").
+        - **Outcome Assessment:** If the prompt implies a personality test or typology outcome (e.g., "personality test", "assessment", "what type of leader are you", "which character are you", "enneagram").
+
+      - **IF the form is a Knowledge Quiz:**
+        - You MUST add the top-level properties: \`"isQuiz": true\` and \`"quizType": "KNOWLEDGE"\`.
+        - For each gradable question ("radio", "checkbox", "select"), you MUST include \`"correctAnswer"\` and \`"points": 1\`.
+        - You MUST NOT include a \`resultPages\` array or \`scoring\` arrays on fields.
+
+      - **IF the form is an Outcome Assessment:**
+        - You MUST add the top-level properties: \`"isQuiz": true\` and \`"quizType": "OUTCOME"\`.
+        - You MUST generate a \`resultPages\` array. Each object in this array MUST contain a \`title\`, \`description\`, and a unique, snake_case \`outcomeId\`.
+        - You MUST NOT include \`scoreRange\` inside \`resultPages\`.
+        - For EVERY question that contributes to the outcome (e.g., "radio", "checkbox", "radioGrid"), you MUST add a \`scoring\` array.
+        - Each entry in the \`scoring\` array maps an answer to an outcome:
+          - For "radio", "checkbox", "select": \`{ "option": "Option Text", "points": 1, "outcomeId": "<one_of_the_outcome_ids>" }\`
+          - For "radioGrid": \`{ "column": "Column Label", "points": 1, "outcomeId": "<one_of_the_outcome_ids>" }\`
+        - For \`radioGrid\` in an Outcome Assessment, the \`columns\` array MUST contain only strings (labels), not objects with points.
+        - You MUST intelligently assign different \`outcomeId\`s to different answers to create a meaningful assessment. Do not assign all answers to the same outcome.
+        - You MUST NOT include \`correctAnswer\` or a top-level \`points\` key on any field.
+
+      - **FOR ALL QUIZZES AND ASSESSMENTS:**
+        - Any question that contributes to a score (\`points\` key or \`scoring\` array) MUST have \`"validation": { "required": true }\`.
+        - For opinion-based scales (like Likert), you MUST include a neutral option (e.g., "Neutral", "Sometimes True") to avoid forcing a biased answer.
 
       User's request: "${req.body.prompt}" ${addQuizGuardrails(req.body.prompt)}
     `;
@@ -296,6 +287,26 @@ The from value of the very first score_range in the list MUST always be 0.
         throw new Error('Model response was not valid JSON.');
       }
     }
+
+    // Post-process: infer quizType when model omitted it to keep FE behavior consistent
+    try {
+      const obj = (jsonResponse && typeof jsonResponse === 'object') ? jsonResponse : null;
+      if (obj) {
+        const fieldsArr = Array.isArray(obj.fields) ? obj.fields : [];
+        const hasTraitScoring = fieldsArr.some((f) => Array.isArray((f || {}).scoring) && (f.scoring || []).length > 0);
+        const hasOutcomeIds =
+          Array.isArray(obj.resultPages) &&
+          (obj.resultPages || []).some((p) => typeof (p || {}).outcomeId === 'string' && (p || {}).outcomeId.length > 0);
+
+        if (hasTraitScoring || hasOutcomeIds) {
+          obj.quizType = 'OUTCOME';
+          obj.isQuiz = true;
+        } else if (obj.isQuiz === true) {
+          // Knowledge test: ensure flag is set when not outcome-based
+          obj.quizType = 'KNOWLEDGE';
+        }
+      }
+    } catch {}
 
     // Send the valid JSON back to the client
     console.log('[SUCCESS]: Sending valid JSON to client.');
@@ -395,9 +406,24 @@ app.post('/suggest-question', async (req, res) => {
       return res.status(400).json({ error: 'Invalid "form" object in request body.' });
     }
 
-    // Determine quizType context
+    // Determine quizType context (with heuristic fallback when not explicitly provided)
     const quizTypeRaw = String(form?.quizType || '').toUpperCase();
-    const quizType = (quizTypeRaw === 'KNOWLEDGE' || quizTypeRaw === 'OUTCOME') ? quizTypeRaw : null;
+    let quizType = (quizTypeRaw === 'KNOWLEDGE' || quizTypeRaw === 'OUTCOME') ? quizTypeRaw : null;
+
+    if (!quizType) {
+      // Heuristic: treat as OUTCOME if there are trait scoring rules or resultPages with outcomeId
+      const fieldsArr = Array.isArray(form?.fields) ? form.fields : [];
+      const hasTraitScoring = fieldsArr.some((f) => Array.isArray((f || {}).scoring) && (f.scoring || []).length > 0);
+      const hasOutcomeIds =
+        Array.isArray(form?.resultPages) &&
+        (form.resultPages || []).some((p) => typeof (p || {}).outcomeId === 'string' && (p || {}).outcomeId.length > 0);
+
+      if (hasTraitScoring || hasOutcomeIds) {
+        quizType = 'OUTCOME';
+      } else if (form?.isQuiz === true) {
+        quizType = 'KNOWLEDGE';
+      }
+    }
 
     // Build existing labels/names for anti-duplication
     const fieldsArr = Array.isArray(form?.fields) ? form.fields : [];
@@ -543,28 +569,17 @@ ${OUTCOME_GUARDRAILS}
     } else if (quizType === 'KNOWLEDGE') {
       // Knowledge quiz: SME prompt that outputs a single option-based question with correctAnswer
       masterPrompt = `
- You are a subject matter expert creating a knowledge-check question that complements the existing quiz.
- Generate ONE new option-based question aligned with the form's topic.
- 
- ${ANTI_DUP_CLAUSE}
- 
- CRITICAL REQUIREMENT: You MUST determine the correct answer for the question you generate. Your final JSON output MUST include a correctAnswer key with the correct option's text, and a points key with a value of 1.
- 
- Output ONLY a single field JSON object with:
- - Required: "label", "type", "name"
- - Allowed "type": "radio", "checkbox", or "select" (choose the best fit)
- - Include "options": ["..."] with 3–6 plausible answers
- - MUST include "correctAnswer":
-   - For "radio" or "select": a single string exactly matching one of the options
-   - For "checkbox": an array of one or more strings, each exactly matching options
- - Include "points": 1
- - Do NOT include "scoring" or "resultPages"
- - Do NOT include "section" or "submit"
- - Do NOT include any surrounding prose or markdown. Output only the JSON object.
- 
- Existing form (for context):
- """${formBlock}"""
- `;
+You are a subject matter expert on the topic of the current quiz. Your task is to generate ONE new, on-topic question that is similar in style and difficulty to the existing questions.
+CRITICAL REQUIREMENTS:
+- Analyze the existing questions in the provided form JSON to determine the quiz's specific topic (e.g., "League of Legends lore," "World Capitals," "Chemistry").
+- The new question you generate MUST be on the same topic.
+- Your response must be a single, valid JSON object for the new form field.
+- This JSON object MUST include a correctAnswer key with the correct option's text, and a points key with a value of 1.
+- The new question MUST be unique and not a duplicate of an existing question.
+
+Existing form JSON:
+"""${formBlock}"""
+      `;
     } else {
       // Normal forms: form design expert prompt (no scoring/correctAnswer)
       masterPrompt = `
@@ -648,6 +663,13 @@ Existing form (for context):
     return res.json(fieldJson);
   } catch (e) {
     console.error('[suggest-question] error:', e);
+    const msg = String(e?.message || '').toLowerCase();
+    if (msg.includes('fetch failed') || msg.includes('undici') || msg.includes('network')) {
+      return res.status(502).json({
+        error: 'Upstream model network error.',
+        message: 'The AI provider could not be reached from the server. Please check your internet connection or try again shortly.',
+      });
+    }
     return res.status(500).json({
       error: 'Internal server error.',
       message: e?.message || 'Unknown error',

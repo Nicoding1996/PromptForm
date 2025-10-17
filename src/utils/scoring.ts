@@ -218,6 +218,7 @@ function calculateOutcome(form: FormData, submission: Record<string, any>): Outc
   const ensure = (id: string) => {
     if (!totals[id]) totals[id] = 0;
   };
+  console.log("Starting Trait-Based Scoring. Initial scores:", { ...totals });
 
   const norm = (s: any) => normalizeLoose(s);
 
@@ -239,9 +240,13 @@ function calculateOutcome(form: FormData, submission: Record<string, any>): Outc
       const v = submission[f.name];
       const key = norm(v);
       const rule = byOption[key];
+      console.log(`--- Question: ${String((f as any)?.label ?? f.name)} ---`);
+      console.log(`User Answer:`, v);
+      console.log("Matching Rule Found:", rule);
       if (rule && rule.outcomeId) {
         ensure(rule.outcomeId);
         totals[rule.outcomeId] += Number.isFinite(Number(rule.points)) ? Number(rule.points) : 0;
+        console.log("Updated Scores:", { ...totals });
       }
     } else if (f.type === 'checkbox') {
       const list = toArray(submission[f.name]);
@@ -255,13 +260,17 @@ function calculateOutcome(form: FormData, submission: Record<string, any>): Outc
       }
     } else if (f.type === 'radioGrid') {
       const rows = (f as any).rows ?? [];
+      console.log(`--- Question: ${String((f as any)?.label ?? f.name)} (radioGrid) ---`);
       rows.forEach((rowLabel: string, rIdx: number) => {
         const sel = getGridSelectedLabel(submission, f, rowLabel, rIdx);
         if (sel != null) {
           const rule = byColumn[norm(sel)];
+          console.log(`Row: ${rowLabel} | User Answer: ${sel}`);
+          console.log("Matching Rule Found:", rule);
           if (rule && rule.outcomeId) {
             ensure(rule.outcomeId);
             totals[rule.outcomeId] += Number.isFinite(Number(rule.points)) ? Number(rule.points) : 0;
+            console.log("Updated Scores:", { ...totals });
           }
         } else {
           // Also try nested/dot forms if present directly
@@ -277,9 +286,12 @@ function calculateOutcome(form: FormData, submission: Record<string, any>): Outc
           }
           if (chosen != null && chosen.length > 0) {
             const rule = byColumn[norm(chosen)];
+            console.log(`Row: ${rowLabel} | User Answer (fallback): ${chosen}`);
+            console.log("Matching Rule Found:", rule);
             if (rule && rule.outcomeId) {
               ensure(rule.outcomeId);
               totals[rule.outcomeId] += Number.isFinite(Number(rule.points)) ? Number(rule.points) : 0;
+              console.log("Updated Scores:", { ...totals });
             }
           }
         }
@@ -287,6 +299,7 @@ function calculateOutcome(form: FormData, submission: Record<string, any>): Outc
     }
   }
 
+  console.log("FINAL TRAIT SCORES:", totals);
   // Choose winner: max points; tie-breaker = first by resultPages order; if empty totals, fall back to first page.
   let bestId: string | null = null;
   let bestPoints = -Infinity;
@@ -315,6 +328,8 @@ function calculateOutcome(form: FormData, submission: Record<string, any>): Outc
     bestId = orderedOutcomeIds[0] || null;
   }
   const bestTitle = bestId ? (titleById[bestId] ?? null) : null;
+
+  console.log("Winning outcome:", { outcomeId: bestId, outcomeTitle: bestTitle, score: bestPoints, maxScore });
 
   return { type: 'OUTCOME', outcomeId: bestId, outcomeTitle: bestTitle, totals, score: bestPoints, maxScore };
 }

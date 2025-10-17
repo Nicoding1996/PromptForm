@@ -5,13 +5,16 @@ import { Trash2 } from 'lucide-react';
 type Props = {
   index: number;
   page: ResultPage;
+  // When quizType === 'OUTCOME', we hide score ranges and expose outcomeId editor instead
+  quizType?: 'KNOWLEDGE' | 'OUTCOME';
   onChange: (index: number, patch: Partial<ResultPage>) => void;
   onDelete: (index: number) => void;
 };
 
-const ResultCard: React.FC<Props> = ({ index, page, onChange, onDelete }) => {
+const ResultCard: React.FC<Props> = ({ index, page, quizType, onChange, onDelete }) => {
   const fromVal = page.scoreRange?.from ?? 0;
   const toVal = page.scoreRange?.to ?? 0;
+  const outcomeIdVal = (page as any)?.outcomeId ?? '';
 
   return (
     <div className="flex flex-col gap-3 rounded-md bg-white p-3 ring-1 ring-gray-200">
@@ -42,38 +45,62 @@ const ResultCard: React.FC<Props> = ({ index, page, onChange, onDelete }) => {
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="text-xs font-medium text-gray-600" htmlFor={`outcome-from-${index}`}>
-            Score From
-          </label>
-          <input
-            id={`outcome-from-${index}`}
-            type="number"
-            className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm"
-            defaultValue={fromVal}
-            onBlur={(e) => {
-              const from = Number(e.target.value);
-              onChange(index, { scoreRange: { from: Number.isFinite(from) ? from : 0, to: toVal } });
-            }}
-          />
+      {quizType === 'OUTCOME' ? (
+        <div className="grid grid-cols-1 gap-3">
+          <div>
+            <label className="text-xs font-medium text-gray-600" htmlFor={`outcome-id-${index}`}>
+              Outcome ID
+            </label>
+            <input
+              id={`outcome-id-${index}`}
+              type="text"
+              className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm"
+              value={outcomeIdVal}
+              onChange={(e) => {
+                const v = e.target.value;
+                onChange(index, { ...(page as any), outcomeId: v });
+              }}
+              placeholder="e.g., the_commander"
+            />
+            <p className="mt-1 text-[11px] text-gray-500">
+              Internal identifier used by trait scoring (scoring[].outcomeId). Not shown to respondents. Keep it stable after collecting responses.
+            </p>
+          </div>
         </div>
-        <div>
-          <label className="text-xs font-medium text-gray-600" htmlFor={`outcome-to-${index}`}>
-            Score To
-          </label>
-          <input
-            id={`outcome-to-${index}`}
-            type="number"
-            className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm"
-            defaultValue={toVal}
-            onBlur={(e) => {
-              const to = Number(e.target.value);
-              onChange(index, { scoreRange: { from: fromVal, to: Number.isFinite(to) ? to : 0 } });
-            }}
-          />
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs font-medium text-gray-600" htmlFor={`outcome-from-${index}`}>
+              Score From
+            </label>
+            <input
+              id={`outcome-from-${index}`}
+              type="number"
+              className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm"
+              defaultValue={fromVal}
+              onBlur={(e) => {
+                const from = Number(e.target.value);
+                onChange(index, { scoreRange: { from: Number.isFinite(from) ? from : 0, to: toVal } });
+              }}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600" htmlFor={`outcome-to-${index}`}>
+              Score To
+            </label>
+            <input
+              id={`outcome-to-${index}`}
+              type="number"
+              className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm"
+              defaultValue={toVal}
+              onBlur={(e) => {
+                const to = Number(e.target.value);
+                onChange(index, { scoreRange: { from: fromVal, to: Number.isFinite(to) ? to : 0 } });
+              }}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       <div>
         <label className="text-xs font-medium text-gray-600" htmlFor={`outcome-desc-${index}`}>
