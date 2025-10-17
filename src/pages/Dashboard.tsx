@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { listFormsForUser, type StoredForm, deleteForm, updateFormTitle } from '../services/forms';
+import { listFormsForUser, type StoredForm, deleteForm, updateFormTitle, duplicateForm } from '../services/forms';
 import UserMenu from '../components/ui/UserMenu';
 import { Logo } from '../components/ui/Logo';
 import FormCard from '../components/dashboard/FormCard';
@@ -259,6 +259,17 @@ const Dashboard: React.FC = () => {
                         setRenameOpenId(id);
                         setRenameValue(currentTitle);
                       }}
+                      onDuplicate={async (id: string) => {
+                        if (!user) return;
+                        try {
+                          const newRow = await duplicateForm(user.uid, id);
+                          setForms((rows) => [newRow, ...rows]);
+                          // Optionally focus or scroll to new item; keeping simple for now
+                          toast.success('Form duplicated');
+                        } catch {
+                          toast.error('Failed to duplicate form.');
+                        }
+                      }}
                     />
                   ))}
                 </div>
@@ -283,6 +294,16 @@ const Dashboard: React.FC = () => {
                     } catch {}
                     setRenameOpenId(id);
                     setRenameValue(currentTitle);
+                  }}
+                  onDuplicate={async (id: string) => {
+                    if (!user) return;
+                    try {
+                      const newRow = await duplicateForm(user.uid, id);
+                      setForms((rows) => [newRow, ...rows]);
+                      toast.success('Form duplicated');
+                    } catch {
+                      toast.error('Failed to duplicate form.');
+                    }
                   }}
                 />
               )}

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { markFormOpened, type StoredForm } from '../../services/forms';
-import { FileText, MoreVertical, Share2, Trash2, ExternalLink, TextCursorInput, MessageSquare } from 'lucide-react';
+import { FileText, MoreVertical, Share2, Trash2, ExternalLink, TextCursorInput, MessageSquare, Copy } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
@@ -12,6 +12,7 @@ type Props = {
   onShare: (formId: string) => void;
   onDelete: (formId: string) => void;
   onRename: (formId: string, currentTitle: string) => void;
+  onDuplicate: (formId: string) => void;
 };
 
 function formatOpened(ts?: any): string {
@@ -37,7 +38,7 @@ function formatOpened(ts?: any): string {
   }
 }
 
-const FormCard: React.FC<Props> = ({ form, onShare, onDelete, onRename }) => {
+const FormCard: React.FC<Props> = ({ form, onShare, onDelete, onRename, onDuplicate }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const btnRef = useRef<HTMLButtonElement | null>(null);
@@ -242,6 +243,20 @@ const FormCard: React.FC<Props> = ({ form, onShare, onDelete, onRename }) => {
                     <span className="ml-2">Share</span>
                   </button>
 
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={menuItemClasses}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMenuOpen(false);
+                      onDuplicate(form.id);
+                    }}
+                  >
+                    <Copy className="h-4 w-4 text-neutral-700" />
+                    <span className="ml-2">Duplicate</span>
+                  </button>
+ 
                   <Link
                     to={`/form/${form.id}/edit`}
                     role="menuitem"

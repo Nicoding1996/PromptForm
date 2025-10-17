@@ -208,3 +208,44 @@ export async function deleteForm(id: string): Promise<void> {
   // allow delete: if request.auth != null && get(...forms/$(formId)).data.userId == request.auth.uid;
   await deleteDoc(doc(db, FORMS_COL, id));
 }
+
+/**
+ * Duplicate a form for the given user.
+ * - Copies form structure, title, description, and theme fields
+ * - Does NOT copy any responses (responses live in a subcollection and are not touched)
+ * - Renames title to "… (Copy)"
+ */
+export async function duplicateForm(userId: string, sourceId: string): Promise<StoredForm> {
+  if (!userId) throw new Error('Missing userId');
+  if (!sourceId) throw new Error('Missing sourceId');
+
+  const src = await getFormById(sourceId);
+  if (!src) throw new Error('Source form not found');
+
+  const newTitle = `${src.title || 'Untitled form'} (Copy)`;
+
+  const newFormData: FormData = {
+    ...(src.form as any),
+    title: newTitle,
+    description: (src.form as any)?.description ?? src.description ?? '',
+  } as FormData;
+
+  const ref = await addDoc(collection(db, FORMS_COL), {
+    userId,
+    title: newTitle,
+    description: src.description ?? '',
+    form: newFormData,
+    // Preserve adaptive theming fields exactly as stored
+    theme_name: src.theme_name ?? null,
+    theme_primary_color: src.theme_primary_color ?? null,
+    theme_background_color: src.theme_background_color ?? null,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+
+  // Read back to obtain resolved server timestamps
+  const snap = await getDoc(ref);
+  const data = snap.data() as Omit<StoredForm, 'id'>;
+  // Ensure responseCount is initialized to 0 for UI purposes
+  return { id: snap.id, ...data, responseCount: 0 };
+}

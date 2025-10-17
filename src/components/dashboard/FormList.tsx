@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { createPortal } from 'react-dom';
-import { MoreVertical, MessageSquare, FileText, ExternalLink, Share2, TextCursorInput, Trash2 } from 'lucide-react';
+import { MoreVertical, MessageSquare, FileText, ExternalLink, Share2, TextCursorInput, Trash2, Copy } from 'lucide-react';
 import type { StoredForm } from '../../services/forms';
 import { markFormOpened } from '../../services/forms';
 import Button from '../ui/Button';
@@ -11,6 +11,7 @@ type Props = {
   onShare: (formId: string) => void;
   onDelete: (formId: string) => void;
   onRename: (formId: string, currentTitle: string) => void;
+  onDuplicate: (formId: string) => void;
 };
 
 function formatOpened(ts?: any): string {
@@ -39,7 +40,7 @@ function formatOpened(ts?: any): string {
 const menuItemClasses =
   'flex items-center w-full px-4 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 transition-colors duration-150';
 
-const FormList: React.FC<Props> = ({ forms, onShare, onDelete, onRename }) => {
+const FormList: React.FC<Props> = ({ forms, onShare, onDelete, onRename, onDuplicate }) => {
   const navigate = useNavigate();
 
   // Dropdown menu state, one menu per list (track which id is open)
@@ -214,6 +215,20 @@ const FormList: React.FC<Props> = ({ forms, onShare, onDelete, onRename }) => {
                         <span className="ml-2">Share</span>
                       </button>
 
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className={menuItemClasses}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenMenuId(null);
+                          onDuplicate(form.id);
+                        }}
+                      >
+                        <Copy className="h-4 w-4 text-neutral-700" />
+                        <span className="ml-2">Duplicate</span>
+                      </button>
+ 
                       <Link
                         to={`/form/${form.id}/edit`}
                         role="menuitem"
