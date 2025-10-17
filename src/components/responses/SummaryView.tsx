@@ -24,6 +24,7 @@ import { calculateResult } from '../../utils/scoring';
 import ConfirmModal from '../common/ConfirmModal';
 import { toast } from 'react-hot-toast';
 import { updateFormAiSummary } from '../../services/forms';
+import { resolveServerBase } from '../../services/ai';
 type Props = {
   formId?: string;
   aiSummaryInitial?: string;
@@ -294,7 +295,7 @@ const SummaryView: React.FC<Props> = ({ formId, aiSummaryInitial, form, response
     setReportError(null);
     setIsReportLoading(true);
     try {
-      const apiBase = import.meta.env.VITE_API_BASE || 'http://localhost:3001';
+      const apiBase = resolveServerBase();
       const resp = await fetch(`${apiBase}/analyze-responses`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
