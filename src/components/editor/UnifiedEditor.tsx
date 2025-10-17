@@ -19,6 +19,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import Card from '../ui/Card';
 import Toast from '../ui/Toast';
 import StylePanel from './StylePanel';
+import LocalAIDiagnosticsModal from '../common/LocalAIDiagnosticsModal';
+import { generateFormHybrid } from '../../services/ai';
 
 type UnifiedEditorProps = {
   formId?: string;
@@ -198,6 +200,9 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
   // Online/offline + Local AI availability (Chrome Prompt API)
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [hasLocalAI, setHasLocalAI] = useState<boolean>(typeof window !== 'undefined' ? !!(window as any)?.ai : false);
+  // Modal state for Local AI diagnostics
+  const [localAIModalOpen, setLocalAIModalOpen] = useState(false);
+  const [localAIDetails, setLocalAIDetails] = useState<any | null>(null);
   useEffect(() => {
     const updateAI = () => setHasLocalAI(typeof window !== 'undefined' ? !!(window as any)?.ai : false);
     const on = () => setIsOnline(true);
@@ -214,6 +219,34 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
       document.removeEventListener('visibilitychange', visHandler);
     };
   }, []);
+
+  // Minimal diagnostics/help for Local AI enablement
+  const showLocalAIDiagnostics = () => {
+    try {
+      const anyWin: any = (window as any) || {};
+      const details = {
+        hasPrompt: typeof anyWin?.ai?.prompt === 'function',
+        secure: (window as any)?.isSecureContext === true,
+        protocol: window.location?.protocol || '',
+        online: navigator.onLine,
+        userAgent: navigator.userAgent,
+      };
+      // Log a richer report to DevTools
+      // eslint-disable-next-line no-console
+      console.log(
+        '[Local AI diagnostics]\\n' +
+          `Local AI prompt(): ${details.hasPrompt}\\n` +
+          `Secure context: ${details.secure} (${details.protocol})\\n` +
+          `navigator.onLine: ${details.online}\\n` +
+          `UserAgent: ${details.userAgent}`
+      );
+      setLocalAIDetails(details);
+      setLocalAIModalOpen(true);
+    } catch {
+      setLocalAIDetails(null);
+      setLocalAIModalOpen(true);
+    }
+  };
 
   // Load existing form when formId is provided
   useEffect(() => {
@@ -1599,7 +1632,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
     });
   };
 
-  // Generate via backend services (AI) with offline/local fallback
+  // Generate via AI (Hybrid): delegates to shared AI service (cloud or local)
   const handleGenerate = async (promptOverride?: string) => {
     setError(null);
     const effectivePrompt = (promptOverride ?? promptText).trim();
@@ -1608,166 +1641,19 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
       return;
     }
 
-    // Offline-first: use Chrome's built-in Prompt API when available
-    const aiAny: any = (window as any)?.ai;
-    const localAiAvailable = !!aiAny && typeof aiAny.prompt === 'function';
-
-    if (!navigator.onLine) {
-      if (selectedFile) {
-        setError('Offline generation supports text prompts only. Remove the file to generate locally.');
-        return;
-      }
-      if (localAiAvailable) {
-        await generateFormLocally(effectivePrompt);
-        return;
-      }
-      setError('You are offline and local AI is unavailable in this browser.');
-      return;
-    }
-
-    // Online path: use cloud API as before
     setIsLoading(true);
     try {
-      let resp: Response | null = null;
+      const data = await generateFormHybrid({
+        prompt: effectivePrompt,
+        file: selectedFile || null,
+        serverBase: 'http://localhost:3001',
+      });
 
-      if (selectedFile) {
-        if (selectedFile.type && selectedFile.type.startsWith('image/')) {
-          const { base64, mimeType } = await fileToBase64(selectedFile);
-          resp = await fetch('http://localhost:3001/generate-form-from-image', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              image: base64,
-              mimeType,
-              context: effectivePrompt || undefined,
-            }),
-          });
-        } else {
-          const form = new FormData();
-          form.append('file', selectedFile, selectedFile.name);
-          if (effectivePrompt) form.append('prompt', effectivePrompt);
-          resp = await fetch('http://localhost:3001/generate-form-from-document', {
-            method: 'POST',
-            body: form,
-          });
-        }
-      } else {
-        resp = await fetch('http://localhost:3001/generate-form', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: effectivePrompt }),
-        });
-      }
-
-      let data: unknown = null;
-      try {
-        data = await resp.json();
-      } catch {}
-
-      if (!resp.ok) {
-        const message = (() => {
-          if (data && typeof data === 'object') {
-            const d = data as Record<string, unknown>;
-            if (typeof d.error === 'string') return d.error;
-            if (typeof d.message === 'string') return d.message;
-          }
-          return 'Failed to generate form.';
-        })();
-        setError(message);
-        setFormJson(null);
-      } else {
-        // Mark AI-first generated forms for default visibility in future sessions
-        const withMeta = { ...(data as any), meta: { ...((data as any)?.meta), aiGenerated: true } } as FormData;
-        setFormJson(withMeta as FormData);
-        // Immediately reflect theme from generated JSON for anonymous users (and logged-in users too)
-        setThemeName(
-          (withMeta as any)?.theme_name ??
-          (withMeta as any)?.themeName ??
-          (withMeta as any)?.theme?.name ??
-          null
-        );
-        setThemePrimary(
-          (withMeta as any)?.theme_primary_color ??
-          (withMeta as any)?.themePrimaryColor ??
-          (withMeta as any)?.theme?.primaryColor ??
-          null
-        );
-        setThemeBackground(
-          (withMeta as any)?.theme_background_color ??
-          (withMeta as any)?.themeBackgroundColor ??
-          (withMeta as any)?.theme?.backgroundColor ??
-          null
-        );
-        setLastSavedId(null);
-
-        // Seamless Creation-to-Edit Flow:
-        // If we're on the homepage (no formId yet) and the user is logged in,
-        // auto-save the newly generated form and navigate to /form/:id/edit.
-        if (!formId && user) {
-          try {
-            const newId = await saveFormForUser(user.uid, withMeta as FormData);
-            setLastSavedId(newId);
-            toast.success('Form created. Opening editor...');
-            navigate(`/form/${newId}/edit?ai=1`);
-          } catch (e: any) {
-            const msg = e?.message || 'Auto-save failed. Please save manually.';
-            toast.error(msg);
-          }
-        }
-      }
-    } catch (err) {
-      setError('Network error while contacting backend.');
-      setFormJson(null);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Local client-side generation using Chrome's Prompt API
-  const generateFormLocally = async (userPrompt: string) => {
-    setError(null);
-    setIsLoading(true);
-    try {
-      const systemPrompt = [
-        'You are an expert form generator.',
-        'Return ONLY a valid JSON object representing a web form.',
-        'The JSON must have "title", "description", and a "fields" array.',
-        'Each field object must include "label", "type", and "name".',
-        'Allowed "type" values: text, email, password, textarea, radio, checkbox, select, date, time, file, range, radioGrid, section, submit.',
-        'Use snake_case for unique "name" values.',
-        'Include exactly one "submit" field as the final item in "fields".',
-        'Return ONLY the JSON. No prose. No markdown.',
-      ].join(' ');
-      const composed = `${systemPrompt}\n\nUser request: "${userPrompt}"`;
-
-      const aiAny: any = (window as any)?.ai;
-      if (!aiAny || typeof aiAny.prompt !== 'function') {
-        throw new Error('Local AI (window.ai.prompt) is not available.');
-      }
-
-      const res = await aiAny.prompt(composed);
-      const raw = String(res ?? '').trim();
-      if (!raw) throw new Error('Local AI returned an empty response.');
-
-      // Robust JSON extraction (handles accidental wrappers)
-      let data: any;
-      try {
-        data = JSON.parse(raw);
-      } catch {
-        const start = raw.indexOf('{');
-        const end = raw.lastIndexOf('}');
-        if (start !== -1 && end !== -1 && end > start) {
-          const slice = raw.slice(start, end + 1);
-          data = JSON.parse(slice);
-        } else {
-          throw new Error('Local AI did not return valid JSON.');
-        }
-      }
-
+      // Mark AI-first generated forms for default visibility in future sessions
       const withMeta = { ...(data as any), meta: { ...((data as any)?.meta), aiGenerated: true } } as FormData;
       setFormJson(withMeta as FormData);
 
-      // Reflect theme immediately when present
+      // Immediately reflect theme from generated JSON for anonymous users (and logged-in users too)
       setThemeName(
         (withMeta as any)?.theme_name ??
         (withMeta as any)?.themeName ??
@@ -1788,12 +1674,14 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
       );
       setLastSavedId(null);
 
-      // Seamless Creation-to-Edit Flow (same as cloud path)
+      // Seamless Creation-to-Edit Flow:
+      // If we're on the homepage (no formId yet) and the user is logged in,
+      // auto-save the newly generated form and navigate to /form/:id/edit.
       if (!formId && user) {
         try {
           const newId = await saveFormForUser(user.uid, withMeta as FormData);
           setLastSavedId(newId);
-          toast.success('Form created locally. Opening editor...');
+          toast.success('Form created. Opening editor...');
           navigate(`/form/${newId}/edit?ai=1`);
         } catch (e: any) {
           const msg = e?.message || 'Auto-save failed. Please save manually.';
@@ -1801,12 +1689,13 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
         }
       }
     } catch (e: any) {
-      setError(e?.message || 'Local AI generation failed.');
+      setError(e?.message || 'Failed to generate form.');
       setFormJson(null);
     } finally {
       setIsLoading(false);
     }
   };
+
 
   // AI Refactor Engine: apply a user command across the entire form
   const handleRefactorRequest = async (command: string) => {
@@ -1963,24 +1852,6 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
     }
   };
 
-  // Convert selected image file to Base64 (without data: prefix) and mime type
-  const fileToBase64 = (file: File): Promise<{ base64: string; mimeType: string }> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        try {
-          const result = String(reader.result);
-          const [prefix, b64] = result.split(',');
-          const mimeType = prefix?.match(/data:(.*);base64/)?.[1] ?? file.type;
-          if (!b64) return reject(new Error('Failed to read file as Base64.'));
-          resolve({ base64: b64, mimeType });
-        } catch (e) {
-          reject(e);
-        }
-      };
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(file);
-    });
 
   // Save handler (update when formId exists, otherwise create)
   const handleSaveForm = async () => {
@@ -2275,9 +2146,23 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
               </div>
               <div className="mt-2 w-full md:w-4/5 mx-auto text-center">
                 <p className="text-xs text-neutral-600">
-                  {isOnline
-                    ? '☁️ Cloud AI Connected'
-                    : (hasLocalAI ? '🧠 Local AI Active' : '⚠️ Offline (Local AI unavailable)')}
+                  {isOnline ? (
+                    '☁️ Cloud AI Connected'
+                  ) : hasLocalAI ? (
+                    '🧠 Local AI Active'
+                  ) : (
+                    <>
+                      ⚠️ Offline (Local AI unavailable)
+                      <button
+                        type="button"
+                        onClick={showLocalAIDiagnostics}
+                        className="ml-2 underline text-neutral-700 hover:text-neutral-900"
+                        title="Why is Local AI unavailable?"
+                      >
+                        Why?
+                      </button>
+                    </>
+                  )}
                 </p>
               </div>
 
@@ -2704,6 +2589,13 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
           }
         }}
         onThemeUpdate={handleThemeUpdate}
+      />
+
+      {/* Local AI Diagnostics Modal */}
+      <LocalAIDiagnosticsModal
+        open={localAIModalOpen}
+        onClose={() => setLocalAIModalOpen(false)}
+        details={localAIDetails || undefined}
       />
 
       {/* Non-blocking "Show details" popover */}
