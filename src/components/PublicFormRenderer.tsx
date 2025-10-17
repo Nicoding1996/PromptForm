@@ -79,6 +79,25 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
   const brand = themePrimaryColor || '#4F46E5'; // indigo-600 fallback
   const styleVars = { ['--color-brand-600' as any]: brand } as React.CSSProperties;
 
+  // Detect if this form is configured for scoring/outcomes
+  const scoringEnabled = useMemo(() => {
+    const form: any = formData as any;
+    const qt = form?.quizType as ('KNOWLEDGE' | 'OUTCOME' | undefined);
+    if (qt === 'KNOWLEDGE' || qt === 'OUTCOME') return true;
+
+    const hasTraitScoring =
+      Array.isArray(form?.fields) &&
+      (form.fields as any[]).some((f) => Array.isArray((f as any)?.scoring) && (f as any).scoring.length > 0);
+
+    const hasOutcomeIds =
+      Array.isArray(form?.resultPages) &&
+      (form.resultPages as any[]).some(
+        (p) => typeof (p as any)?.outcomeId === 'string' && (p as any).outcomeId.length > 0
+      );
+
+    return hasTraitScoring || hasOutcomeIds;
+  }, [formData]);
+
   if (!formData) return null;
 
   // Partition fields into sections using explicit "section" markers.
@@ -268,17 +287,26 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
       const finalPagePayload = collectCurrentSectionAnswers();
       const payload = mergePayload(allAnswers, finalPagePayload);
 
-      // Central scoring (knowledge or outcome-based)
-      try {
-        const calcRes = calculateResult(formData as any, payload);
-        setLastResult(calcRes as any);
-        setLastScore((calcRes as any).score ?? null);
-        setLastMaxScore((calcRes as any).maxScore ?? null);
-        scoreToSend = (calcRes as any).score ?? null;
-        maxToSend = (calcRes as any).maxScore ?? null;
-      } catch {
-        // Non-fatal: if scoring fails, continue with submission
+      // Central scoring (only if the form is configured for scoring/outcomes)
+      if (scoringEnabled) {
+        try {
+          const calcRes = calculateResult(formData as any, payload);
+          setLastResult(calcRes as any);
+          setLastScore((calcRes as any).score ?? null);
+          setLastMaxScore((calcRes as any).maxScore ?? null);
+          scoreToSend = (calcRes as any).score ?? null;
+          maxToSend = (calcRes as any).maxScore ?? null;
+        } catch {
+          // Non-fatal: if scoring fails, continue with submission
+          setLastResult(null);
+        }
+      } else {
+        // Not a quiz and no trait/outcome scoring configured
         setLastResult(null);
+        setLastScore(null);
+        setLastMaxScore(null);
+        scoreToSend = null;
+        maxToSend = null;
       }
 
       // Use score/maxScore from the calculated result (using local vars set above)
@@ -676,7 +704,7 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
         <Card className="p-6">
           <div className="text-center">
             <h2 className="text-lg font-semibold text-gray-900">Thank you for your response!</h2>
-            {lastScore != null && lastMaxScore != null ? (
+            {scoringEnabled && lastScore != null && lastMaxScore != null ? (
               <p className="mt-2 text-base font-semibold" style={{ color: brand }}>
                 You scored {lastScore} out of {lastMaxScore}!
               </p>
