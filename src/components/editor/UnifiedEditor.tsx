@@ -20,7 +20,7 @@ import Card from '../ui/Card';
 import Toast from '../ui/Toast';
 import StylePanel from './StylePanel';
 import LocalAIDiagnosticsModal from '../common/LocalAIDiagnosticsModal';
-import { generateFormHybrid } from '../../services/ai';
+import { generateFormHybrid, resolveServerBase } from '../../services/ai';
 
 type UnifiedEditorProps = {
   formId?: string;
@@ -1065,7 +1065,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
     setError(null);
     setSuggestLoading(true);
     try {
-      const resp = await fetch('http://localhost:3001/suggest-question', {
+      const resp = await fetch(`${resolveServerBase()}/suggest-question`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ form: formJson }),
@@ -1275,7 +1275,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
       const label = String(formJson?.fields?.[fieldIndex]?.label ?? '').trim();
       const prompt = label || 'New question';
 
-      const resp = await fetch('http://localhost:3001/assist-question', {
+      const resp = await fetch(`${resolveServerBase()}/assist-question`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt }),
@@ -1645,7 +1645,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
       const data = await generateFormHybrid({
         prompt: effectivePrompt,
         file: selectedFile || null,
-        serverBase: 'http://localhost:3001',
+        serverBase: resolveServerBase(),
       });
 
       // Mark AI-first generated forms for default visibility in future sessions
@@ -1709,7 +1709,7 @@ const UnifiedEditor: React.FC<UnifiedEditorProps> = ({ formId }) => {
     setIsRefactoring(true);
     setRefactorLoading(true);
     try {
-      const resp = await fetch('http://localhost:3001/refactor-form', {
+      const resp = await fetch(`${resolveServerBase()}/refactor-form`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ formJson, command }),

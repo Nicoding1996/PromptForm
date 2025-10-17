@@ -2,6 +2,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import type { FormData, FormField } from './FormRenderer';
 import Card from './ui/Card';
 import { calculateResult, type CalcResult } from '../utils/scoring';
+import { resolveServerBase } from '../services/ai';
 
 const baseInputClass =
   'block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-[--color-brand-600] focus:outline-none focus:ring-2 focus:ring-[--color-brand-600]';
@@ -71,7 +72,7 @@ const PublicFormRenderer: React.FC<Props> = ({ formData, formId, preview = false
   const submitBtnRef = useRef<HTMLButtonElement>(null);
 
   const actionBase = useMemo(() => {
-    return (import.meta as any)?.env?.VITE_API_BASE || 'http://localhost:3001';
+    return resolveServerBase();
   }, []);
 
   // Theme variables (from props, with sensible defaults)
