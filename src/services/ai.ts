@@ -16,7 +16,7 @@ export type GenerateFormParams = {
   /**
    * Base URL of the backend server (cloud AI proxy).
    * Resolved from VITE_API_BASE or explicit override.
-   * In development only, falls back to http://localhost:3001.
+   * No hardcoded localhost fallback in any build.
    */
   serverBase?: string;
 };
@@ -26,16 +26,17 @@ export type AIStatus =
   | { online: false; local: true; mode: 'local' }
   | { online: false; local: false; mode: 'offline-unsupported' };
 
-const DEFAULT_DEV_SERVER_BASE = 'http://localhost:3001';
-// Resolve server base URL from param override or Vite env; dev-only fallback to localhost
 const ENV_SERVER_BASE = (import.meta as any)?.env?.VITE_API_BASE as string | undefined;
+/**
+ * Resolve API base strictly from override or VITE_API_BASE.
+ * Intentionally NO localhost fallback to prevent cross-environment leaks.
+ * Local dev must set VITE_API_BASE in .env (already added).
+ */
 export function resolveServerBase(override?: string): string {
-  const isDev = !!(import.meta as any)?.env?.DEV;
-  const base = override || ENV_SERVER_BASE || (isDev ? DEFAULT_DEV_SERVER_BASE : undefined);
+  const base = override || ENV_SERVER_BASE;
   if (!base) {
     throw new Error('API base URL is not configured. Set VITE_API_BASE.');
   }
-  // normalize: remove trailing slash to avoid double slashes in fetch URLs
   return String(base).replace(/\/+$/, '');
 }
 
