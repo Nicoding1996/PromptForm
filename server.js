@@ -57,33 +57,42 @@ function condenseText(input, limit = DOC_TEXT_CHAR_LIMIT) {
 }
 
 const NODE_ENV = process.env.NODE_ENV || 'development';
-const DEFAULT_PROD_ORIGIN = 'https://instant-form.vercel.app';
-const DEFAULT_DEV_ORIGIN = 'http://localhost:5173';
-// Single source of truth for allowed frontend origin (env overrides defaults)
-const ALLOWED_ORIGIN =
-  process.env.FRONTEND_ORIGIN ||
-  (NODE_ENV === 'production' ? DEFAULT_PROD_ORIGIN : DEFAULT_DEV_ORIGIN);
 
-// In development, also accept 127.0.0.1:5173 for convenience
-const DEV_EXTRA_ORIGINS = new Set(['http://127.0.0.1:5173']);
+// Build explicit allowlist (comma-separated env supported)
+const DEFAULT_PROD_ORIGIN = 'https://instant-form.vercel.app';
+const DEFAULT_DEV_ORIGINS = ['http://localhost:5173', 'http://127.0.0.1:5173'];
+
+// FRONTEND_ORIGIN may be single or CSV. Trailing slashes removed.
+const parseOrigins = (val) =>
+  (String(val || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => s.replace(/\/+$/, '')));
+
+const prodOrigins = parseOrigins(process.env.FRONTEND_ORIGIN || DEFAULT_PROD_ORIGIN);
+const devOrigins = DEFAULT_DEV_ORIGINS.map((s) => s.replace(/\/+$/, ''));
+
+// Final allowlist by env
+const ALLOWLIST = new Set(NODE_ENV === 'production' ? prodOrigins : [...prodOrigins, ...devOrigins]);
+
 const isAllowedOrigin = (origin) => {
-  if (!origin) return true; // same-origin or non-browser clients
-  if (origin === ALLOWED_ORIGIN) return true;
-  if (NODE_ENV !== 'production' && DEV_EXTRA_ORIGINS.has(origin)) return true;
-  return false;
+  if (!origin) return true; // same-origin/non-browser
+  const norm = String(origin).replace(/\/+$/, '');
+  return ALLOWLIST.has(norm);
 };
 
-// Explicit CORS for configured frontend (prod) and localhost in dev
+// CORS middleware using explicit allowlist
 app.use(
- cors({
-   origin: (origin, cb) => {
-     if (isAllowedOrigin(origin)) return cb(null, true);
-     return cb(new Error('Not allowed by CORS'));
-   },
-   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-   allowedHeaders: ['Content-Type', 'Authorization'],
-   credentials: false,
- })
+  cors({
+    origin: (origin, cb) => {
+      if (isAllowedOrigin(origin)) return cb(null, true);
+      return cb(new Error('Not allowed by CORS'));
+    },
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: false,
+  })
 );
 
 // Preflight for all routes (express-safe, validates Origin)
